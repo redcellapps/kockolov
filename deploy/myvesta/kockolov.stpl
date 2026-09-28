@@ -1,0 +1,33 @@
+# Kockolov — myVesta/VestaCP nginx proxy template (HTTPS).
+# Sends the whole site to the Kockolov container on 127.0.0.1:3100
+# (APP_PORT in .env; change both together).
+server {
+    listen      %ip%:%proxy_ssl_port% ssl;
+    server_name %domain_idn% %alias_idn%;
+    ssl_certificate      %ssl_pem%;
+    ssl_certificate_key  %ssl_key%;
+    error_log  /var/log/%web_system%/domains/%domain%.error.log error;
+
+    client_max_body_size 2m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location /.well-known/acme-challenge/ {
+        proxy_pass https://%ip%:%web_ssl_port%;
+    }
+
+    location / {
+        # www.kockolov.rs → kockolov.rs (one address, one login cookie)
+        if ($host != %domain_idn%) {
+            return 301 https://%domain_idn%$request_uri;
+        }
+        proxy_pass         http://127.0.0.1:3100;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    include %home%/%user%/conf/web/snginx.%domain%.conf*;
+}

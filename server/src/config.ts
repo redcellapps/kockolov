@@ -43,6 +43,8 @@ const schema = z.object({
   SMTP_SECURE: bool(false),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
+  // Accept a self-signed certificate (the server's own Exim on VestaCP/myVesta)
+  SMTP_TLS_INSECURE: bool(false),
   MAIL_FROM: z.string().default('Kockolov <no-reply@kockolov.rs>'),
   ADMIN_ALERT_EMAIL: z.string().optional(),
 });

@@ -14,6 +14,7 @@ function getTransport(): Transporter {
       port: config.SMTP_PORT,
       secure: config.SMTP_SECURE,
       auth: config.SMTP_USER ? { user: config.SMTP_USER, pass: config.SMTP_PASS } : undefined,
+      tls: config.SMTP_TLS_INSECURE ? { rejectUnauthorized: false } : undefined,
     });
   }
   return transporter;

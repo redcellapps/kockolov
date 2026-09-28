@@ -1,4 +1,4 @@
-# Kockolov on the Shindiri server:
+# Kockolov with Docker Compose (see deploy/myvesta/README.md for the kockolov.rs server):
 #   cp .env.example .env   # fill in passwords + SMTP
 #   docker compose up -d --build
 #   docker compose exec app node server/dist/cli.js user:create --email you@example.com --name Milan --admin
@@ -30,8 +30,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Only reachable from the server itself; nginx in front serves the domain with HTTPS.
+    # 3100 because Apache already uses 8080 on VestaCP/myVesta servers.
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3100}:8080"
 
   # Scheduler: crawl at 05:30, morning e-mail at 07:00 (Europe/Belgrade)
   worker:

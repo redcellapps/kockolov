@@ -52,7 +52,13 @@ server/            Node 22 + TypeScript (Fastify, pg, cheerio)
 web/               React 19 + Vite + Tailwind 4, Serbian UI (src/i18n/sr.ts)
 ```
 
-## Deploy on the Shindiri server (Docker)
+## Deploy (Docker)
+
+Production runs at **https://kockolov.rs** on the Hetzner server with myVesta:
+step-by-step guide in [deploy/myvesta/README.md](deploy/myvesta/README.md) (DNS, Docker, nginx
+proxy template, Let's Encrypt, mail, backups, updates).
+
+Any other Docker host works the same way:
 
 ```bash
 git clone git@github.com:redcellapps/kockolov.git && cd kockolov
@@ -66,8 +72,8 @@ docker compose exec app node server/dist/cli.js user:create --email you@example.
 docker compose exec worker node server/dist/cli.js crawl
 ```
 
-The app listens on `APP_PORT` (default 8080). Put it behind the usual nginx/Traefik with HTTPS
-and keep `COOKIE_SECURE=true`.
+The app listens on `127.0.0.1:${APP_PORT}` (default 3100). Put nginx/Caddy/Traefik with HTTPS in
+front and keep `COOKIE_SECURE=true`.
 
 ### Private now, public later
 
