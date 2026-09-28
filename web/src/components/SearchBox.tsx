@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { t } from '../i18n';
 import { SearchIcon, XIcon } from './icons';
 import { cx } from './ui';
@@ -8,12 +8,13 @@ export function SearchBox({ size = 'md', autoFocus, className }: { size?: 'md' |
   const [params] = useSearchParams();
   const [value, setValue] = useState(params.get('q') ?? '');
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => setValue(params.get('q') ?? ''), [params]);
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const next = new URLSearchParams(window.location.pathname === '/pretraga' ? params : undefined);
+    const next = new URLSearchParams(location.pathname === '/pretraga' ? params : undefined);
     if (value.trim()) next.set('q', value.trim());
     else next.delete('q');
     next.delete('page');

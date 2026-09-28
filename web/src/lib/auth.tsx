@@ -23,6 +23,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     logout: async () => {
       await api('/api/auth/logout', { method: 'POST' });
+      if (import.meta.env.VITE_DEMO) {
+        // in-browser preview: no server behind it, so drop cached data and re-read the session
+        qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
+        await qc.refetchQueries({ queryKey: ['me'] });
+        window.location.hash = '#/prijava';
+        return;
+      }
       // full reload: nothing from the previous session stays in memory
       window.location.assign('/prijava');
     },

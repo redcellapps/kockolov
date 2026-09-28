@@ -109,6 +109,16 @@ npm run dev:server & npm run dev:web   # open http://localhost:5173
 
 Pictures are generated placeholders in the demo; the real crawl stores the shops' own images.
 
+### Clickable preview without a server
+
+The same demo data can be packed into one HTML file that answers the app's API calls in the
+browser (search, filters, set pages, watchlist, admin), handy for showing the site to someone:
+
+```bash
+DATABASE_URL=... npx tsx server/scripts/export-demo.ts   # after npm run demo; writes web/src/demo/snapshot.json
+npm run build:demo -w web                                # -> web/dist-demo/demo.html
+```
+
 ## Development
 
 ```bash

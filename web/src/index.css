@@ -31,10 +31,13 @@
   --series-7: #4a3aa7;
   --series-8: #e34948;
   --grid: #ece9e1;
+  --stud-shade: rgba(22, 21, 15, 0.07);
+  --stud-shine: rgba(255, 255, 255, 0.55);
 }
 
+/* Dark palette: follows the OS setting unless the page is pinned with data-theme */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #0f0f0e;
     --surface: #1c1b19;
@@ -63,7 +66,42 @@
     --series-7: #9085e9;
     --series-8: #e66767;
     --grid: #2a2926;
+    --stud-shade: rgba(0, 0, 0, 0.22);
+    --stud-shine: rgba(255, 255, 255, 0.18);
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f0f0e;
+  --surface: #1c1b19;
+  --surface-2: #242320;
+  --ink: #f5f3ec;
+  --ink-2: #c4c0b5;
+  --ink-3: #8f8b81;
+  --line: #2f2d29;
+  --brand: #ffcf00;
+  --brand-2: #ffdb4d;
+  --brand-ink: #16150f;
+  --deal: #ff5f59;
+  --deal-soft: #3a1917;
+  --save: #3cc570;
+  --save-soft: #16301f;
+  --accent: #7aa8ff;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 20px 44px -14px rgba(0, 0, 0, 0.8);
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --grid: #2a2926;
+  --stud-shade: rgba(0, 0, 0, 0.22);
+  --stud-shine: rgba(255, 255, 255, 0.18);
 }
 
 @theme inline {
@@ -107,15 +145,9 @@ body {
 
 /* Signature: faint brick studs behind the hero */
 .studs {
-  background-image: radial-gradient(circle at 12px 12px, rgba(22, 21, 15, 0.07) 5px, transparent 5.5px),
-    radial-gradient(circle at 12px 12px, rgba(255, 255, 255, 0.55) 3px, transparent 3.5px);
+  background-image: radial-gradient(circle at 12px 12px, var(--stud-shade) 5px, transparent 5.5px),
+    radial-gradient(circle at 12px 12px, var(--stud-shine) 3px, transparent 3.5px);
   background-size: 24px 24px;
-}
-@media (prefers-color-scheme: dark) {
-  .studs {
-    background-image: radial-gradient(circle at 12px 12px, rgba(0, 0, 0, 0.22) 5px, transparent 5.5px),
-      radial-gradient(circle at 12px 12px, rgba(255, 255, 255, 0.18) 3px, transparent 3.5px);
-  }
 }
 
 /* Product images are shop photos on white; keep them on white in dark mode too */
@@ -142,4 +174,37 @@ body {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Preview build only (src/demo/entry.tsx) */
+.demo-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+.demo-note strong {
+  padding: 0 0.45rem;
+  border-radius: 0.3rem;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.demo-note code {
+  font-family: inherit;
+  font-weight: 700;
+}
+.demo-login {
+  opacity: 0.8;
 }
