@@ -1,0 +1,609 @@
+{
+ "products": [
+  {
+   "id": 8087586078798,
+   "title": "‍Jezivo ukleto drvo",
+   "handle": "lego-creator-40900-sca_clone_freegift",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "Bravostore Central Europe Kft.",
+   "product_type": "LEGO®",
+   "tags": [
+    "20260921",
+    "bogos-gift",
+    "GWP",
+    "LEGO® Store Beograd",
+    "new"
+   ],
+   "variants": [
+    {
+     "id": 80875860787980,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "40900",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "1.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8087586078798,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 808758607879800,
+     "position": 1,
+     "product_id": 8087586078798,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-creator-40900-sca_clone_freegift-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8041500966990,
+   "title": "Egzekutor superuništitelj zvezda",
+   "handle": "lego-star-wars-75457",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "LEGO® Star Wars™",
+   "tags": [
+    "20261001",
+    "coming soon",
+    "GWP",
+    "LEGO® Star Wars™",
+    "new",
+    "rocket-notify-me"
+   ],
+   "variants": [
+    {
+     "id": 80415009669900,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "75457",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": false,
+     "price": "0.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8041500966990,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804150096699000,
+     "position": 1,
+     "product_id": 8041500966990,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-star-wars-75457-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000001,
+   "title": "Ministarstvo magije – kolekcionarsko izdanje",
+   "handle": "lego-harry-potter-76476",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "Bravostore Central Europe Kft.",
+   "product_type": "LEGO® Harry Potter™",
+   "tags": [
+    "20260829",
+    "LEGO® Store Beograd",
+    "new"
+   ],
+   "variants": [
+    {
+     "id": 80400000000010,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "76476",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "51999.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8040000000001,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000100,
+     "position": 1,
+     "product_id": 8040000000001,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-harry-potter-76476-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000002,
+   "title": "Ajronmen MK4 bista",
+   "handle": "lego-marvel-76327",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "LEGO® Super Heroes",
+   "tags": [
+    "LEGO® Store Beograd"
+   ],
+   "variants": [
+    {
+     "id": 80400000000020,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "76327",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "7799.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8040000000002,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000200,
+     "position": 1,
+     "product_id": 8040000000002,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-marvel-76327-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000003,
+   "title": "Betmobil iz filma Povratak Betmena",
+   "handle": "lego-super-heroes-76355",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "LEGO® Super Heroes",
+   "tags": [
+    "LEGO® Store Beograd",
+    "new"
+   ],
+   "variants": [
+    {
+     "id": 80400000000030,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "76355",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "24999.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8040000000003,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000300,
+     "position": 1,
+     "product_id": 8040000000003,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-super-heroes-76355-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000004,
+   "title": "Douglas™ DC-3™ PAN AM® putnički avion",
+   "handle": "lego-icons-11378",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "LEGO® Icons",
+   "tags": [],
+   "variants": [
+    {
+     "id": 80400000000040,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "11378",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "27999.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8040000000004,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000400,
+     "position": 1,
+     "product_id": 8040000000004,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-icons-11378-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000005,
+   "title": "Gradonačelnikova rezidencija",
+   "handle": "lego-icons-11383",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "LEGO® Icons",
+   "tags": [],
+   "variants": [
+    {
+     "id": 80400000000050,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "11383",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": false,
+     "price": "13999.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8040000000005,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000500,
+     "position": 1,
+     "product_id": 8040000000005,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-icons-11383-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000006,
+   "title": "LEGO peškir",
+   "handle": "lego-towel",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "LEGO®",
+   "tags": [],
+   "variants": [
+    {
+     "id": 80400000000060,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "LG3TEMTW002",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "2499.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8040000000006,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000600,
+     "position": 1,
+     "product_id": 8040000000006,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-towel-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000007,
+   "title": "Buket cveća",
+   "handle": "lego-botanicals-10280",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "Botanical Collection",
+   "tags": [],
+   "variants": [
+    {
+     "id": 80400000000070,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "10280",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "8999.00",
+     "grams": 500,
+     "compare_at_price": "9999.00",
+     "position": 1,
+     "product_id": 8040000000007,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000700,
+     "position": 1,
+     "product_id": 8040000000007,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-botanicals-10280-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000008,
+   "title": "Mini orhideja",
+   "handle": "lego-botanicals-10343",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "LEGO® Botanical Collection",
+   "tags": [],
+   "variants": [
+    {
+     "id": 80400000000080,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "10343",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "3999.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8040000000008,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000800,
+     "position": 1,
+     "product_id": 8040000000008,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-botanicals-10343-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 8040000000009,
+   "title": "Most Kloda Monea",
+   "handle": "lego-art-31999",
+   "body_html": "<p>...</p>",
+   "published_at": "2026-08-29T13:32:36+02:00",
+   "created_at": "2026-08-29T13:32:34+02:00",
+   "updated_at": "2026-09-27T23:51:20+02:00",
+   "vendor": "LEGO® Store Srbija",
+   "product_type": "LEGO® Art",
+   "tags": [],
+   "variants": [
+    {
+     "id": 80400000000090,
+     "title": "Default Title",
+     "option1": "Default Title",
+     "option2": null,
+     "option3": null,
+     "sku": "31999",
+     "requires_shipping": true,
+     "taxable": true,
+     "featured_image": null,
+     "available": true,
+     "price": "16999.00",
+     "grams": 500,
+     "compare_at_price": null,
+     "position": 1,
+     "product_id": 8040000000009,
+     "created_at": "2026-08-29T13:32:35+02:00",
+     "updated_at": "2026-09-27T23:51:20+02:00"
+    }
+   ],
+   "images": [
+    {
+     "id": 804000000000900,
+     "position": 1,
+     "product_id": 8040000000009,
+     "variant_ids": [],
+     "src": "https://cdn.shopify.com/s/files/1/0289/7530/0686/files/lego-art-31999-01.jpg?v=1788003156",
+     "width": 1200,
+     "height": 1200
+    }
+   ],
+   "options": [
+    {
+     "name": "Title",
+     "position": 1,
+     "values": [
+      "Default Title"
+     ]
+    }
+   ]
+  }
+ ]
+}

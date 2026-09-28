@@ -1,0 +1,22 @@
+{
+  "name": "kockolov",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Kockolov — poređenje cena LEGO setova u srpskim prodavnicama",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w server && npm run build -w web",
+    "test": "npm test -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "crawl": "npm run cli -w server -- crawl",
+    "cli": "npm run cli -w server --"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
