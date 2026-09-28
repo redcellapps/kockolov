@@ -1,4 +1,6 @@
-# Deploy on kockolov.rs (Hetzner server, fresh Debian 13)
+# Deploy on a fresh server (Debian 13, Docker + Caddy)
+
+Alternative to [myvesta/README.md](myvesta/README.md) for a server that runs nothing else.
 
 The server behind 159.69.146.251 is rebuilt with Debian 13 and only runs Kockolov:
 
@@ -70,6 +72,7 @@ git clone github-kockolov:redcellapps/kockolov.git /opt/kockolov
 cd /opt/kockolov
 cp .env.example .env
 sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
+sed -i 's/^#DOMAIN=/DOMAIN=/; s/^#COMPOSE_FILE=/COMPOSE_FILE=/' .env    # turn Caddy on
 nano .env                        # ADMIN_ALERT_EMAIL now, SMTP_* in step 7; the rest is preset for kockolov.rs
 docker compose up -d --build     # first build takes 5-10 minutes on this server
 docker compose ps                # db, app, worker, caddy: all "running"/"healthy"

@@ -10,6 +10,13 @@ browser ─https─> nginx (myVesta, template "kockolov") ─> 127.0.0.1:3100 �
                                                                           └─ Postgres (Docker volume)
 ```
 
+**Needs Debian 12** (Docker has no packages for Debian 9). The server is on Debian 9 as of 28 Sep 2026:
+upgrade 9 → 10 → 11 → 12 first with myVesta's guides
+([9→10](https://forum.myvestacp.com/viewtopic.php?f=28&t=815),
+[10→11](https://forum.myvestacp.com/viewtopic.php?f=28&t=873),
+[11→12](https://forum.myvestacp.com/viewtopic.php?f=28&t=877)), after `v-backup-users` and a Hetzner
+snapshot. Not Debian 13: myVesta doesn't support it yet.
+
 Already done in myVesta (user `kockalov`): web domain `kockolov.rs` + `www`, DNS zone, mail domain
 with DKIM.
 
@@ -63,7 +70,7 @@ git clone github-kockolov:redcellapps/kockolov.git /opt/kockolov
 cd /opt/kockolov
 cp .env.example .env
 sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
-nano .env                              # ADMIN_ALERT_EMAIL, SMTP_* (step 7); the rest is preset
+nano .env                              # ADMIN_ALERT_EMAIL, SMTP_* (step 7); keep DOMAIN/COMPOSE_FILE commented
 ss -tlnp | grep -q ':3100 ' && echo "3100 is taken: change APP_PORT and kockolov.stpl" || echo "3100 free"
 docker compose up -d --build           # first build takes a few minutes
 curl -s http://127.0.0.1:3100/api/health
