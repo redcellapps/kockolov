@@ -1,4 +1,13 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+
+// Local development: read the repository's .env (e.g. DATABASE_URL). Real environment variables win;
+// in production Docker passes the variables itself, and tests set their own.
+const localEnv = fileURLToPath(new URL('../../.env', import.meta.url));
+if (process.env.NODE_ENV !== 'production' && !process.env.VITEST && existsSync(localEnv)) {
+  process.loadEnvFile(localEnv);
+}
 
 const bool = (def: boolean) =>
   z
