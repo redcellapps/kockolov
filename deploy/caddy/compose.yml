@@ -1,0 +1,23 @@
+# Adds Caddy (HTTPS on ports 80/443) in front of the app. Enabled on the server through .env:
+#   COMPOSE_FILE=docker-compose.yml:deploy/caddy/compose.yml
+# after which plain `docker compose up -d --build` starts db + app + worker + caddy.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-kockolov.rs}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

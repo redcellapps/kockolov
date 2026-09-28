@@ -1,4 +1,4 @@
-# Kockolov with Docker Compose (see deploy/myvesta/README.md for the kockolov.rs server):
+# Kockolov with Docker Compose (deploy/README.md: the kockolov.rs server, with Caddy for HTTPS):
 #   cp .env.example .env   # fill in passwords + SMTP
 #   docker compose up -d --build
 #   docker compose exec app node server/dist/cli.js user:create --email you@example.com --name Milan --admin
@@ -30,8 +30,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Only reachable from the server itself; nginx in front serves the domain with HTTPS.
-    # 3100 because Apache already uses 8080 on VestaCP/myVesta servers.
+    # Only reachable from the server itself; Caddy (deploy/caddy) or nginx in front serves HTTPS.
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3100}:8080"
 

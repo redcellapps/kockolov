@@ -54,9 +54,10 @@ web/               React 19 + Vite + Tailwind 4, Serbian UI (src/i18n/sr.ts)
 
 ## Deploy (Docker)
 
-Production runs at **https://kockolov.rs** on the Hetzner server with myVesta:
-step-by-step guide in [deploy/myvesta/README.md](deploy/myvesta/README.md) (DNS, Docker, nginx
-proxy template, Let's Encrypt, mail, backups, updates).
+Production runs at **https://kockolov.rs** on a Hetzner server with Debian 13, Docker and Caddy
+(automatic HTTPS): step-by-step guide in [deploy/README.md](deploy/README.md) (rebuild, DNS, Docker,
+first start, mail, backups, updates). For a server that runs myVesta instead, see
+[deploy/myvesta/README.md](deploy/myvesta/README.md).
 
 Any other Docker host works the same way:
 
@@ -72,8 +73,8 @@ docker compose exec app node server/dist/cli.js user:create --email you@example.
 docker compose exec worker node server/dist/cli.js crawl
 ```
 
-The app listens on `127.0.0.1:${APP_PORT}` (default 3100). Put nginx/Caddy/Traefik with HTTPS in
-front and keep `COOKIE_SECURE=true`.
+The app listens on `127.0.0.1:${APP_PORT}` (default 3100). With `COMPOSE_FILE` from `.env.example`,
+Caddy is started too and serves `DOMAIN` over HTTPS; keep `COOKIE_SECURE=true`.
 
 ### Private now, public later
 
