@@ -10,12 +10,19 @@ browser ─https─> nginx (myVesta, template "kockolov") ─> 127.0.0.1:3100 �
                                                                           └─ Postgres (Docker volume)
 ```
 
-**Needs Debian 12** (Docker has no packages for Debian 9). The server is on Debian 9 as of 28 Sep 2026:
-upgrade 9 → 10 → 11 → 12 first with myVesta's guides
-([9→10](https://forum.myvestacp.com/viewtopic.php?f=28&t=815),
+**The server runs Debian 9** with Docker 19.03.15 + Compose v5, installed by myVesta's
+`v-install-docker-service` (Debian 9 fix: myvesta/vesta@f9079a3). Docker 19.03 can't build the app's
+Alpine-based image and its seccomp profile is outdated, so on this server:
+
+- GitHub Actions builds the image on every push to `main` and publishes it as
+  `ghcr.io/redcellapps/kockolov:latest`; the server only pulls it;
+- `deploy/myvesta/compose.docker19.yml` switches app/worker to that image and turns seccomp off.
+
+Later, after upgrading to Debian 12 (myVesta guides
+[9→10](https://forum.myvestacp.com/viewtopic.php?f=28&t=815),
 [10→11](https://forum.myvestacp.com/viewtopic.php?f=28&t=873),
-[11→12](https://forum.myvestacp.com/viewtopic.php?f=28&t=877)), after `v-backup-users` and a Hetzner
-snapshot. Not Debian 13: myVesta doesn't support it yet.
+[11→12](https://forum.myvestacp.com/viewtopic.php?f=28&t=877); not 13, myVesta doesn't support it yet)
+with current Docker, drop the override and build on the server again.
 
 Already done in myVesta (user `kockalov`): web domain `kockolov.rs` + `www`, DNS zone, mail domain
 with DKIM.
@@ -36,11 +43,20 @@ The DNS zone myVesta created then goes live (usually within an hour or two for .
 dig +short kockolov.rs @8.8.8.8        # → 159.69.146.251
 ```
 
-## 2. Docker (once, as root)
+## 2. Docker, swap and registry login (once, as root)
 
 ```bash
-docker --version && docker compose version || curl -fsSL https://get.docker.com | sh
-free -h && df -h /                     # the image build needs ~1.5 GB RAM (add swap if less)
+docker --version && docker compose version     # 19.03.15 and v5.x on this server
+# 2 GB swap: the server has ~850 MB free RAM and no swap
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
+
+The image is private. Log in once with a GitHub token that can read packages (on GitHub: Settings →
+Developer settings → Personal access tokens → Tokens (classic), scope `read:packages` only):
+
+```bash
+docker login ghcr.io -u <github-username>      # paste the token as the password
 ```
 
 ## 3. Get the code (private repo → read-only deploy key)
@@ -70,9 +86,12 @@ git clone github-kockolov:redcellapps/kockolov.git /opt/kockolov
 cd /opt/kockolov
 cp .env.example .env
 sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
-nano .env                              # ADMIN_ALERT_EMAIL, SMTP_* (step 7); keep DOMAIN/COMPOSE_FILE commented
+echo 'COMPOSE_FILE=docker-compose.yml:deploy/myvesta/compose.docker19.yml' >> .env   # Docker 19.03 (Debian 9)
+nano .env                              # ADMIN_ALERT_EMAIL, SMTP_* (step 7); keep DOMAIN commented
 ss -tlnp | grep -q ':3100 ' && echo "3100 is taken: change APP_PORT and kockolov.stpl" || echo "3100 free"
-docker compose up -d --build           # first build takes a few minutes
+docker compose pull                    # postgres + the ready-made app image
+docker compose up -d
+docker compose ps                      # db healthy, app and worker running
 curl -s http://127.0.0.1:3100/api/health
 ```
 
@@ -139,8 +158,10 @@ docker compose exec app node server/dist/cli.js digest --email you@example.com
 ## Updating
 
 ```bash
-cd /opt/kockolov && git pull && docker compose up -d --build
+cd /opt/kockolov && git pull && docker compose pull && docker compose up -d
 ```
+
+(on Debian 12 with current Docker and without the override: `git pull && docker compose up -d --build`)
 
 ## Backups
 
@@ -160,5 +181,7 @@ EOF
   (`docker compose ps`, `curl -s http://127.0.0.1:3100/api/health`).
 - **Crawler suddenly can't reach any shop:** a myVesta firewall change can wipe Docker's network
   rules. `systemctl restart docker` puts them back (containers restart by themselves).
-- **Build killed / out of memory:** add swap:
-  `fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`.
+- **"Operation not permitted" inside a container:** the `COMPOSE_FILE` line for Docker 19.03 is missing
+  from `.env` (`docker compose config | grep seccomp` should show `seccomp=unconfined`).
+- **`docker compose pull` says denied / not found:** `docker login ghcr.io` is missing, the token lacks
+  `read:packages`, or the GitHub Actions run that publishes the image hasn't finished (Actions tab).

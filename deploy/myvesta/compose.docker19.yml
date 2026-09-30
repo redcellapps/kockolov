@@ -1,0 +1,19 @@
+# Debian 9 with Docker 19.03 (installed by myVesta's v-install-docker-service).
+# - Docker 19.03 can't build the Alpine-based image (known faccessat2/seccomp problem: "Operation not
+#   permitted"), so app and worker run the image GitHub Actions builds on every push to main.
+# - The same outdated seccomp profile blocks newer system calls inside the containers, so it is off here.
+# Enabled through .env:  COMPOSE_FILE=docker-compose.yml:deploy/myvesta/compose.docker19.yml
+# Remove that line (and use docker compose up -d --build) once the server runs Debian 12 with current Docker.
+services:
+  db:
+    security_opt: ["seccomp=unconfined"]
+  app:
+    image: ghcr.io/redcellapps/kockolov:latest
+    build: !reset null
+    pull_policy: always
+    security_opt: ["seccomp=unconfined"]
+  worker:
+    image: ghcr.io/redcellapps/kockolov:latest
+    build: !reset null
+    pull_policy: always
+    security_opt: ["seccomp=unconfined"]

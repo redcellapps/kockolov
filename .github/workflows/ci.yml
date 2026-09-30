@@ -30,3 +30,34 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # Ready-made image for servers that can't build it themselves (Docker 19.03 on Debian 9):
+  # ghcr.io/redcellapps/kockolov:latest, see deploy/myvesta/compose.docker19.yml
+  image:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # plain Docker v2 manifest without attestations, so Docker 19.03 can pull it
+          provenance: false
+          sbom: false
+          outputs: type=registry,oci-mediatypes=false
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
