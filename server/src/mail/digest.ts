@@ -3,6 +3,7 @@ import { one, query } from '../db.js';
 import { todayLocal } from '../lib/time.js';
 import { escapeHtml, reasonText, rsd, shopLabel, type Reason } from './format.js';
 import { mailConfigured, sendMail } from './mailer.js';
+import { eurRate, moneyFormatter } from '../fx.js';
 
 interface DealRow {
   rank: number;
@@ -61,7 +62,15 @@ export function unsubscribeUrl(token: string): string {
   return `${config.APP_URL.replace(/\/$/, '')}/odjava/${token}`;
 }
 
-export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadDigestData>>, day: string, unsubscribe?: string) {
+export function renderDigest(
+  name: string,
+  data: Awaited<ReturnType<typeof loadDigestData>>,
+  day: string,
+  unsubscribe?: string,
+  /** prices in the reader's currency; the note explains a converted (EUR) price */
+  opts: { money?: (n: number | null | undefined) => string; fxNote?: string } = {},
+) {
+  const money = opts.money ?? rsd;
   const url = config.APP_URL.replace(/\/$/, '');
   const off = unsubscribe ?? `${url}/nalog`;
   const dayLabel = new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
@@ -71,7 +80,7 @@ export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadD
   const hello = name ? `Dobro jutro, ${escapeHtml(name)}!` : 'Dobro jutro!';
   const dealRows = data.deals
     .map((d) => {
-      const reasons = d.reasons.map(reasonText).filter(Boolean).slice(0, 2);
+      const reasons = d.reasons.map((r) => reasonText(r, money)).filter(Boolean).slice(0, 2);
       const img = d.image_url
         ? `<img src="${escapeHtml(abs(d.image_url))}" width="88" height="88" alt="" style="display:block;width:88px;height:88px;object-fit:contain;border-radius:10px;background:#fff">`
         : '';
@@ -80,8 +89,8 @@ export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadD
         <td style="padding:14px 0 14px 12px;border-bottom:1px solid #eee;vertical-align:top">
           <div style="font-size:12px;color:#6b6b6b">${escapeHtml(d.set_num)}${d.theme_name ? ` · ${escapeHtml(d.theme_name)}` : ''}</div>
           <a href="${url}/set/${encodeURIComponent(d.set_num)}" style="font-size:16px;font-weight:700;color:#1a1a1a;text-decoration:none">${escapeHtml(d.name)}</a>
-          <div style="margin-top:6px;font-size:18px;font-weight:800;color:#d01012">${rsd(d.best_price_rsd)}
-            ${d.reference_price_rsd && d.reference_price_rsd > d.best_price_rsd ? `<span style="font-size:13px;font-weight:400;color:#8a8a8a;text-decoration:line-through;margin-left:6px">${rsd(d.reference_price_rsd)}</span>` : ''}
+          <div style="margin-top:6px;font-size:18px;font-weight:800;color:#d01012">${money(d.best_price_rsd)}
+            ${d.reference_price_rsd && d.reference_price_rsd > d.best_price_rsd ? `<span style="font-size:13px;font-weight:400;color:#8a8a8a;text-decoration:line-through;margin-left:6px">${money(d.reference_price_rsd)}</span>` : ''}
           </div>
           <div style="font-size:13px;color:#444">u prodavnici ${escapeHtml(shopLabel(d.best_shop ?? '', d.best_seller))}</div>
           ${reasons.map((r) => `<div style="font-size:12px;color:#1b7d3a;margin-top:3px">✓ ${escapeHtml(r)}</div>`).join('')}
@@ -96,11 +105,11 @@ export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadD
         delta === null || delta === 0
           ? '<span style="color:#8a8a8a">bez promene</span>'
           : delta < 0
-            ? `<span style="color:#1b7d3a;font-weight:700">▼ ${rsd(-delta)}</span>`
-            : `<span style="color:#b3261e">▲ ${rsd(delta)}</span>`;
+            ? `<span style="color:#1b7d3a;font-weight:700">▼ ${money(-delta)}</span>`
+            : `<span style="color:#b3261e">▲ ${money(delta)}</span>`;
       return `<tr><td style="padding:8px 0;border-bottom:1px solid #eee">
           <a href="${url}/set/${encodeURIComponent(w.set_num)}" style="color:#1a1a1a;text-decoration:none"><b>${escapeHtml(w.set_num)}</b> ${escapeHtml(w.name)}</a></td>
-        <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${w.best_price ? rsd(w.best_price) : 'nema na stanju'}<br><span style="font-size:12px">${trend}</span></td></tr>`;
+        <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${w.best_price ? money(w.best_price) : 'nema na stanju'}<br><span style="font-size:12px">${trend}</span></td></tr>`;
     })
     .join('');
 
@@ -119,7 +128,7 @@ export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadD
     ${watchRows ? `<tr><td style="padding:24px 24px 4px"><div style="font-size:16px;font-weight:700">Setovi koje pratiš</div></td></tr>
     <tr><td style="padding:0 24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px">${watchRows}</table></td></tr>` : ''}
     <tr><td style="padding:24px"><a href="${url}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:10px">Otvori Kockolov</a></td></tr>
-    <tr><td style="padding:0 24px 24px;font-size:12px;color:#8a8a8a">Ne želiš više ove poruke? <a href="${escapeHtml(off)}" style="color:#6b6b6b">Odjavi se jednim klikom</a>.<br>LEGO® je zaštićeni znak LEGO grupe; Kockolov nije povezan sa LEGO grupom.</td></tr>
+    <tr><td style="padding:0 24px 24px;font-size:12px;color:#8a8a8a">${opts.fxNote ? `${escapeHtml(opts.fxNote)}<br>` : ''}Ne želiš više ove poruke? <a href="${escapeHtml(off)}" style="color:#6b6b6b">Odjavi se jednim klikom</a>.<br>LEGO® je zaštićeni znak LEGO grupe; Kockolov nije povezan sa LEGO grupom.</td></tr>
   </table></td></tr></table></body></html>`;
 
   const text = [
@@ -127,23 +136,34 @@ export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadD
     '',
     ...data.deals.map(
       (d) =>
-        `${d.rank}. ${d.set_num} ${d.name} — ${rsd(d.best_price_rsd)} (${shopLabel(d.best_shop ?? '', d.best_seller)})\n   ${d.reasons
-          .map(reasonText)
+        `${d.rank}. ${d.set_num} ${d.name} — ${money(d.best_price_rsd)} (${shopLabel(d.best_shop ?? '', d.best_seller)})\n   ${d.reasons
+          .map((r) => reasonText(r, money))
           .filter(Boolean)
           .join('; ')}\n   ${url}/set/${d.set_num}`,
     ),
     ...(data.watched.length
-      ? ['', 'Setovi koje pratiš:', ...data.watched.map((w) => `- ${w.set_num} ${w.name}: ${w.best_price ? rsd(w.best_price) : 'nema na stanju'}`)]
+      ? ['', 'Setovi koje pratiš:', ...data.watched.map((w) => `- ${w.set_num} ${w.name}: ${w.best_price ? money(w.best_price) : 'nema na stanju'}`)]
       : []),
     '',
+    ...(opts.fxNote ? [opts.fxNote] : []),
     `Odjava sa jutarnjeg pregleda: ${off}`,
   ].join('\n');
 
   const top = data.deals[0];
   const subject = top
-    ? `LEGO ponude dana: ${top.name} za ${rsd(top.best_price_rsd)}${data.deals.length > 1 ? ` i još ${data.deals.length - 1}` : ''}`
+    ? `LEGO ponude dana: ${top.name} za ${money(top.best_price_rsd)}${data.deals.length > 1 ? ` i još ${data.deals.length - 1}` : ''}`
     : 'Kockolov: jutarnji pregled';
   return { subject, html, text };
+}
+
+/** Formatter and note for someone who reads prices in euros */
+export async function currencyOpts(currency: 'RSD' | 'EUR') {
+  if (currency !== 'EUR') return {};
+  const fx = await eurRate();
+  return {
+    money: moneyFormatter('EUR', fx.rate),
+    fxNote: `Cene u evrima su preračunate po srednjem kursu NBS (1 € = ${new Intl.NumberFormat('sr-RS', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(fx.rate)} RSD); prodavnice naplaćuju u dinarima.`,
+  };
 }
 
 /** Send the morning digest to every user who has it enabled (once per day). */
@@ -156,8 +176,8 @@ export async function sendDigests(opts: { dryRun?: boolean; onlyEmail?: string; 
     log('digest: SMTP nije podešen (SMTP_HOST) — preskačem slanje');
     return { sent: 0, skipped: 0, failed: 0 };
   }
-  const users = await query<{ id: number; email: string; name: string; unsubscribe_token: string }>(
-    `SELECT u.id, u.email, u.name, u.unsubscribe_token FROM users u
+  const users = await query<{ id: number; email: string; name: string; unsubscribe_token: string; currency: 'RSD' | 'EUR' }>(
+    `SELECT u.id, u.email, u.name, u.unsubscribe_token, u.currency FROM users u
       WHERE u.digest_enabled ${opts.onlyEmail ? 'AND u.email = $2' : 'AND u.accepted_at IS NOT NULL'}
         AND NOT EXISTS (SELECT 1 FROM digest_log l WHERE l.user_id = u.id AND l.day = $1 AND l.status = 'sent')`,
     opts.onlyEmail ? [day, opts.onlyEmail.toLowerCase()] : [day],
@@ -167,7 +187,7 @@ export async function sendDigests(opts: { dryRun?: boolean; onlyEmail?: string; 
   for (const u of users) {
     const data = await loadDigestData(u.id);
     const off = unsubscribeUrl(u.unsubscribe_token);
-    const mail = renderDigest(u.name, data, day, off);
+    const mail = renderDigest(u.name, data, day, off, await currencyOpts(u.currency));
     if (opts.dryRun) {
       log(`digest (dry-run) → ${u.email}: ${mail.subject}`);
       continue;

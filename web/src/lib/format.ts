@@ -8,6 +8,37 @@ export function rsd(n: number | null | undefined): string {
   return `${nf.format(n)} RSD`;
 }
 
+// ---- display currency: prices are stored in RSD; signed-in users can read them in EUR ----
+export type Currency = 'RSD' | 'EUR';
+let display: { currency: Currency; rate: number } = { currency: 'RSD', rate: 1 };
+const eurFmt = new Intl.NumberFormat('sr-RS', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const eurNum = new Intl.NumberFormat('sr-RS', { maximumFractionDigits: 0 });
+
+/** Set by the auth provider from the user's setting and today's NBS rate (RSD for 1 EUR). */
+export function setDisplayCurrency(currency: Currency, rate: number) {
+  display = currency === 'EUR' && rate > 0 ? { currency, rate } : { currency: 'RSD', rate: 1 };
+}
+export const displayCurrency = (): Currency => display.currency;
+
+/** An RSD amount in the reader's currency: "7.319 RSD" or "62,45 €". */
+export function money(n: number | null | undefined): string {
+  if (n === null || n === undefined) return '—';
+  return display.currency === 'EUR' ? eurFmt.format(n / display.rate) : rsd(n);
+}
+
+/** Bare number in the reader's currency (chart axes): "7.319" or "62". */
+export function moneyNum(n: number | null | undefined): string {
+  if (n === null || n === undefined) return '—';
+  return display.currency === 'EUR' ? eurNum.format(n / display.rate) : nf.format(n);
+}
+
+/** "117,4991" → "117,50" */
+export const rateText = (rate: number | undefined) => (rate ? new Intl.NumberFormat('sr-RS', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(rate) : '—');
+
+/** Between RSD (what the API speaks) and the reader's currency, for price filters. */
+export const toDisplay = (rsdAmount: number) => (display.currency === 'EUR' ? rsdAmount / display.rate : rsdAmount);
+export const fromDisplay = (amount: number) => Math.round(display.currency === 'EUR' ? amount * display.rate : amount);
+
 export function num(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—';
   return nf.format(n);
@@ -77,7 +108,7 @@ export function reasonText(r: Reason): string {
     case 'vs_rrp':
       return t('reason.vs_rrp', { pct: r.pct });
     case 'vs_next':
-      return t('reason.vs_next', { amount: rsd(r.amount) });
+      return t('reason.vs_next', { amount: money(r.amount) });
     case 'shop_sale':
       return t('reason.shop_sale', { pct: r.pct });
     case 'new_low':

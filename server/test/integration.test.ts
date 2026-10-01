@@ -435,6 +435,49 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     expect([1, 2, 5, 11, 12, 21, 22, 25, 112].map((n) => plural(n, 'a', 'b', 'c')).join('')).toBe('abcccabcc');
   });
 
+  it('lets a user read prices in euros at the NBS rate, on the site and in the morning e-mail', async () => {
+    const { refreshEurRate, eurRate } = await import('../src/fx.js');
+    const { sendDigests } = await import('../src/mail/digest.js');
+    const answer = (o: object) => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      // the daily rate is stored; nonsense or an unreachable source keeps the last good one
+      fetchSpy.mockResolvedValueOnce(answer({ code: 'EUR', date: '2026-10-01', exchange_middle: 117.4991 }));
+      expect(await refreshEurRate(() => {})).toEqual({ rate: 117.4991, day: '2026-10-01' });
+      fetchSpy.mockResolvedValueOnce(answer({ code: 'EUR', date: '2026-10-02', exchange_middle: 1.17 }));
+      expect(await refreshEurRate(() => {})).toBeNull();
+      fetchSpy.mockRejectedValueOnce(new Error('offline'));
+      expect(await refreshEurRate(() => {})).toBeNull();
+      expect(await eurRate()).toEqual({ rate: 117.4991, day: '2026-10-01' });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+
+    const me = async () => (await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })).json();
+    expect((await me()).fx).toEqual({ eur: { rate: 117.4991, day: '2026-10-01' } });
+    expect((await me()).user.currency).toBe('RSD');
+    const bad = await app.inject({ method: 'PATCH', url: '/api/me', headers: { cookie }, payload: { currency: 'USD' } });
+    expect(bad.statusCode).toBe(400);
+    expect((await app.inject({ method: 'PATCH', url: '/api/me', headers: { cookie }, payload: { currency: 'EUR' } })).statusCode).toBe(200);
+    expect((await me()).user.currency).toBe('EUR');
+
+    // the morning e-mail follows the setting: 7.319 RSD → 62,29 €, with a note about the rate
+    mail.on = true;
+    mail.sent.length = 0;
+    try {
+      await query("DELETE FROM digest_log WHERE user_id = (SELECT id FROM users WHERE email = 'milan@example.com')");
+      await sendDigests({ onlyEmail: 'milan@example.com', log: () => {} });
+      expect(mail.sent).toHaveLength(1);
+      const text = mail.sent[0].text.replace(/\u00a0/g, ' ');
+      expect(text).toContain('62,29 €');
+      expect(text).not.toContain('7.319 RSD');
+      expect(text).toContain('srednjem kursu NBS (1 € = 117,50 RSD)');
+    } finally {
+      mail.on = false;
+      await app.inject({ method: 'PATCH', url: '/api/me', headers: { cookie }, payload: { currency: 'RSD' } });
+    }
+  });
+
   it('records price changes and marks vanished listings as unavailable on the next run', async () => {
     const page1 = readFileSync(path.join(__dirname, 'fixtures/kockarium/page1.html'), 'utf8').replace('13.190,00', '12.490,00');
     await mock.close();

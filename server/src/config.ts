@@ -41,6 +41,10 @@ const schema = z.object({
   KOCKARIUM_BASE_URL: z.string().default('https://www.kockarium.rs'),
   ANANAS_BASE_URL: z.string().default('https://ananas.rs'),
 
+  // Euro display: NBS middle rate, refreshed daily; the fallback is used until the first fetch works
+  FX_URL: z.string().default('https://kurs.resenje.org/api/v1/currencies/eur/rates/today'),
+  EUR_RSD_FALLBACK: z.coerce.number().default(117.2),
+
   // Schedules (Europe/Belgrade)
   TZ_NAME: z.string().default('Europe/Belgrade'),
   CRAWL_CRON: z.string().default('30 5 * * *'),

@@ -4,7 +4,7 @@ import { Link, NavLink, useLocation } from 'react-router';
 import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { ago } from '../lib/format';
+import { ago, displayCurrency, rateText } from '../lib/format';
 import { CONTACT_EMAIL, CREDITS } from '../lib/site';
 import { ClockIcon, HeartIcon } from './icons';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -137,7 +137,7 @@ function Header() {
 }
 
 function Footer() {
-  const { user, publicMode } = useAuth();
+  const { user, publicMode, fx } = useAuth();
   const stats = useQuery({
     queryKey: ['stats'],
     queryFn: () => api<Stats>('/api/stats'),
@@ -167,6 +167,7 @@ function Footer() {
             </a>
           </nav>
           <p className="mt-4 text-xs leading-relaxed text-ink-3">{t('footer.disclaimer')}</p>
+          {displayCurrency() === 'EUR' && <p className="mt-2 text-xs leading-relaxed text-ink-3">{t('fx.note', { rate: rateText(fx?.eur.rate) })}</p>}
         </div>
       </div>
       <div className="border-t border-line">

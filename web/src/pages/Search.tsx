@@ -7,7 +7,7 @@ import { SetCard } from '../components/SetCard';
 import { Button, CardSkeleton, EmptyState, ErrorState, Spinner, cx } from '../components/ui';
 import { t, tn, type TKey } from '../i18n';
 import { api, type SearchResponse, type Theme } from '../lib/api';
-import { shopName } from '../lib/format';
+import { displayCurrency, moneyNum, shopName } from '../lib/format';
 import { usePageTitle } from '../lib/title';
 
 const SORTS = ['relevance', 'deal', 'discount', 'price_asc', 'price_desc', 'newest', 'name'];
@@ -162,7 +162,7 @@ function ActiveChips({ f, onChange }: { f: FilterState; onChange: (f: FilterStat
   f.shops.forEach((s) => chips.push({ label: shopName(s), clear: () => onChange({ ...f, shops: f.shops.filter((x) => x !== s) }) }));
   if (f.min !== undefined || f.max !== undefined)
     chips.push({
-      label: `${f.min ?? 0} – ${f.max ?? '∞'} RSD`,
+      label: `${moneyNum(f.min ?? 0)} – ${f.max !== undefined ? moneyNum(f.max) : '∞'} ${displayCurrency() === 'EUR' ? '€' : 'RSD'}`,
       clear: () => onChange({ ...f, min: undefined, max: undefined }),
     });
   f.ages.forEach((a) => chips.push({ label: `${t(`filters.age.${a}` as TKey)}`, clear: () => onChange({ ...f, ages: f.ages.filter((x) => x !== a) }) }));

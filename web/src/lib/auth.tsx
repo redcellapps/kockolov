@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, type ReactNode } from 'react';
 import { api, type MeResponse } from './api';
+import { setDisplayCurrency } from './format';
 
 interface AuthState extends MeResponse {
   loading: boolean;
@@ -13,10 +14,14 @@ const Ctx = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['me'], queryFn: () => api<MeResponse>('/api/auth/me'), staleTime: 60_000 });
+  // prices render in the user's currency; set before the children render, and remount them on a change
+  const currency = q.data?.user?.currency === 'EUR' ? 'EUR' : 'RSD';
+  setDisplayCurrency(currency, q.data?.fx?.eur.rate ?? 0);
   const value: AuthState = {
     user: q.data?.user ?? null,
     publicMode: q.data?.publicMode ?? false,
     registrationOpen: q.data?.registrationOpen ?? false,
+    fx: q.data?.fx,
     loading: q.isLoading,
     refresh: async () => {
       await qc.invalidateQueries();
@@ -34,7 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.location.assign('/prijava');
     },
   };
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      <Fragment key={currency}>{children}</Fragment>
+    </Ctx.Provider>
+  );
 }
 
 export function useAuth(): AuthState {

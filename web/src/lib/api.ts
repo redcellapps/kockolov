@@ -161,10 +161,13 @@ export interface User {
   name: string;
   role: 'user' | 'admin';
   digest_enabled: boolean;
+  currency?: 'RSD' | 'EUR';
 }
 
 export interface MeResponse {
   user: User | null;
   publicMode: boolean;
   registrationOpen: boolean;
+  /** NBS middle rate: RSD for 1 EUR (day is null while only the fallback is known) */
+  fx?: { eur: { rate: number; day: string | null } };
 }

@@ -27,12 +27,12 @@ export type Reason =
   | { type: 'new_low'; days: number }
   | { type: 'only_offer' };
 
-export function reasonText(r: Reason): string {
+export function reasonText(r: Reason, money: (n: number) => string = rsd): string {
   switch (r.type) {
     case 'vs_rrp':
-      return `${r.pct}% jeftinije nego u LEGO® Store-u (ušteda ${rsd(r.amount)})`;
+      return `${r.pct}% jeftinije nego u LEGO® Store-u (ušteda ${money(r.amount)})`;
     case 'vs_next':
-      return `${rsd(r.amount)} jeftinije od sledeće ponude (${shopLabel(r.shop, r.seller)})`;
+      return `${money(r.amount)} jeftinije od sledeće ponude (${shopLabel(r.shop, r.seller)})`;
     case 'shop_sale':
       return `Na akciji −${r.pct}%`;
     case 'new_low':

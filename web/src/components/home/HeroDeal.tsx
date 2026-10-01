@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import { t } from '../../i18n';
 import type { Deal, Reason } from '../../lib/api';
-import { ago, rsd, shopLabel } from '../../lib/format';
+import { ago, money, shopLabel } from '../../lib/format';
 import { ClockIcon, TagIcon, TrendDown } from '../icons';
 import { ProductImage } from '../SetCard';
 import { ShopDot, cx } from '../ui';
@@ -70,17 +70,17 @@ export function HeroDeal({ d, updated }: { d: Deal; updated?: string | null }) {
             </Link>
           </h2>
           <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
-            <span className="tabular whitespace-nowrap text-2xl font-extrabold tracking-tight text-hero-red lg:text-3xl">{rsd(d.best_price_rsd)}</span>
+            <span className="tabular whitespace-nowrap text-2xl font-extrabold tracking-tight text-hero-red lg:text-3xl">{money(d.best_price_rsd)}</span>
             {saving > 0 && (
               <span className="tabular whitespace-nowrap text-sm text-hero-muted">
                 <span className="sr-only">{t('home.top.was')} </span>
-                <s>{rsd(ref)}</s>
+                <s>{money(ref)}</s>
               </span>
             )}
           </p>
           {saving > 0 && (
             <p className="mt-1.5 inline-flex items-start gap-1 text-sm font-bold text-hero-green">
-              <TrendDown size={16} className="mt-0.5 shrink-0" /> {t('home.top.saving', { amount: rsd(saving) })}
+              <TrendDown size={16} className="mt-0.5 shrink-0" /> {t('home.top.saving', { amount: money(saving) })}
             </p>
           )}
         </div>
@@ -101,7 +101,7 @@ export function HeroDeal({ d, updated }: { d: Deal; updated?: string | null }) {
                     </span>
                   )}
                 </span>
-                <span className={cx('tabular whitespace-nowrap', r.best ? 'font-extrabold' : 'font-semibold text-hero-muted')}>{rsd(r.price)}</span>
+                <span className={cx('tabular whitespace-nowrap', r.best ? 'font-extrabold' : 'font-semibold text-hero-muted')}>{money(r.price)}</span>
                 <span aria-hidden className="col-span-2 block h-1.5 overflow-hidden rounded-full bg-hero-ink/[0.07]">
                   <span
                     className={cx('block h-full rounded-full', r.best ? 'bg-hero-green' : 'bg-hero-ink/30')}

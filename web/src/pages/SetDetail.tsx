@@ -7,12 +7,14 @@ import { EmptyState, ErrorState, ShopDot, Skeleton, buttonClasses, cx } from '..
 import { WatchButton } from '../components/WatchButton';
 import { t } from '../i18n';
 import { api, ApiError, type SetDetail as SetDetailData } from '../lib/api';
-import { ageLabel, ago, dateLong, reasonText, rsd, shopName } from '../lib/format';
+import { ageLabel, ago, dateLong, displayCurrency, money, rateText, reasonText, shopName } from '../lib/format';
+import { useAuth } from '../lib/auth';
 import { usePageTitle } from '../lib/title';
 
 export default function SetDetail() {
   const { setNum = '' } = useParams();
   const navigate = useNavigate();
+  const { fx } = useAuth();
   const q = useQuery({
     queryKey: ['set', setNum],
     queryFn: () => api<SetDetailData>(`/api/sets/${encodeURIComponent(setNum)}`),
@@ -23,7 +25,7 @@ export default function SetDetail() {
   usePageTitle(
     d
       ? cheapest
-        ? t('title.set', { num: d.set.set_num, name: d.set.name, price: rsd(cheapest.price_rsd) })
+        ? t('title.set', { num: d.set.set_num, name: d.set.name, price: money(cheapest.price_rsd) })
         : t('title.setNoPrice', { num: d.set.set_num, name: d.set.name })
       : q.error instanceof ApiError && q.error.status === 404
         ? t('title.notFound')
@@ -94,17 +96,18 @@ export default function SetDetail() {
               <>
                 <div className="text-sm font-semibold text-ink-3">{t('set.bestPrice')}</div>
                 <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className={cx('tabular text-4xl font-extrabold tracking-tight', saving ? 'text-deal' : 'text-ink')}>{rsd(best.price_rsd)}</span>
-                  {rrp && rrp > best.price_rsd && <span className="tabular text-lg text-ink-3 line-through">{rsd(rrp)}</span>}
+                  <span className={cx('tabular text-4xl font-extrabold tracking-tight', saving ? 'text-deal' : 'text-ink')}>{money(best.price_rsd)}</span>
+                  {rrp && rrp > best.price_rsd && <span className="tabular text-lg text-ink-3 line-through">{money(rrp)}</span>}
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-[15px] text-ink-2">
                   <ShopDot shop={best.shop_id} />
                   {t('set.at')} <b className="text-ink">{shopName(best.shop_id)}</b>
                   {best.seller && <span>· {best.seller}</span>}
                 </div>
+                {displayCurrency() === 'EUR' && <p className="mt-1.5 text-xs text-ink-3">{t('fx.note', { rate: rateText(fx?.eur.rate) })}</p>}
                 {saving > 0 && (
                   <div className="mt-4 flex items-center gap-2 rounded-xl bg-save-soft px-3 py-2 text-sm font-bold text-save">
-                    <TrendDown size={18} /> {t('set.youSave', { amount: rsd(saving), pct: savingPct })}
+                    <TrendDown size={18} /> {t('set.youSave', { amount: money(saving), pct: savingPct })}
                   </div>
                 )}
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -139,9 +142,9 @@ export default function SetDetail() {
           </div>
 
           <dl className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-            <Stat label={t('set.rrp')} value={rrp ? rsd(rrp) : '—'} hint={rrp ? undefined : t('set.rrp.unknown')} />
-            <Stat label={t('set.lowest30')} value={rsd(stats?.lowest_30d)} />
-            <Stat label={t('set.lowestEver')} value={rsd(stats?.lowest_ever)} hint={stats?.tracked_since ? t('set.trackedSince', { date: dateLong(stats.tracked_since) }) : undefined} />
+            <Stat label={t('set.rrp')} value={rrp ? money(rrp) : '—'} hint={rrp ? undefined : t('set.rrp.unknown')} />
+            <Stat label={t('set.lowest30')} value={money(stats?.lowest_30d)} />
+            <Stat label={t('set.lowestEver')} value={money(stats?.lowest_ever)} hint={stats?.tracked_since ? t('set.trackedSince', { date: dateLong(stats.tracked_since) }) : undefined} />
           </dl>
         </div>
       </div>
@@ -196,10 +199,10 @@ export default function SetDetail() {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right sm:px-5">
-                      <div className={cx('tabular text-lg font-extrabold', isBest ? 'text-save' : 'text-ink')}>{rsd(o.price_rsd)}</div>
+                      <div className={cx('tabular text-lg font-extrabold', isBest ? 'text-save' : 'text-ink')}>{money(o.price_rsd)}</div>
                       {o.regular_price_rsd && o.regular_price_rsd > o.price_rsd && (
                         <div className="tabular text-xs text-ink-3">
-                          <span className="line-through">{rsd(o.regular_price_rsd)}</span> {t('set.offers.sale')}
+                          <span className="line-through">{money(o.regular_price_rsd)}</span> {t('set.offers.sale')}
                         </div>
                       )}
                     </td>

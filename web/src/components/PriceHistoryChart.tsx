@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../i18n';
 import type { HistoryPoint, Offer } from '../lib/api';
-import { dateShort, num, rsd, shopLabel } from '../lib/format';
+import { dateShort, fromDisplay, money, moneyNum, shopLabel, toDisplay } from '../lib/format';
 
 // Step-line chart: prices only change when a shop changes them, so lines stay flat between changes.
 // Colors follow the offer (fixed categorical order by shop, then seller) — never re-assigned by rank.
@@ -91,7 +91,8 @@ export function PriceHistoryChart({ offers, history }: { offers: Offer[]; histor
   const pMin = Math.min(...prices);
   const pMax = Math.max(...prices);
   const pad = Math.max((pMax - pMin) * 0.15, pMax * 0.04);
-  const yTicks = niceTicks(Math.max(0, pMin - pad), pMax + pad);
+  // round numbers in the reader's currency (RSD or EUR), placed on the RSD scale
+  const yTicks = niceTicks(toDisplay(Math.max(0, pMin - pad)), toDisplay(pMax + pad)).map(fromDisplay);
   const yLo = yTicks[0];
   const yHi = yTicks[yTicks.length - 1];
   const sx = (x: number) => m.left + ((x - x0) / (now - x0)) * iw;
@@ -140,7 +141,7 @@ export function PriceHistoryChart({ offers, history }: { offers: Offer[]; histor
           <g key={v}>
             <line x1={m.left} x2={m.left + iw} y1={sy(v)} y2={sy(v)} stroke="var(--grid)" strokeWidth={1} />
             <text x={m.left - 10} y={sy(v)} dy="0.32em" textAnchor="end" className="tabular fill-ink-3 text-[11px]">
-              {num(v)}
+              {moneyNum(v)}
             </text>
           </g>
         ))}
@@ -174,7 +175,7 @@ export function PriceHistoryChart({ offers, history }: { offers: Offer[]; histor
             <g key={s.id}>
               <line x1={sx(now) + 6} x2={sx(now) + 14} y1={y} y2={y} stroke={s.color} strokeWidth={2} />
               <text x={sx(now) + 18} y={y} dy="0.32em" className="tabular fill-ink text-[12px] font-bold">
-                {num(s.current)}
+                {moneyNum(s.current)}
               </text>
             </g>
           ))}
@@ -197,7 +198,7 @@ export function PriceHistoryChart({ offers, history }: { offers: Offer[]; histor
           {hoverRows.map(({ s, v }) => (
             <div key={s.id} className="flex items-center gap-2 py-0.5 text-sm">
               <span className="inline-block h-0.5 w-3.5 rounded" style={{ background: s.color }} />
-              <span className="tabular font-extrabold text-ink">{rsd(v)}</span>
+              <span className="tabular font-extrabold text-ink">{money(v)}</span>
               <span className="truncate text-ink-2">{s.label}</span>
             </div>
           ))}

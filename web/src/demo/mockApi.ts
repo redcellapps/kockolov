@@ -63,7 +63,8 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
   const p = url.searchParams;
 
   if (path === '/api/health') return ok({ ok: true });
-  if (path === '/api/auth/me' && method === 'GET') return ok({ user: state.user, publicMode: false, registrationOpen: false });
+  if (path === '/api/auth/me' && method === 'GET')
+    return ok({ user: state.user, publicMode: false, registrationOpen: false, fx: { eur: { rate: 117.2, day: null } } });
   if (path === '/api/auth/login' && method === 'POST') {
     const email = String(body?.email ?? '').trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email) || !body?.password) return err(400, 'Unesite ispravan e-mail i lozinku.');
@@ -110,6 +111,7 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
   if (path === '/api/me' && method === 'PATCH') {
     if (typeof body?.name === 'string') state.user!.name = body.name;
     if (typeof body?.digestEnabled === 'boolean') state.user!.digest_enabled = body.digestEnabled;
+    if (body?.currency === 'RSD' || body?.currency === 'EUR') state.user!.currency = body.currency;
     return ok({ ok: true });
   }
   if (path === '/api/me/password' && method === 'POST') {

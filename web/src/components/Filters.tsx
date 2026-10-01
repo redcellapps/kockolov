@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { t, type TKey } from '../i18n';
 import { api, type SearchResponse, type Shop, type Theme } from '../lib/api';
-import { num } from '../lib/format';
+import { displayCurrency, fromDisplay, num, toDisplay, type Currency } from '../lib/format';
 import { CheckIcon } from './icons';
 import { Chip, ShopDot, Toggle, cx } from './ui';
 
@@ -53,13 +53,24 @@ export function activeFilterCount(f: FilterState): number {
 }
 
 const AGES = ['1-3', '4-6', '7-9', '10-13', '14-17', '18'] as const;
-const PRICE_PRESETS: [number | undefined, number | undefined, TKey][] = [
-  [undefined, 2000, 'filters.price.p1'],
-  [2000, 5000, 'filters.price.p2'],
-  [5000, 10000, 'filters.price.p3'],
-  [10000, 20000, 'filters.price.p4'],
-  [20000, undefined, 'filters.price.p5'],
-];
+// price ranges in the reader's currency; the URL and the API always use RSD
+const PRICE_PRESETS: Record<Currency, [number | undefined, number | undefined, TKey][]> = {
+  RSD: [
+    [undefined, 2000, 'filters.price.p1'],
+    [2000, 5000, 'filters.price.p2'],
+    [5000, 10000, 'filters.price.p3'],
+    [10000, 20000, 'filters.price.p4'],
+    [20000, undefined, 'filters.price.p5'],
+  ],
+  EUR: [
+    [undefined, 20, 'filters.priceEur.p1'],
+    [20, 50, 'filters.priceEur.p2'],
+    [50, 100, 'filters.priceEur.p3'],
+    [100, 200, 'filters.priceEur.p4'],
+    [200, undefined, 'filters.priceEur.p5'],
+  ],
+};
+const inDisplay = (rsd: number | undefined) => (rsd === undefined ? '' : String(Math.round(toDisplay(rsd))));
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -106,11 +117,11 @@ export function Filters({
   const shops = useQuery({ queryKey: ['shops'], queryFn: () => api<Shop[]>('/api/shops'), staleTime: 600_000 });
   const [themeQuery, setThemeQuery] = useState('');
   const [showAllThemes, setShowAllThemes] = useState(false);
-  const [minText, setMinText] = useState(value.min?.toString() ?? '');
-  const [maxText, setMaxText] = useState(value.max?.toString() ?? '');
+  const [minText, setMinText] = useState(inDisplay(value.min));
+  const [maxText, setMaxText] = useState(inDisplay(value.max));
   useEffect(() => {
-    setMinText(value.min?.toString() ?? '');
-    setMaxText(value.max?.toString() ?? '');
+    setMinText(inDisplay(value.min));
+    setMaxText(inDisplay(value.max));
   }, [value.min, value.max]);
 
   const toggle = (key: 'themes' | 'shops' | 'ages', v: string) => {
@@ -129,8 +140,8 @@ export function Filters({
   const visibleThemes = showAllThemes || themeQuery ? themeList : themeList.slice(0, 10);
 
   const applyPrice = () => {
-    const min = minText ? Math.max(0, parseInt(minText.replace(/\D/g, ''), 10)) : undefined;
-    const max = maxText ? Math.max(0, parseInt(maxText.replace(/\D/g, ''), 10)) : undefined;
+    const min = minText ? fromDisplay(Math.max(0, parseInt(minText.replace(/\D/g, ''), 10))) : undefined;
+    const max = maxText ? fromDisplay(Math.max(0, parseInt(maxText.replace(/\D/g, ''), 10))) : undefined;
     if (min !== value.min || max !== value.max) onChange({ ...value, min, max });
   };
 
@@ -168,7 +179,7 @@ export function Filters({
         )}
       </Section>
 
-      <Section title={t('filters.price')}>
+      <Section title={t('filters.price', { cur: displayCurrency() === 'EUR' ? '€' : 'RSD' })}>
         <div className="flex items-center gap-2">
           <input
             inputMode="numeric"
@@ -193,7 +204,9 @@ export function Filters({
           />
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {PRICE_PRESETS.map(([min, max, key]) => {
+          {PRICE_PRESETS[displayCurrency()].map(([dMin, dMax, key]) => {
+            const min = dMin === undefined ? undefined : fromDisplay(dMin);
+            const max = dMax === undefined ? undefined : fromDisplay(dMax);
             const label = t(key);
             const active = value.min === min && value.max === max;
             return (

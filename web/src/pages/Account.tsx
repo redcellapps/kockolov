@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Button, Toggle } from '../components/ui';
+import { Button, Toggle, cx } from '../components/ui';
+import { dateLong, rateText } from '../lib/format';
 import { t } from '../i18n';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -18,7 +19,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 const input = 'h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-[15px] outline-none focus:border-ink';
 
 export default function AccountPage() {
-  const { user, refresh } = useAuth();
+  const { user, refresh, fx } = useAuth();
   usePageTitle(t('title.account'));
   const [name, setName] = useState(user?.name ?? '');
   const [digest, setDigest] = useState(user?.digest_enabled ?? true);
@@ -31,7 +32,7 @@ export default function AccountPage() {
   }, [user]);
 
   const save = useMutation({
-    mutationFn: (body: { name?: string; digestEnabled?: boolean }) => api('/api/me', { method: 'PATCH', json: body }),
+    mutationFn: (body: { name?: string; digestEnabled?: boolean; currency?: 'RSD' | 'EUR' }) => api('/api/me', { method: 'PATCH', json: body }),
     onSuccess: () => refresh(),
   });
   const pw = useMutation({
@@ -88,6 +89,35 @@ export default function AccountPage() {
           label={t('account.digest')}
         />
         <p className="mt-2 text-sm text-ink-3">{t('account.digest.hint')}</p>
+      </Card>
+
+      <Card title={t('account.currency')}>
+        <div role="radiogroup" aria-label={t('account.currency')} className="grid grid-cols-2 gap-2 sm:max-w-sm">
+          {(['RSD', 'EUR'] as const).map((c) => {
+            const on = (user.currency ?? 'RSD') === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={save.isPending}
+                onClick={() => !on && save.mutate({ currency: c })}
+                className={cx(
+                  'h-12 cursor-pointer rounded-xl border-2 px-3 text-[15px] font-bold transition',
+                  on ? 'border-ink bg-ink text-bg' : 'border-line bg-surface text-ink hover:border-ink-3',
+                )}
+              >
+                {c === 'RSD' ? t('account.currency.rsd') : t('account.currency.eur')}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-sm text-ink-3">
+          {fx?.eur.day
+            ? t('account.currency.hint', { rate: rateText(fx.eur.rate), date: dateLong(fx.eur.day) })
+            : t('account.currency.hintNoDate', { rate: rateText(fx?.eur.rate) })}
+        </p>
       </Card>
 
       <Card title={t('account.password')}>

@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import { t, tn } from '../i18n';
 import type { Deal, SetSummary } from '../lib/api';
-import { ageLabel, reasonText, rsd, shopLabel } from '../lib/format';
+import { ageLabel, reasonText, money, shopLabel } from '../lib/format';
 import { CheckIcon } from './icons';
 import { ShopDot, cx } from './ui';
 import { WatchButton } from './WatchButton';
@@ -73,10 +73,10 @@ export function SetCard({ s }: { s: SetSummary }) {
                       s.discount_pct >= 3 ? 'text-deal' : 'text-ink',
                     )}
                   >
-                    {rsd(price)}
+                    {money(price)}
                   </span>
                   {s.rrp_rsd && s.best_price !== null && s.rrp_rsd > s.best_price && (
-                    <span className="tabular whitespace-nowrap text-[13px] text-ink-3 line-through">{rsd(s.rrp_rsd)}</span>
+                    <span className="tabular whitespace-nowrap text-[13px] text-ink-3 line-through">{money(s.rrp_rsd)}</span>
                   )}
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 text-[13px] text-ink-2">
@@ -89,7 +89,7 @@ export function SetCard({ s }: { s: SetSummary }) {
               </>
             ) : (
               <>
-                <div className="tabular whitespace-nowrap text-lg font-extrabold tracking-tight text-ink-3 sm:text-xl">{rsd(price)}</div>
+                <div className="tabular whitespace-nowrap text-lg font-extrabold tracking-tight text-ink-3 sm:text-xl">{money(price)}</div>
                 <div className="mt-1 text-[13px] text-ink-3">{t('card.outOfStock')}</div>
               </>
             )}
@@ -132,9 +132,9 @@ export function DealCard({ d }: { d: Deal }) {
           </div>
           <h3 className="mt-1 line-clamp-2 text-[15px] font-bold leading-snug">{d.name}</h3>
           <div className="mt-3 flex flex-wrap items-baseline gap-x-2">
-            <span className="tabular whitespace-nowrap text-xl font-extrabold tracking-tight text-deal sm:text-2xl">{rsd(d.best_price_rsd)}</span>
+            <span className="tabular whitespace-nowrap text-xl font-extrabold tracking-tight text-deal sm:text-2xl">{money(d.best_price_rsd)}</span>
             {d.reference_price_rsd && d.reference_price_rsd > d.best_price_rsd && (
-              <span className="tabular whitespace-nowrap text-[13px] text-ink-3 line-through">{rsd(d.reference_price_rsd)}</span>
+              <span className="tabular whitespace-nowrap text-[13px] text-ink-3 line-through">{money(d.reference_price_rsd)}</span>
             )}
           </div>
           <div className="mt-1 flex items-center gap-1.5 text-[13px] text-ink-2">

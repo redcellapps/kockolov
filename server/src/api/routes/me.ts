@@ -10,10 +10,13 @@ export async function requireUser(req: FastifyRequest, reply: FastifyReply) {
 
 export async function meRoutes(app: FastifyInstance) {
   app.patch('/api/me', { preHandler: requireUser }, async (req) => {
-    const body = z.object({ name: z.string().max(80).optional(), digestEnabled: z.boolean().optional() }).parse(req.body);
+    const body = z
+      .object({ name: z.string().max(80).optional(), digestEnabled: z.boolean().optional(), currency: z.enum(['RSD', 'EUR']).optional() })
+      .parse(req.body);
     await query(
-      'UPDATE users SET name = coalesce($2, name), digest_enabled = coalesce($3, digest_enabled) WHERE id = $1',
-      [req.user!.id, body.name ?? null, body.digestEnabled ?? null],
+      `UPDATE users SET name = coalesce($2, name), digest_enabled = coalesce($3, digest_enabled), currency = coalesce($4, currency)
+        WHERE id = $1`,
+      [req.user!.id, body.name ?? null, body.digestEnabled ?? null, body.currency ?? null],
     );
     return { ok: true };
   });

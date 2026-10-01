@@ -5,11 +5,12 @@ import { sendLink } from './api/invites.js';
 import { migrate, one, pool, query } from './db.js';
 import { runCrawl } from './crawler/pipeline.js';
 import { refreshSets } from './crawler/refresh.js';
+import { refreshEurRate } from './fx.js';
 import { seedReferenceData } from './crawler/seed.js';
 import { computeDeals } from './deals/engine.js';
 import { alertOnCrawlProblems } from './jobs/alerts.js';
 import { writeFileSync } from 'node:fs';
-import { loadDigestData, renderDigest, sendDigests, unsubscribeUrl } from './mail/digest.js';
+import { currencyOpts, loadDigestData, renderDigest, sendDigests, unsubscribeUrl } from './mail/digest.js';
 import { todayLocal } from './lib/time.js';
 
 const HELP = `Kockolov CLI
@@ -17,6 +18,7 @@ const HELP = `Kockolov CLI
   migrate                                  primeni migracije baze
   crawl [lstore kockarium ananas]          preuzmi cene (podrazumevano sve prodavnice)
   refresh                                  ponovo izračunaj podatke o setovima
+  fx                                       preuzmi današnji kurs evra (NBS)
   deals                                    izračunaj današnje najbolje ponude
   digest [--dry-run] [--email x@y.rs]      pošalji jutarnji pregled
   digest --preview pregled.html [--email]  sačuvaj e-mail kao HTML (bez slanja)
@@ -60,17 +62,20 @@ async function main() {
     case 'refresh':
       await refreshSets();
       break;
+    case 'fx':
+      if (!(await refreshEurRate())) process.exitCode = 1;
+      break;
     case 'deals':
       await computeDeals();
       break;
     case 'digest': {
       if (values.preview) {
-        const u = await one<{ id: number; name: string; email: string; unsubscribe_token: string }>(
-          `SELECT id, name, email, unsubscribe_token FROM users ${values.email ? 'WHERE email = $1' : 'ORDER BY id'} LIMIT 1`,
+        const u = await one<{ id: number; name: string; email: string; unsubscribe_token: string; currency: 'RSD' | 'EUR' }>(
+          `SELECT id, name, email, unsubscribe_token, currency FROM users ${values.email ? 'WHERE email = $1' : 'ORDER BY id'} LIMIT 1`,
           values.email ? [normalizeEmail(values.email)] : [],
         );
         if (!u) throw new Error('Nema korisnika');
-        const mail = renderDigest(u.name, await loadDigestData(u.id), todayLocal(), unsubscribeUrl(u.unsubscribe_token));
+        const mail = renderDigest(u.name, await loadDigestData(u.id), todayLocal(), unsubscribeUrl(u.unsubscribe_token), await currencyOpts(u.currency));
         writeFileSync(values.preview, mail.html);
         console.log(`${mail.subject}\n→ ${values.preview} (za ${u.email})`);
         break;

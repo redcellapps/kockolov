@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { config } from '../../config.js';
 import { one, query, tx } from '../../db.js';
+import { eurRate } from '../../fx.js';
 import { accountFrom, mailConfigured } from '../../mail/mailer.js';
 import { hashToken, linkSentRecently, sendLink, validLink } from '../invites.js';
 import {
@@ -62,6 +63,8 @@ export async function authRoutes(app: FastifyInstance) {
     user: req.user ?? null,
     publicMode: config.PUBLIC_MODE,
     registrationOpen: config.registrationOpen,
+    // for showing prices in euros (users who chose EUR)
+    fx: { eur: await eurRate() },
   }));
 
   app.post('/api/auth/login', async (req, reply) => {

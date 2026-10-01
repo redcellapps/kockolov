@@ -4,6 +4,7 @@ import { migrate, query } from './db.js';
 import { runCrawl } from './crawler/pipeline.js';
 import { seedReferenceData } from './crawler/seed.js';
 import { alertOnCrawlProblems } from './jobs/alerts.js';
+import { refreshEurRate } from './fx.js';
 import { sendDigests } from './mail/digest.js';
 
 const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
@@ -11,6 +12,7 @@ const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
 async function crawlJob() {
   try {
     log('posao: jutarnje preuzimanje cena');
+    await refreshEurRate(log);
     const res = await runCrawl({ log });
     await alertOnCrawlProblems(res, log);
     await query('DELETE FROM sessions WHERE expires_at < now()');
@@ -33,6 +35,7 @@ async function digestJob() {
 async function main() {
   await migrate(log);
   await seedReferenceData();
+  await refreshEurRate(log);
   cron.schedule(config.CRAWL_CRON, crawlJob, { timezone: config.TZ_NAME, name: 'crawl' });
   cron.schedule(config.DIGEST_CRON, digestJob, { timezone: config.TZ_NAME, name: 'digest' });
   log(`worker: preuzimanje "${config.CRAWL_CRON}", pregled "${config.DIGEST_CRON}" (${config.TZ_NAME})`);
