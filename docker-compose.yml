@@ -42,6 +42,9 @@ services:
     environment:
       DATABASE_URL: postgres://kockolov:${POSTGRES_PASSWORD}@db:5432/kockolov
     command: ["node", "server/dist/worker.js"]
+    # the image's health check calls the web API, which the worker doesn't serve
+    healthcheck:
+      disable: true
     depends_on:
       db:
         condition: service_healthy
