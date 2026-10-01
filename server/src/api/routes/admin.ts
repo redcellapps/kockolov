@@ -64,7 +64,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.get('/api/admin/users', async () =>
     query(
-      `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.created_at, u.last_login_at, u.accepted_at,
+      `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.created_at, u.last_login_at, u.accepted_at, u.self_signup,
               (SELECT max(t.created_at) FROM user_tokens t WHERE t.user_id = u.id AND t.kind = 'invite') AS invited_at
          FROM users u ORDER BY u.created_at`,
     ),

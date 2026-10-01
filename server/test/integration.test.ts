@@ -1,9 +1,18 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config.js';
 import { startMockShops } from './mockShops.js';
+
+// Outgoing mail is captured instead of sent; off by default, like a server without SMTP
+const mail = vi.hoisted(() => ({ on: false, sent: [] as { to: string; subject: string; text: string; headers?: Record<string, string> }[] }));
+vi.mock('../src/mail/mailer.js', () => ({
+  mailConfigured: () => mail.on,
+  sendMail: async (m: { to: string; subject: string; text: string; headers?: Record<string, string> }) => {
+    mail.sent.push(m);
+  },
+}));
 
 const dbUrl = process.env.DATABASE_URL!;
 const dbAvailable = await (async () => {
@@ -192,6 +201,151 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     // expired links don't work
     await query("UPDATE user_tokens SET expires_at = now() - interval '1 minute' WHERE used_at IS NULL");
     expect((await app.inject({ method: 'GET', url: `/api/auth/invite/${r2.link.split('/poziv/')[1]}` })).statusCode).toBe(410);
+  });
+
+  it('lets people sign up, confirm the address, reset a forgotten password, unsubscribe and delete the account', async () => {
+    const { sendDigests } = await import('../src/mail/digest.js');
+    const login = (password: string) =>
+      app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'pera@example.com', password } });
+    config.registrationOpen = true;
+    mail.on = true;
+    mail.sent.length = 0;
+    try {
+      const reg = await app.inject({
+        method: 'POST',
+        url: '/api/auth/register',
+        payload: { email: 'Pera@Example.com', password: 'perina-lozinka', name: 'Pera' },
+      });
+      expect(reg.statusCode).toBe(200);
+      expect(reg.json()).toEqual({ ok: true, email: 'pera@example.com' });
+      expect(reg.headers['set-cookie']).toBeUndefined(); // not signed in before confirming
+      expect(mail.sent).toHaveLength(1);
+      expect(mail.sent[0]).toMatchObject({ to: 'pera@example.com', subject: 'Potvrdi e-mail adresu za Kockolov' });
+      const token = mail.sent[0].text.match(/\/potvrda\/([\w-]+)/)![1];
+
+      // a second click right away doesn't send another e-mail
+      await app.inject({ method: 'POST', url: '/api/auth/register', payload: { email: 'pera@example.com', password: 'perina-lozinka' } });
+      expect(mail.sent).toHaveLength(1);
+
+      // unconfirmed: can't log in, gets no morning e-mail
+      const early = await login('perina-lozinka');
+      expect(early.statusCode).toBe(403);
+      expect(early.json().code).toBe('unconfirmed');
+      const lines: string[] = [];
+      await sendDigests({ dryRun: true, log: (m) => lines.push(m) });
+      expect(lines.join('\n')).not.toContain('pera@example.com');
+
+      // a confirmation link can't be used to set a password, only to confirm
+      expect((await app.inject({ method: 'GET', url: `/api/auth/invite/${token}` })).json()).toMatchObject({ kind: 'verify' });
+      expect((await app.inject({ method: 'POST', url: `/api/auth/invite/${token}`, payload: { password: 'neka-druga' } })).statusCode).toBe(410);
+      const ok = await app.inject({ method: 'POST', url: `/api/auth/verify/${token}` });
+      expect(ok.statusCode).toBe(200);
+      const peraCookie = String(ok.headers['set-cookie']).split(';')[0];
+      expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie: peraCookie } })).json().user).toMatchObject({
+        email: 'pera@example.com',
+        name: 'Pera',
+      });
+      expect((await app.inject({ method: 'POST', url: `/api/auth/verify/${token}` })).statusCode).toBe(410);
+      expect((await login('perina-lozinka')).statusCode).toBe(200);
+      const later: string[] = [];
+      await sendDigests({ dryRun: true, log: (m) => later.push(m) });
+      expect(later.join('\n')).toContain('pera@example.com');
+
+      // the address is taken now
+      const dup = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { email: 'pera@example.com', password: 'tudja-lozinka' } });
+      expect(dup.statusCode).toBe(409);
+
+      // forgotten password: same answer whether or not the account exists
+      mail.sent.length = 0;
+      expect((await app.inject({ method: 'POST', url: '/api/auth/forgot', payload: { email: 'niko@example.com' } })).json()).toEqual({ ok: true });
+      expect(mail.sent).toHaveLength(0);
+      expect((await app.inject({ method: 'POST', url: '/api/auth/forgot', payload: { email: 'pera@example.com' } })).json()).toEqual({ ok: true });
+      expect(mail.sent).toHaveLength(1);
+      expect(mail.sent[0].subject).toBe('Link za novu lozinku na Kockolovu');
+      expect(mail.sent[0].text).toContain('24 sata');
+      const reset = mail.sent[0].text.match(/\/poziv\/([\w-]+)/)![1];
+      expect((await app.inject({ method: 'POST', url: `/api/auth/invite/${reset}`, payload: { password: 'nova-perina-lozinka' } })).statusCode).toBe(200);
+      expect((await login('perina-lozinka')).statusCode).toBe(401);
+      const fresh = await login('nova-perina-lozinka');
+      expect(fresh.statusCode).toBe(200);
+      const cookie2 = String(fresh.headers['set-cookie']).split(';')[0];
+
+      // the morning e-mail carries a one-click unsubscribe
+      const { unsubscribe_token: unsub } = (await one("SELECT unsubscribe_token FROM users WHERE email = 'pera@example.com'"))!;
+      mail.sent.length = 0;
+      await sendDigests({ onlyEmail: 'pera@example.com', log: () => {} });
+      expect(mail.sent[0].headers).toEqual({
+        'List-Unsubscribe': `<${config.APP_URL.replace(/\/$/, '')}/api/unsubscribe/${unsub}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      });
+      expect(mail.sent[0].text).toContain(`/odjava/${unsub}`);
+      expect((await app.inject({ method: 'GET', url: `/api/unsubscribe/${unsub}` })).json()).toEqual({ email: 'pera@example.com', digestEnabled: true });
+      const oneClick = await app.inject({
+        method: 'POST',
+        url: `/api/unsubscribe/${unsub}`,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: 'List-Unsubscribe=One-Click',
+      });
+      expect(oneClick.json()).toEqual({ ok: true, digestEnabled: false });
+      expect((await one("SELECT digest_enabled FROM users WHERE email = 'pera@example.com'"))!.digest_enabled).toBe(false);
+      expect((await app.inject({ method: 'POST', url: `/api/unsubscribe/${unsub}?on=1` })).json().digestEnabled).toBe(true);
+      expect((await app.inject({ method: 'GET', url: '/api/unsubscribe/nije-dobar' })).statusCode).toBe(404);
+
+      // deleting the account needs the password and removes everything
+      await app.inject({ method: 'PUT', url: '/api/me/watchlist/10280', headers: { cookie: cookie2 } });
+      const wrong = await app.inject({ method: 'DELETE', url: '/api/me', headers: { cookie: cookie2 }, payload: { password: 'pogresna' } });
+      expect(wrong.statusCode).toBe(400);
+      const del = await app.inject({ method: 'DELETE', url: '/api/me', headers: { cookie: cookie2 }, payload: { password: 'nova-perina-lozinka' } });
+      expect(del.statusCode).toBe(200);
+      expect(await one("SELECT 1 AS x FROM users WHERE email = 'pera@example.com'")).toBeNull();
+      expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie: cookie2 } })).json().user).toBeNull();
+      // the only admin can't delete the account
+      const lastAdmin = await app.inject({ method: 'DELETE', url: '/api/me', headers: { cookie }, payload: { password: 'tajna-lozinka' } });
+      expect(lastAdmin.statusCode).toBe(400);
+    } finally {
+      config.registrationOpen = false;
+      mail.on = false;
+    }
+  });
+
+  it('keeps sign-up closed while the site is private, and limits sign-ups per IP', async () => {
+    const { limits } = await import('../src/api/routes/auth.js');
+    const closed = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { email: 'x@example.com', password: '12345678' } });
+    expect(closed.statusCode).toBe(403);
+    config.registrationOpen = true;
+    try {
+      limits.registerIp.clear();
+      const codes: number[] = [];
+      for (let i = 0; i < 11; i++) {
+        const r = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { email: `bot${i}@example.com`, password: '12345678' } });
+        codes.push(r.statusCode);
+      }
+      expect(codes.slice(0, 10).every((c) => c === 200)).toBe(true);
+      expect(codes[10]).toBe(429);
+    } finally {
+      config.registrationOpen = false;
+      limits.registerIp.clear();
+      limits.mailIp.clear();
+      limits.mailAddress.clear();
+    }
+  });
+
+  it('serves robots.txt and a sitemap that follow the public mode', async () => {
+    const priv = await app.inject({ method: 'GET', url: '/robots.txt' });
+    expect(priv.body).toBe('User-agent: *\nDisallow: /\n');
+    expect((await app.inject({ method: 'GET', url: '/sitemap.xml' })).statusCode).toBe(404);
+    config.PUBLIC_MODE = true;
+    try {
+      const robots = (await app.inject({ method: 'GET', url: '/robots.txt' })).body;
+      expect(robots).toContain('Disallow: /api/');
+      expect(robots).toContain('Sitemap: ');
+      const map = await app.inject({ method: 'GET', url: '/sitemap.xml' });
+      expect(map.headers['content-type']).toContain('application/xml');
+      expect(map.body).toContain('/set/10280</loc>');
+      expect(map.body).toContain('/privatnost</loc>');
+    } finally {
+      config.PUBLIC_MODE = false;
+    }
   });
 
   it('records price changes and marks vanished listings as unavailable on the next run', async () => {

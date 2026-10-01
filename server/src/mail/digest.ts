@@ -56,8 +56,14 @@ export async function loadDigestData(userId: number, limit = 10) {
   return { deals, watched };
 }
 
-export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadDigestData>>, day: string) {
+/** Address of the page that turns the morning e-mail off for this user. */
+export function unsubscribeUrl(token: string): string {
+  return `${config.APP_URL.replace(/\/$/, '')}/odjava/${token}`;
+}
+
+export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadDigestData>>, day: string, unsubscribe?: string) {
   const url = config.APP_URL.replace(/\/$/, '');
+  const off = unsubscribe ?? `${url}/nalog`;
   const dayLabel = new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
     new Date(`${day}T12:00:00Z`),
   );
@@ -113,7 +119,7 @@ export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadD
     ${watchRows ? `<tr><td style="padding:24px 24px 4px"><div style="font-size:16px;font-weight:700">Setovi koje pratiš</div></td></tr>
     <tr><td style="padding:0 24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px">${watchRows}</table></td></tr>` : ''}
     <tr><td style="padding:24px"><a href="${url}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:10px">Otvori Kockolov</a></td></tr>
-    <tr><td style="padding:0 24px 24px;font-size:12px;color:#8a8a8a">Ove poruke možeš isključiti u podešavanjima naloga: ${url}/nalog<br>LEGO® je zaštićeni znak LEGO grupe; Kockolov nije povezan sa LEGO grupom.</td></tr>
+    <tr><td style="padding:0 24px 24px;font-size:12px;color:#8a8a8a">Ne želiš više ove poruke? <a href="${escapeHtml(off)}" style="color:#6b6b6b">Odjavi se jednim klikom</a>.<br>LEGO® je zaštićeni znak LEGO grupe; Kockolov nije povezan sa LEGO grupom.</td></tr>
   </table></td></tr></table></body></html>`;
 
   const text = [
@@ -130,7 +136,7 @@ export function renderDigest(name: string, data: Awaited<ReturnType<typeof loadD
       ? ['', 'Setovi koje pratiš:', ...data.watched.map((w) => `- ${w.set_num} ${w.name}: ${w.best_price ? rsd(w.best_price) : 'nema na stanju'}`)]
       : []),
     '',
-    `Isključivanje: ${url}/nalog`,
+    `Odjava sa jutarnjeg pregleda: ${off}`,
   ].join('\n');
 
   const top = data.deals[0];
@@ -150,8 +156,8 @@ export async function sendDigests(opts: { dryRun?: boolean; onlyEmail?: string; 
     log('digest: SMTP nije podešen (SMTP_HOST) — preskačem slanje');
     return { sent: 0, skipped: 0, failed: 0 };
   }
-  const users = await query<{ id: number; email: string; name: string }>(
-    `SELECT u.id, u.email, u.name FROM users u
+  const users = await query<{ id: number; email: string; name: string; unsubscribe_token: string }>(
+    `SELECT u.id, u.email, u.name, u.unsubscribe_token FROM users u
       WHERE u.digest_enabled ${opts.onlyEmail ? 'AND u.email = $2' : 'AND u.accepted_at IS NOT NULL'}
         AND NOT EXISTS (SELECT 1 FROM digest_log l WHERE l.user_id = u.id AND l.day = $1 AND l.status = 'sent')`,
     opts.onlyEmail ? [day, opts.onlyEmail.toLowerCase()] : [day],
@@ -160,13 +166,20 @@ export async function sendDigests(opts: { dryRun?: boolean; onlyEmail?: string; 
   let failed = 0;
   for (const u of users) {
     const data = await loadDigestData(u.id);
-    const mail = renderDigest(u.name, data, day);
+    const off = unsubscribeUrl(u.unsubscribe_token);
+    const mail = renderDigest(u.name, data, day, off);
     if (opts.dryRun) {
       log(`digest (dry-run) → ${u.email}: ${mail.subject}`);
       continue;
     }
     try {
-      await sendMail({ to: u.email, ...mail });
+      // one-click unsubscribe straight from the mail app (RFC 8058)
+      const oneClick = `${config.APP_URL.replace(/\/$/, '')}/api/unsubscribe/${u.unsubscribe_token}`;
+      await sendMail({
+        to: u.email,
+        ...mail,
+        headers: { 'List-Unsubscribe': `<${oneClick}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+      });
       await query(
         `INSERT INTO digest_log (user_id, day, status) VALUES ($1, $2, 'sent')
          ON CONFLICT (user_id, day) DO UPDATE SET status = 'sent', sent_at = now(), error = NULL`,

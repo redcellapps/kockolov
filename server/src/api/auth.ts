@@ -67,19 +67,39 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// Tiny in-memory limiter for login attempts (per IP + e-mail)
-const attempts = new Map<string, { count: number; until: number }>();
+/**
+ * Tiny in-memory rate limiter: at most `max` hits per key within the window. One process serves
+ * the site, so memory is enough; a restart simply starts the counts over.
+ */
+export function createLimiter(max: number, windowMs: number) {
+  const hits = new Map<string, { count: number; until: number }>();
+  return {
+    /** Counts a hit; true when the key is over the limit. */
+    hit(key: string): boolean {
+      const now = Date.now();
+      if (hits.size > 5000) for (const [k, v] of hits) if (v.until < now) hits.delete(k);
+      const a = hits.get(key);
+      if (!a || a.until < now) {
+        hits.set(key, { count: 1, until: now + windowMs });
+        return false;
+      }
+      a.count++;
+      return a.count > max;
+    },
+    reset(key: string) {
+      hits.delete(key);
+    },
+    clear() {
+      hits.clear();
+    },
+  };
+}
+
+// login attempts per IP + e-mail
+const loginLimiter = createLimiter(8, 10 * 60_000);
 export function loginRateLimited(key: string): boolean {
-  const now = Date.now();
-  if (attempts.size > 5000) for (const [k, v] of attempts) if (v.until < now) attempts.delete(k);
-  const a = attempts.get(key);
-  if (!a || a.until < now) {
-    attempts.set(key, { count: 1, until: now + 10 * 60_000 });
-    return false;
-  }
-  a.count++;
-  return a.count > 8;
+  return loginLimiter.hit(key);
 }
 export function resetLoginAttempts(key: string) {
-  attempts.delete(key);
+  loginLimiter.reset(key);
 }

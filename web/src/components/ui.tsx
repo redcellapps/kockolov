@@ -6,7 +6,7 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ');
 }
 
-type Variant = 'primary' | 'dark' | 'ghost' | 'outline';
+type Variant = 'primary' | 'dark' | 'ghost' | 'outline' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 export function buttonClasses(variant: Variant = 'primary', size: Size = 'md', className?: string): string {
@@ -19,6 +19,7 @@ export function buttonClasses(variant: Variant = 'primary', size: Size = 'md', c
     variant === 'dark' && 'bg-ink text-bg hover:opacity-90',
     variant === 'ghost' && 'text-ink-2 hover:bg-surface-2 hover:text-ink',
     variant === 'outline' && 'border border-line bg-surface text-ink hover:border-ink-3',
+    variant === 'danger' && 'bg-deal text-white hover:opacity-90',
     className,
   );
 }

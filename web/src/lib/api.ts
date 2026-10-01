@@ -2,6 +2,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** machine-readable reason from the server, e.g. 'unconfirmed' */
+    public code?: string,
   ) {
     super(message);
   }
@@ -17,7 +19,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Greška ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Greška ${res.status}`, data?.code);
   return data as T;
 }
 

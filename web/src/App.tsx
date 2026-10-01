@@ -9,8 +9,10 @@ import Home from './pages/Home';
 import InvitePage from './pages/Invite';
 import LoginPage from './pages/Login';
 import { DealsPage, NotFoundPage, ThemesPage, WatchlistPage } from './pages/Other';
+import PrivacyPage from './pages/Privacy';
 import SearchPage from './pages/Search';
 import SetDetail from './pages/SetDetail';
+import UnsubscribePage from './pages/Unsubscribe';
 
 /** While the site is private, every page except login needs a session. */
 function Gate({ children, needUser, needAdmin }: { children: ReactNode; needUser?: boolean; needAdmin?: boolean }) {
@@ -30,13 +32,13 @@ function Gate({ children, needUser, needAdmin }: { children: ReactNode; needUser
   return <>{children}</>;
 }
 
-/** Login/registration page; once signed in, continue to the page the user originally wanted. */
+/** Login, sign-up and forgotten-password page; once signed in, continue to the page the user originally wanted. */
 function LoginRoute() {
   const { user, loading } = useAuth();
   const loc = useLocation();
   if (!loading && user) {
     const from = (loc.state as { from?: string } | null)?.from;
-    return <Navigate to={from && !from.startsWith('/prijava') ? from : '/'} replace />;
+    return <Navigate to={from && !['/prijava', '/registracija', '/zaboravljena-lozinka'].includes(from) ? from : '/'} replace />;
   }
   return <LoginPage />;
 }
@@ -47,7 +49,11 @@ export default function App() {
       <Routes>
         <Route path="/prijava" element={<LoginRoute />} />
         <Route path="/registracija" element={<LoginRoute />} />
+        <Route path="/zaboravljena-lozinka" element={<LoginRoute />} />
         <Route path="/poziv/:token" element={<InvitePage />} />
+        <Route path="/potvrda/:token" element={<InvitePage />} />
+        <Route path="/odjava/:token" element={<UnsubscribePage />} />
+        <Route path="/privatnost" element={<PrivacyPage />} />
         <Route path="/" element={<Gate><Home /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />

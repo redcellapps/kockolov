@@ -76,6 +76,8 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
     return ok({ ok: true });
   }
   if (path === '/api/auth/register') return err(403, 'Registracija trenutno nije otvorena.');
+  // no mail in the preview; pretend the link went out
+  if ((path === '/api/auth/forgot' || path === '/api/auth/resend') && method === 'POST') return ok({ ok: true });
 
   // private mode: everything else needs a session
   if (!state.user) return err(401, 'Potrebna je prijava.');

@@ -22,6 +22,7 @@ export default function AccountPage() {
   const [digest, setDigest] = useState(user?.digest_enabled ?? true);
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
+  const [delPw, setDelPw] = useState('');
   useEffect(() => {
     setName(user?.name ?? '');
     setDigest(user?.digest_enabled ?? true);
@@ -37,6 +38,12 @@ export default function AccountPage() {
       setCur('');
       setNext('');
     },
+  });
+
+  const remove = useMutation({
+    mutationFn: () => api('/api/me', { method: 'DELETE', json: { password: delPw } }),
+    // full reload: nothing from the deleted account stays in memory
+    onSuccess: () => window.location.assign('/'),
   });
 
   if (!user) return null;
@@ -112,6 +119,32 @@ export default function AccountPage() {
           {pw.isSuccess && <p className="text-sm font-semibold text-save">{t('account.password.done')}</p>}
           <Button type="submit" variant="dark" disabled={pw.isPending}>
             {t('account.password.submit')}
+          </Button>
+        </form>
+      </Card>
+
+      <Card title={t('account.delete')}>
+        <p className="text-sm text-ink-2">{t('account.delete.text')}</p>
+        <form
+          className="mt-4 space-y-4"
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            remove.mutate();
+          }}
+        >
+          <input
+            className={input}
+            type="password"
+            placeholder={t('account.delete.password')}
+            aria-label={t('account.delete.password')}
+            value={delPw}
+            onChange={(e) => setDelPw(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+          {remove.isError && <p className="text-sm font-semibold text-deal">{(remove.error as Error).message}</p>}
+          <Button type="submit" variant="danger" disabled={remove.isPending || !delPw}>
+            {t('account.delete.submit')}
           </Button>
         </form>
       </Card>

@@ -42,11 +42,12 @@ interface AdminUser {
   last_login_at: string | null;
   accepted_at: string | null;
   invited_at: string | null;
+  self_signup?: boolean;
 }
 
 interface LinkResult {
   email: string;
-  kind: 'invite' | 'reset';
+  kind: 'invite' | 'reset' | 'verify';
   emailSent: boolean;
   link?: string;
   error?: string;
@@ -247,7 +248,11 @@ export default function AdminPage() {
                       <span className="text-ink-3">{u.digest_enabled ? t('admin.users.digestOn') : t('admin.users.digestOff')}</span>
                     ) : (
                       <span className="inline-flex rounded-full bg-brand/30 px-2 py-0.5 text-xs font-bold text-ink">
-                        {u.invited_at ? t('admin.users.pending', { when: ago(u.invited_at) }) : t('admin.users.pendingNoInvite')}
+                        {u.self_signup
+                          ? t('admin.users.unconfirmed')
+                          : u.invited_at
+                            ? t('admin.users.pending', { when: ago(u.invited_at) })
+                            : t('admin.users.pendingNoInvite')}
                       </span>
                     )}
                   </td>
@@ -259,7 +264,7 @@ export default function AdminPage() {
                       disabled={resend.isPending}
                       className="cursor-pointer rounded-lg px-2 py-1 text-xs font-bold text-accent hover:bg-surface-2 disabled:opacity-50"
                     >
-                      {u.accepted_at ? t('admin.users.reset') : t('admin.users.resend')}
+                      {u.accepted_at ? t('admin.users.reset') : u.self_signup ? t('admin.users.resendVerify') : t('admin.users.resend')}
                     </button>
                   </td>
                 </tr>
@@ -313,7 +318,11 @@ function LinkNotice({ r }: { r: LinkResult }) {
   if (r.emailSent) {
     return (
       <p role="status" className="mb-3 rounded-xl bg-save-soft px-3 py-2 text-sm font-semibold text-save">
-        {r.kind === 'invite' ? t('admin.users.invited', { email: r.email }) : t('admin.users.resetSent', { email: r.email })}
+        {r.kind === 'invite'
+          ? t('admin.users.invited', { email: r.email })
+          : r.kind === 'verify'
+            ? t('admin.users.verifySent', { email: r.email })
+            : t('admin.users.resetSent', { email: r.email })}
       </p>
     );
   }

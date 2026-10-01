@@ -9,6 +9,7 @@ import { config } from '../config.js';
 import { pool } from '../db.js';
 import { type SessionUser, userFromRequest } from './auth.js';
 import { adminRoutes } from './routes/admin.js';
+import { publicRoutes } from './routes/public.js';
 import { authRoutes } from './routes/auth.js';
 import { catalogRoutes } from './routes/catalog.js';
 import { meRoutes } from './routes/me.js';
@@ -19,7 +20,7 @@ declare module 'fastify' {
   }
 }
 
-const OPEN_PATHS = ['/api/auth/', '/api/health'];
+const OPEN_PATHS = ['/api/auth/', '/api/health', '/api/unsubscribe/'];
 
 export function webDistDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -30,7 +31,8 @@ export function webDistDir(): string {
 export async function buildApp(opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: opts.logger ?? { level: config.isProd ? 'info' : 'warn' },
-    trustProxy: true,
+    // one reverse proxy (nginx/Caddy) in front: the client IP is the last X-Forwarded-For entry
+    trustProxy: (_addr: string, hop: number) => hop === 0,
   });
   await app.register(cookie);
   app.decorateRequest('user', null);
@@ -60,6 +62,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(catalogRoutes);
   await app.register(meRoutes);
   await app.register(adminRoutes);
+  await app.register(publicRoutes);
 
   const dist = webDistDir();
   if (existsSync(dist)) {

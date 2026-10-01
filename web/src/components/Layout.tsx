@@ -5,14 +5,15 @@ import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { ago } from '../lib/format';
+import { CONTACT_EMAIL } from '../lib/site';
 import { ClockIcon, HeartIcon } from './icons';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Logo } from './Logo';
 import { SearchBox } from './SearchBox';
-import { cx } from './ui';
+import { buttonClasses, cx } from './ui';
 
 function UserMenu() {
-  const { user, logout } = useAuth();
+  const { user, logout, registrationOpen } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -22,9 +23,16 @@ function UserMenu() {
   }, []);
   if (!user) {
     return (
-      <Link to="/prijava" className="rounded-xl px-3 py-2 text-sm font-bold hover:bg-surface-2">
-        {t('nav.login')}
-      </Link>
+      <div className="flex items-center gap-1.5">
+        <Link to="/prijava" className="rounded-xl px-3 py-2 text-sm font-bold hover:bg-surface-2">
+          {t('nav.login')}
+        </Link>
+        {registrationOpen && (
+          <Link to="/registracija" className={buttonClasses('primary', 'sm', 'whitespace-nowrap')}>
+            {t('nav.register')}
+          </Link>
+        )}
+      </div>
     );
   }
   const initial = (user.name || user.email).trim()[0]?.toUpperCase() ?? '?';
@@ -149,7 +157,17 @@ function Footer() {
             </p>
           )}
         </div>
-        <p className="max-w-xl text-xs leading-relaxed text-ink-3">{t('footer.disclaimer')}</p>
+        <div className="max-w-xl">
+          <nav aria-label={t('footer.privacy')} className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold">
+            <Link to="/privatnost" className="text-ink-2 hover:text-ink hover:underline">
+              {t('footer.privacy')}
+            </Link>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink-2 hover:text-ink hover:underline">
+              {t('footer.contact')}: {CONTACT_EMAIL}
+            </a>
+          </nav>
+          <p className="mt-4 text-xs leading-relaxed text-ink-3">{t('footer.disclaimer')}</p>
+        </div>
       </div>
     </footer>
   );

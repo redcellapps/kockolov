@@ -155,6 +155,19 @@ docker compose up -d
 docker compose exec app node server/dist/cli.js digest --email you@example.com
 ```
 
+## 8. Public launch
+
+1. myVesta → **Mail** → `kockolov.rs` → add the account `kontakt@kockolov.rs` (or a forward to an
+   address you read). The privacy page and the footer list it as the contact for data requests.
+2. In `/opt/kockolov/.env` set `PUBLIC_MODE=true`, then `docker compose up -d`.
+   - browsing works without an account; sign-up needs an e-mail confirmation link
+   - `https://kockolov.rs/robots.txt` and `/sitemap.xml` open up for search engines
+   - unconfirmed sign-ups are removed after 30 days (worker, with the morning crawl)
+3. Check: open the site in a private window, sign up with a second address, confirm from the
+   e-mail. Optionally submit `https://kockolov.rs/sitemap.xml` in Google Search Console.
+
+To close sign-up again but keep the site public: `REGISTRATION_OPEN=false`.
+
 ## Updating
 
 ```bash

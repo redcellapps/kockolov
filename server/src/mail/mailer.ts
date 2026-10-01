@@ -20,7 +20,13 @@ function getTransport(): Transporter {
   return transporter;
 }
 
-export async function sendMail(msg: { to: string; subject: string; html: string; text: string }): Promise<void> {
+export async function sendMail(msg: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  headers?: Record<string, string>;
+}): Promise<void> {
   if (!mailConfigured()) throw new Error('SMTP nije podešen (SMTP_HOST)');
   await getTransport().sendMail({ from: config.MAIL_FROM, ...msg });
 }

@@ -14,6 +14,9 @@ async function crawlJob() {
     const res = await runCrawl({ log });
     await alertOnCrawlProblems(res, log);
     await query('DELETE FROM sessions WHERE expires_at < now()');
+    // sign-ups nobody confirmed within 30 days, and old one-time links
+    await query("DELETE FROM users WHERE self_signup AND accepted_at IS NULL AND created_at < now() - interval '30 days'");
+    await query("DELETE FROM user_tokens WHERE expires_at < now() - interval '30 days'");
   } catch (err) {
     log(`posao: preuzimanje nije uspelo: ${(err as Error).stack ?? err}`);
   }

@@ -9,7 +9,7 @@ import { seedReferenceData } from './crawler/seed.js';
 import { computeDeals } from './deals/engine.js';
 import { alertOnCrawlProblems } from './jobs/alerts.js';
 import { writeFileSync } from 'node:fs';
-import { loadDigestData, renderDigest, sendDigests } from './mail/digest.js';
+import { loadDigestData, renderDigest, sendDigests, unsubscribeUrl } from './mail/digest.js';
 import { todayLocal } from './lib/time.js';
 
 const HELP = `Kockolov CLI
@@ -65,12 +65,12 @@ async function main() {
       break;
     case 'digest': {
       if (values.preview) {
-        const u = await one<{ id: number; name: string; email: string }>(
-          `SELECT id, name, email FROM users ${values.email ? 'WHERE email = $1' : 'ORDER BY id'} LIMIT 1`,
+        const u = await one<{ id: number; name: string; email: string; unsubscribe_token: string }>(
+          `SELECT id, name, email, unsubscribe_token FROM users ${values.email ? 'WHERE email = $1' : 'ORDER BY id'} LIMIT 1`,
           values.email ? [normalizeEmail(values.email)] : [],
         );
         if (!u) throw new Error('Nema korisnika');
-        const mail = renderDigest(u.name, await loadDigestData(u.id), todayLocal());
+        const mail = renderDigest(u.name, await loadDigestData(u.id), todayLocal(), unsubscribeUrl(u.unsubscribe_token));
         writeFileSync(values.preview, mail.html);
         console.log(`${mail.subject}\n→ ${values.preview} (za ${u.email})`);
         break;
