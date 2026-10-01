@@ -4,6 +4,7 @@ import { Button, Toggle } from '../components/ui';
 import { t } from '../i18n';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { usePageTitle } from '../lib/title';
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -18,6 +19,7 @@ const input = 'h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-
 
 export default function AccountPage() {
   const { user, refresh } = useAuth();
+  usePageTitle(t('title.account'));
   const [name, setName] = useState(user?.name ?? '');
   const [digest, setDigest] = useState(user?.digest_enabled ?? true);
   const [cur, setCur] = useState('');

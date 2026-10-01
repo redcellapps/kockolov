@@ -5,6 +5,7 @@ import { Button } from '../components/ui';
 import { t } from '../i18n';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { usePageTitle } from '../lib/title';
 
 export function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   const { label, ...rest } = props;
@@ -84,6 +85,7 @@ export default function LoginPage() {
   const loc = useLocation();
   const navigate = useNavigate();
   const mode = modeFor(loc.pathname);
+  usePageTitle(mode === 'login' ? t('title.login') : mode === 'register' ? t('title.register') : t('title.forgot'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');

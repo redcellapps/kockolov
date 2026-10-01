@@ -4,6 +4,7 @@ import { Button, ShopDot, Spinner, cx } from '../components/ui';
 import { t } from '../i18n';
 import { api } from '../lib/api';
 import { ago, num, rsd, shopName } from '../lib/format';
+import { usePageTitle } from '../lib/title';
 
 interface Overview {
   runs: {
@@ -74,6 +75,7 @@ function Box({ title, action, children }: { title: string; action?: React.ReactN
 
 export default function AdminPage() {
   const qc = useQueryClient();
+  usePageTitle(t('title.admin'));
   const ov = useQuery({ queryKey: ['admin', 'overview'], queryFn: () => api<Overview>('/api/admin/overview'), refetchInterval: 15_000 });
   const um = useQuery({ queryKey: ['admin', 'unmatched'], queryFn: () => api<Unmatched[]>('/api/admin/unmatched') });
   const users = useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<AdminUser[]>('/api/admin/users') });

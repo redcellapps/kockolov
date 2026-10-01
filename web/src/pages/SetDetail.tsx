@@ -8,6 +8,7 @@ import { WatchButton } from '../components/WatchButton';
 import { t } from '../i18n';
 import { api, ApiError, type SetDetail as SetDetailData } from '../lib/api';
 import { ageLabel, ago, dateLong, reasonText, rsd, shopName } from '../lib/format';
+import { usePageTitle } from '../lib/title';
 
 export default function SetDetail() {
   const { setNum = '' } = useParams();
@@ -17,6 +18,17 @@ export default function SetDetail() {
     queryFn: () => api<SetDetailData>(`/api/sets/${encodeURIComponent(setNum)}`),
     retry: (n, err) => !(err instanceof ApiError && err.status === 404) && n < 2,
   });
+  const d = q.data;
+  const cheapest = d?.offers.find((o) => o.in_stock);
+  usePageTitle(
+    d
+      ? cheapest
+        ? t('title.set', { num: d.set.set_num, name: d.set.name, price: rsd(cheapest.price_rsd) })
+        : t('title.setNoPrice', { num: d.set.set_num, name: d.set.name })
+      : q.error instanceof ApiError && q.error.status === 404
+        ? t('title.notFound')
+        : null,
+  );
 
   if (q.isLoading) return <DetailSkeleton />;
   if (q.error instanceof ApiError && q.error.status === 404)

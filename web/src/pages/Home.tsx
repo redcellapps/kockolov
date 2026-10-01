@@ -7,8 +7,10 @@ import { CardSkeleton, EmptyState, SectionHeader } from '../components/ui';
 import { t, tn } from '../i18n';
 import { api, type Deal, type Shop, type Stats, type Theme } from '../lib/api';
 import { num, SHOPS } from '../lib/format';
+import { usePageTitle } from '../lib/title';
 
 export default function Home() {
+  usePageTitle(null);
   const deals = useQuery({ queryKey: ['deals', 12], queryFn: () => api<{ day: string | null; items: Deal[] }>('/api/deals?limit=12') });
   const themes = useQuery({ queryKey: ['themes'], queryFn: () => api<Theme[]>('/api/themes'), staleTime: 600_000 });
   const stats = useQuery({ queryKey: ['stats'], queryFn: () => api<Stats>('/api/stats'), staleTime: 300_000 });

@@ -7,6 +7,7 @@ import { t } from '../i18n';
 import { api, type Deal, type Theme } from '../lib/api';
 import { dateLong } from '../lib/format';
 import { ThemeTile } from './Home';
+import { usePageTitle } from '../lib/title';
 
 function PageHead({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -33,6 +34,13 @@ function Loading() {
 
 export function DealsPage() {
   const q = useQuery({ queryKey: ['deals', 40], queryFn: () => api<{ day: string | null; items: Deal[] }>('/api/deals?limit=40') });
+  usePageTitle(
+    q.data?.day
+      ? t('title.dealsDay', {
+          date: new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${q.data.day.slice(0, 10)}T12:00:00Z`)),
+        })
+      : t('title.deals'),
+  );
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <PageHead title={t('deals.title')} subtitle={t('deals.subtitle')} />
@@ -56,6 +64,8 @@ export function DealsPage() {
 
 export function ThemesPage() {
   const q = useQuery({ queryKey: ['themes'], queryFn: () => api<Theme[]>('/api/themes'), staleTime: 600_000 });
+  // same as the server's title: the three themes with the most sets
+  usePageTitle(q.data?.length ? t('title.themesTop', { names: q.data.slice(0, 3).map((x) => x.name).join(', ') }) : t('title.themes'));
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <PageHead title={t('themes.title')} subtitle={t('themes.subtitle')} />
@@ -76,6 +86,7 @@ export function ThemesPage() {
 
 export function WatchlistPage() {
   const q = useWatchlist();
+  usePageTitle(t('title.watchlist'));
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <PageHead title={t('watch.title')} subtitle={t('watch.subtitle')} />
@@ -103,6 +114,7 @@ export function WatchlistPage() {
 }
 
 export function NotFoundPage() {
+  usePageTitle(t('title.notFound'));
   return (
     <div className="mx-auto max-w-3xl px-4 py-20">
       <EmptyState

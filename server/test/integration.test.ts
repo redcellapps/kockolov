@@ -367,6 +367,74 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     }
   });
 
+  it('gives every page its own head for search engines and link previews', async () => {
+    const { pageMeta, injectHead } = await import('../src/seo/pages.js');
+    const { plural } = await import('../src/seo/og.js');
+    const sharp = (await import('sharp')).default;
+    const template = '<html><head><meta name="description" content="x" /><title>x</title></head><body></body></html>';
+    const head = async (path: string) => {
+      const u = new URL(path, 'http://local');
+      const m = await pageMeta(u.pathname, u.searchParams);
+      return { m, html: injectHead(template, m) };
+    };
+
+    // while the site is private nothing is indexed and nothing is previewed in detail
+    const closed = await head('/set/10280');
+    expect(closed.m.robots).toBe('noindex, nofollow');
+    expect(closed.html).not.toContain('og:image');
+    expect((await app.inject({ method: 'GET', url: '/og/set/10280.jpg' })).statusCode).toBe(404);
+
+    config.PUBLIC_MODE = true;
+    try {
+      const set = await head('/set/10280');
+      expect(set.m.status).toBe(200);
+      expect(set.html).toMatch(/<title>LEGO 10280 .+ – od 7\.319 RSD \| Kockolov<\/title>/);
+      expect(set.html).toContain(`<link rel="canonical" href="${config.APP_URL.replace(/\/$/, '')}/set/10280" />`);
+      expect(set.html).toContain('<meta property="og:type" content="product" />');
+      expect(set.html).toMatch(/<meta property="og:image" content="[^"]+\/og\/set\/10280\.jpg\?v=[\w-]+" \/>/);
+      expect(set.html).toContain('<meta property="product:price:amount" content="7319" />');
+      const ld = [...set.html.matchAll(/<script type="application\/ld\+json">(.+?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+      const product = ld.find((o) => o['@type'] === 'Product');
+      expect(product.offers).toMatchObject({ '@type': 'AggregateOffer', priceCurrency: 'RSD', lowPrice: 7319, availability: 'https://schema.org/InStock' });
+      expect(ld.find((o) => o['@type'] === 'BreadcrumbList').itemListElement.length).toBeGreaterThanOrEqual(2);
+
+      // unknown sets and pages are real 404s; private and search pages stay out of the index
+      expect((await head('/set/00000')).m).toMatchObject({ status: 404, robots: 'noindex' });
+      expect((await head('/nema-ovoga')).m.status).toBe(404);
+      expect((await head('/nalog')).m.robots).toBe('noindex, follow');
+      expect((await head('/pretraga?q=falcon')).m.robots).toBe('noindex, follow');
+      const theme = await head('/pretraga?theme=harry-potter');
+      expect(theme.m.title).toBe('LEGO Harry Potter setovi: cene u Srbiji | Kockolov');
+      expect(theme.m.canonical).toBe('/pretraga?theme=harry-potter');
+      expect((await head('/')).m.jsonLd?.[0]).toMatchObject({ '@type': 'WebSite' });
+
+      // text from the shops can't break out of the HTML
+      const { name: original } = (await one("SELECT name FROM sets WHERE set_num = '10280'"))!;
+      await query("UPDATE sets SET name = 'Zamak </script><b>' WHERE set_num = '10280'");
+      const tricky = (await head('/set/10280')).html;
+      expect(tricky).not.toContain('</script><b>');
+      expect(tricky).toContain('Zamak &lt;/script&gt;&lt;b&gt;');
+      await query("UPDATE sets SET name = $1 WHERE set_num = '10280'", [original]);
+
+      // the preview pictures: 1200×630 JPEG, small enough for WhatsApp
+      for (const url of ['/og/set/10280.jpg', '/og/home.jpg', '/og/deals.jpg', '/og/theme/harry-potter.jpg']) {
+        const r = await app.inject({ method: 'GET', url });
+        expect(r.statusCode, url).toBe(200);
+        expect(r.headers['content-type']).toBe('image/jpeg');
+        const meta = await sharp(r.rawPayload).metadata();
+        expect([meta.width, meta.height]).toEqual([1200, 630]);
+        expect(r.rawPayload.length).toBeLessThan(300 * 1024);
+      }
+      expect((await app.inject({ method: 'GET', url: '/og/set/00000.jpg' })).statusCode).toBe(404);
+      expect((await app.inject({ method: 'GET', url: '/og/theme/nema.jpg' })).statusCode).toBe(404);
+    } finally {
+      config.PUBLIC_MODE = false;
+    }
+
+    // 1 prodavnica, 2 prodavnice, 5/11/12 prodavnica, 21 prodavnica, 22 prodavnice, 25/112 prodavnica
+    expect([1, 2, 5, 11, 12, 21, 22, 25, 112].map((n) => plural(n, 'a', 'b', 'c')).join('')).toBe('abcccabcc');
+  });
+
   it('records price changes and marks vanished listings as unavailable on the next run', async () => {
     const page1 = readFileSync(path.join(__dirname, 'fixtures/kockarium/page1.html'), 'utf8').replace('13.190,00', '12.490,00');
     await mock.close();

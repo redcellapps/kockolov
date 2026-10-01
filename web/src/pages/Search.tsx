@@ -8,6 +8,7 @@ import { Button, CardSkeleton, EmptyState, ErrorState, Spinner, cx } from '../co
 import { t, tn, type TKey } from '../i18n';
 import { api, type SearchResponse, type Theme } from '../lib/api';
 import { shopName } from '../lib/format';
+import { usePageTitle } from '../lib/title';
 
 const SORTS = ['relevance', 'deal', 'discount', 'price_asc', 'price_desc', 'newest', 'name'];
 const PAGE = 24;
@@ -30,6 +31,10 @@ export default function SearchPage() {
     getNextPageParam: (last) => (last.page * last.size < last.total ? last.page + 1 : undefined),
     placeholderData: (prev) => prev,
   });
+
+  const themes = useQuery({ queryKey: ['themes'], queryFn: () => api<Theme[]>('/api/themes'), staleTime: 600_000 });
+  const onlyTheme = f.themes.length === 1 && !f.q ? themes.data?.find((x) => x.slug === f.themes[0])?.name : undefined;
+  usePageTitle(f.q ? t('title.search', { q: f.q }) : onlyTheme ? t('title.theme', { name: onlyTheme }) : t('title.all'));
 
   const first = q.data?.pages[0];
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];

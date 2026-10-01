@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { t, type TKey } from '../i18n';
 import { CONTACT_EMAIL } from '../lib/site';
+import { usePageTitle } from '../lib/title';
 
 const SECTIONS: { h: TKey; p: TKey[] }[] = [
   { h: 'privacy.who.h', p: ['privacy.who.1', 'privacy.who.2'] },
@@ -34,6 +35,7 @@ function linkify(text: string): ReactNode {
 }
 
 export default function PrivacyPage() {
+  usePageTitle(t('title.privacy'));
   return (
     <article className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
       <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t('privacy.title')}</h1>
