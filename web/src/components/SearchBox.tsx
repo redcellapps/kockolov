@@ -1,14 +1,34 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { t } from '../i18n';
 import { SearchIcon, XIcon } from './icons';
 import { cx } from './ui';
 
+/** True while the media query matches; updates when the window is resized. */
+function useMedia(query: string): boolean {
+  const [match, setMatch] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const on = () => setMatch(m.matches);
+    on();
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, [query]);
+  return match;
+}
+
+/**
+ * Set search. `md` is the compact header field; `lg` is the home hero field with its own
+ * "Pretraži" button, drawn in the hero's fixed black/white/yellow colors.
+ */
 export function SearchBox({ size = 'md', autoFocus, className }: { size?: 'md' | 'lg'; autoFocus?: boolean; className?: string }) {
   const [params] = useSearchParams();
   const [value, setValue] = useState(params.get('q') ?? '');
   const navigate = useNavigate();
   const location = useLocation();
+  const id = useId();
+  // the long example placeholder only fits the full-width desktop field
+  const wide = useMedia('(min-width: 1024px)');
 
   useEffect(() => {
     setValue(params.get('q') ?? '');
@@ -24,38 +44,50 @@ export function SearchBox({ size = 'md', autoFocus, className }: { size?: 'md' |
     navigate(`/pretraga?${next.toString()}`);
   }
 
+  const lg = size === 'lg';
   return (
     <form onSubmit={submit} role="search" className={cx('relative', className)}>
+      <label htmlFor={id} className="sr-only">
+        {t('search.label')}
+      </label>
       <SearchIcon
-        size={size === 'lg' ? 22 : 18}
-        className={cx('pointer-events-none absolute top-1/2 -translate-y-1/2 text-ink-3', size === 'lg' ? 'left-4 sm:left-5' : 'left-3.5')}
+        size={lg ? 22 : 18}
+        aria-hidden
+        className={cx(
+          'pointer-events-none absolute top-1/2 -translate-y-1/2',
+          lg ? 'left-4 text-hero-muted sm:left-5' : 'left-3.5 text-ink-3',
+        )}
       />
       <input
+        id={id}
         type="search"
+        enterKeyHint="search"
+        autoComplete="off"
         value={value}
         autoFocus={autoFocus}
         onChange={(e) => setValue(e.target.value)}
-        placeholder={size === 'lg' && typeof window !== 'undefined' && window.innerWidth >= 640 ? t('search.placeholderLong') : t('search.placeholder')}
-        aria-label={t('search.button')}
+        placeholder={lg && wide ? t('search.placeholderLong') : t('search.placeholder')}
         className={cx(
-          'w-full rounded-2xl border border-line bg-surface text-ink placeholder:text-ink-3 outline-none transition focus:border-ink focus:shadow-card [&::-webkit-search-cancel-button]:hidden',
-          size === 'lg' ? 'h-14 pl-12 pr-24 text-base shadow-card sm:h-16 sm:pl-14 sm:pr-36 sm:text-lg' : 'h-11 pl-10 pr-10 text-[15px]',
+          'w-full outline-none transition [&::-webkit-search-cancel-button]:hidden',
+          lg
+            ? 'h-14 rounded-2xl border-2 border-hero-ink bg-hero-paper pl-12 pr-[7.5rem] text-base text-hero-ink shadow-[0_3px_0_0_var(--hero-ink)] placeholder:text-hero-muted focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-hero-ink/25 sm:h-16 sm:pl-14 sm:pr-36 sm:text-lg'
+            : 'h-11 rounded-2xl border border-line bg-surface pl-10 pr-10 text-[15px] text-ink placeholder:text-ink-3 focus:border-ink focus:shadow-card',
         )}
       />
-      {value && size !== 'lg' && (
+      {value && !lg && (
         <button
           type="button"
           onClick={() => setValue('')}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-lg p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink"
           aria-label={t('common.close')}
         >
           <XIcon size={16} />
         </button>
       )}
-      {size === 'lg' && (
+      {lg && (
         <button
           type="submit"
-          className="absolute right-2 top-2 bottom-2 rounded-xl bg-brand px-4 font-bold sm:px-6 text-brand-ink shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)] transition hover:bg-brand-2 cursor-pointer"
+          className="absolute bottom-2 right-2 top-2 cursor-pointer rounded-xl bg-hero-ink px-4 text-[15px] font-extrabold text-brand transition hover:bg-hero-ink/85 sm:px-7 sm:text-base"
         >
           {t('search.button')}
         </button>

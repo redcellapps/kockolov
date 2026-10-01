@@ -33,6 +33,15 @@
   --grid: #ece9e1;
   --stud-shade: rgba(22, 21, 15, 0.07);
   --stud-shine: rgba(255, 255, 255, 0.55);
+
+  /* Home hero: the same yellow, black, white and red in light and dark theme */
+  --hero-ink: #16150f;
+  --hero-paper: #ffffff;
+  --hero-muted: #57544c;
+  --hero-line: rgba(22, 21, 15, 0.12);
+  --hero-red: #c8131a;
+  --hero-green: #0f7a37;
+  --hero-green-soft: #e3f4e9;
 }
 
 /* Dark palette: follows the OS setting unless the page is pinned with data-theme */
@@ -121,6 +130,13 @@
   --color-save: var(--save);
   --color-save-soft: var(--save-soft);
   --color-accent: var(--accent);
+  --color-hero-ink: var(--hero-ink);
+  --color-hero-paper: var(--hero-paper);
+  --color-hero-muted: var(--hero-muted);
+  --color-hero-line: var(--hero-line);
+  --color-hero-red: var(--hero-red);
+  --color-hero-green: var(--hero-green);
+  --color-hero-green-soft: var(--hero-green-soft);
   --shadow-card: var(--shadow);
   --shadow-lift: var(--shadow-lg);
 }
@@ -148,6 +164,43 @@ body {
   background-image: radial-gradient(circle at 12px 12px, var(--stud-shade) 5px, transparent 5.5px),
     radial-gradient(circle at 12px 12px, var(--stud-shine) 3px, transparent 3.5px);
   background-size: 24px 24px;
+}
+
+/* Home hero background: soft light from the top left, sparse studs that fade out behind the text */
+.hero-bg {
+  background:
+    radial-gradient(110% 80% at 0% 0%, rgba(255, 236, 140, 0.85) 0%, transparent 60%),
+    radial-gradient(70% 90% at 100% 100%, rgba(236, 176, 0, 0.5) 0%, transparent 65%),
+    var(--brand);
+}
+.hero-studs {
+  background-image: radial-gradient(circle at 18px 18px, rgba(22, 21, 15, 0.055) 6px, transparent 6.5px);
+  background-size: 36px 36px;
+  -webkit-mask-image: linear-gradient(100deg, transparent 35%, #000 85%);
+  mask-image: linear-gradient(100deg, transparent 35%, #000 85%);
+}
+.hero :focus-visible {
+  outline-color: var(--hero-ink);
+}
+/* Phone: intro, search, deal, stats in one column. Desktop: text column + deal column. */
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.75rem;
+}
+.hero-main {
+  display: contents;
+}
+@media (min-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 3.5rem;
+    align-items: center;
+  }
+  .hero-main {
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 /* Product images are shop photos on white; keep them on white in dark mode too */
