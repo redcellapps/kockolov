@@ -11,7 +11,7 @@ import { OG_HEIGHT, OG_WIDTH, plural } from './og.js';
  * Crawlers and preview bots don't run JavaScript, so this has to be in the HTML itself.
  */
 
-const NB = ' '; // keeps "3 prodavnice" on one line
+const NB = '\u00a0'; // keeps "3 prodavnice" on one line
 const SITE = 'Kockolov';
 
 export interface PageMeta {
@@ -249,7 +249,7 @@ async function themePage(slug: string): Promise<PageMeta> {
     path,
     canonical: path,
     title: `LEGO ${name} setovi: cene u Srbiji | ${SITE}`,
-    description: `${c.subtitle.replace(/ /g, ' ')} Svi LEGO ${name} setovi iz LEGO Store-a, Kockariuma i Ananasa na jednom mestu.`,
+    description: `${c.subtitle} Svi LEGO ${name} setovi iz prodavnica ${list(st.shop_names)} na jednom mestu.`.replace(/\u00a0/g, ' '),
     image: { url: `/og/theme/${encodeURIComponent(slug)}.jpg?v=${version(c.subtitle, c.items[0]?.image_url)}`, alt: `LEGO ${name} na Kockolovu` },
   };
 }
