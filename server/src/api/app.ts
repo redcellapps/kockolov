@@ -63,7 +63,19 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
 
   const dist = webDistDir();
   if (existsSync(dist)) {
-    await app.register(fastifyStatic, { root: dist, wildcard: false, maxAge: '1h' });
+    await app.register(fastifyStatic, {
+      root: dist,
+      wildcard: false,
+      cacheControl: false,
+      // index.html must be re-checked on every visit, or browsers keep an old version after a deploy;
+      // files in assets/ have a content hash in their name and never change
+      setHeaders(res, filePath) {
+        const file = path.basename(filePath);
+        if (file === 'index.html') res.setHeader('Cache-Control', 'no-cache');
+        else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        else res.setHeader('Cache-Control', 'public, max-age=86400');
+      },
+    });
     // SPA fallback: every non-API route renders index.html
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/')) return reply.code(404).send({ error: 'Nije pronađeno.' });
