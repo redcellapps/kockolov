@@ -187,6 +187,8 @@ export const sr = {
   'common.loading': 'Učitavanje…',
   'common.error': 'Nešto nije u redu. Pokušaj ponovo.',
   'common.retry': 'Pokušaj ponovo',
+  'common.reload': 'Osveži stranicu',
+  'common.crash': 'Ova stranica nije uspela da se prikaže. Osveži je, a ako se ponovi, pokušaj ponovo kasnije.',
   'common.cancel': 'Otkaži',
   'common.close': 'Zatvori',
 

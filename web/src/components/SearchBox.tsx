@@ -10,7 +10,9 @@ export function SearchBox({ size = 'md', autoFocus, className }: { size?: 'md' |
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => setValue(params.get('q') ?? ''), [params]);
+  useEffect(() => {
+    setValue(params.get('q') ?? '');
+  }, [params]);
 
   function submit(e: FormEvent) {
     e.preventDefault();

@@ -6,6 +6,7 @@ import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { ago } from '../lib/format';
 import { ClockIcon, HeartIcon } from './icons';
+import { ErrorBoundary } from './ErrorBoundary';
 import { Logo } from './Logo';
 import { SearchBox } from './SearchBox';
 import { cx } from './ui';
@@ -156,11 +157,16 @@ function Footer() {
 
 export function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Braces matter: newer Chrome returns a Promise from scrollTo, and an effect may only return a cleanup function
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
+      </main>
       <Footer />
     </div>
   );

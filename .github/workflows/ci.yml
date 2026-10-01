@@ -27,6 +27,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # an effect may only return a cleanup function; `useEffect(() => fn(), ...)` returns fn's result
+      # (Chrome 154's scrollTo returns a Promise, which crashed every page change)
+      - name: Effects use braces
+        run: "! grep -rnE 'use(Layout)?Effect\\(\\(\\) => [^{]' web/src"
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
