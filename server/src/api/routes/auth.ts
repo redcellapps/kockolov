@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { config } from '../../config.js';
 import { one, query, tx } from '../../db.js';
-import { mailConfigured } from '../../mail/mailer.js';
+import { accountFrom, mailConfigured } from '../../mail/mailer.js';
 import { hashToken, linkSentRecently, sendLink, validLink } from '../invites.js';
 import {
   createLimiter,
@@ -42,7 +42,11 @@ export async function authRoutes(app: FastifyInstance) {
       app.log.warn(`SMTP nije podešen; link (${kind}) za korisnika ${userId}: ${r.link}`);
       return true;
     }
-    app.log.error(`slanje linka (${kind}) korisniku ${userId} nije uspelo: ${r.error}`);
+    const login = config.ACCOUNT_SMTP_USER || config.SMTP_USER || '(bez prijave)';
+    app.log.error(`slanje linka (${kind}) korisniku ${userId} nije uspelo (od: ${accountFrom()}, SMTP prijava: ${login}): ${r.error}`);
+    // the link never reached anyone: drop it, so trying again right away sends a fresh one
+    const token = r.link?.split('/').pop();
+    if (token) await query('DELETE FROM user_tokens WHERE token_hash = $1', [hashToken(token)]);
     return false;
   }
 

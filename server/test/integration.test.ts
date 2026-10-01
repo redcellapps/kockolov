@@ -7,13 +7,15 @@ import { startMockShops } from './mockShops.js';
 
 // Outgoing mail is captured instead of sent; off by default, like a server without SMTP
 type Sent = { to: string; subject: string; text: string; headers?: Record<string, string>; sender?: 'morning' | 'account' };
-const mail = vi.hoisted(() => ({ on: false, sent: [] as Sent[] }));
+const mail = vi.hoisted(() => ({ on: false, fail: false, sent: [] as Sent[] }));
 vi.mock('../src/mail/mailer.js', () => ({
   mailConfigured: () => mail.on,
+  accountFrom: () => 'Kockolov <nalog@example.com>',
   sendMail: async (m: Sent) => {
     mail.sent.push({ ...m, sender: 'morning' });
   },
   sendAccountMail: async (m: Sent) => {
+    if (mail.fail) throw new Error('Invalid login: 535 Incorrect authentication data');
     mail.sent.push({ ...m, sender: 'account' });
   },
 }));
@@ -215,6 +217,16 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     mail.on = true;
     mail.sent.length = 0;
     try {
+      // the mail server refuses: the visitor gets an error, and a retry right after the fix sends the mail
+      mail.fail = true;
+      const refused = await app.inject({
+        method: 'POST',
+        url: '/api/auth/register',
+        payload: { email: 'pera@example.com', password: 'perina-lozinka', name: 'Pera' },
+      });
+      expect(refused.statusCode).toBe(502);
+      expect(mail.sent).toHaveLength(0);
+      mail.fail = false;
       const reg = await app.inject({
         method: 'POST',
         url: '/api/auth/register',
@@ -311,6 +323,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     } finally {
       config.registrationOpen = false;
       mail.on = false;
+      mail.fail = false;
     }
   });
 
