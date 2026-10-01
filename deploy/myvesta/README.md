@@ -157,9 +157,21 @@ docker compose exec app node server/dist/cli.js digest --email you@example.com
 
 ## 8. Public launch
 
-1. myVesta → **Mail** → `kockolov.rs` → add the account `kontakt@kockolov.rs` (or a forward to an
-   address you read). The privacy page and the footer list it as the contact for data requests.
-2. In `/opt/kockolov/.env` set `PUBLIC_MODE=true`, then `docker compose up -d`.
+1. myVesta → **Mail** → `kockolov.rs` → add two accounts:
+   - `kontakt@kockolov.rs` (or a forward to an address you read): the privacy page and the footer
+     list it as the contact for data requests
+   - `nalog@kockolov.rs`: sender of sign-up confirmations, new-password links and invitations
+     (`jutro@` stays the sender of the morning e-mail only)
+2. In `/opt/kockolov/.env` add
+
+   ```
+   PUBLIC_MODE=true
+   ACCOUNT_MAIL_FROM=Kockolov <nalog@kockolov.rs>
+   ACCOUNT_SMTP_USER=nalog@kockolov.rs
+   ACCOUNT_SMTP_PASS=<the nalog mailbox password>
+   ```
+
+   then `docker compose up -d`.
    - browsing works without an account; sign-up needs an e-mail confirmation link
    - `https://kockolov.rs/robots.txt` and `/sitemap.xml` open up for search engines
    - unconfirmed sign-ups are removed after 30 days (worker, with the morning crawl)

@@ -6,11 +6,15 @@ import { config } from '../src/config.js';
 import { startMockShops } from './mockShops.js';
 
 // Outgoing mail is captured instead of sent; off by default, like a server without SMTP
-const mail = vi.hoisted(() => ({ on: false, sent: [] as { to: string; subject: string; text: string; headers?: Record<string, string> }[] }));
+type Sent = { to: string; subject: string; text: string; headers?: Record<string, string>; sender?: 'morning' | 'account' };
+const mail = vi.hoisted(() => ({ on: false, sent: [] as Sent[] }));
 vi.mock('../src/mail/mailer.js', () => ({
   mailConfigured: () => mail.on,
-  sendMail: async (m: { to: string; subject: string; text: string; headers?: Record<string, string> }) => {
-    mail.sent.push(m);
+  sendMail: async (m: Sent) => {
+    mail.sent.push({ ...m, sender: 'morning' });
+  },
+  sendAccountMail: async (m: Sent) => {
+    mail.sent.push({ ...m, sender: 'account' });
   },
 }));
 
@@ -220,7 +224,8 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect(reg.json()).toEqual({ ok: true, email: 'pera@example.com' });
       expect(reg.headers['set-cookie']).toBeUndefined(); // not signed in before confirming
       expect(mail.sent).toHaveLength(1);
-      expect(mail.sent[0]).toMatchObject({ to: 'pera@example.com', subject: 'Potvrdi e-mail adresu za Kockolov' });
+      // account e-mails go out from their own address (nalog@), not the morning one
+      expect(mail.sent[0]).toMatchObject({ to: 'pera@example.com', subject: 'Potvrdi e-mail adresu za Kockolov', sender: 'account' });
       const token = mail.sent[0].text.match(/\/potvrda\/([\w-]+)/)![1];
 
       // a second click right away doesn't send another e-mail
@@ -261,7 +266,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect(mail.sent).toHaveLength(0);
       expect((await app.inject({ method: 'POST', url: '/api/auth/forgot', payload: { email: 'pera@example.com' } })).json()).toEqual({ ok: true });
       expect(mail.sent).toHaveLength(1);
-      expect(mail.sent[0].subject).toBe('Link za novu lozinku na Kockolovu');
+      expect(mail.sent[0]).toMatchObject({ subject: 'Link za novu lozinku na Kockolovu', sender: 'account' });
       expect(mail.sent[0].text).toContain('24 sata');
       const reset = mail.sent[0].text.match(/\/poziv\/([\w-]+)/)![1];
       expect((await app.inject({ method: 'POST', url: `/api/auth/invite/${reset}`, payload: { password: 'nova-perina-lozinka' } })).statusCode).toBe(200);
@@ -274,6 +279,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       const { unsubscribe_token: unsub } = (await one("SELECT unsubscribe_token FROM users WHERE email = 'pera@example.com'"))!;
       mail.sent.length = 0;
       await sendDigests({ onlyEmail: 'pera@example.com', log: () => {} });
+      expect(mail.sent[0].sender).toBe('morning');
       expect(mail.sent[0].headers).toEqual({
         'List-Unsubscribe': `<${config.APP_URL.replace(/\/$/, '')}/api/unsubscribe/${unsub}>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',

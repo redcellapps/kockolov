@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { config } from '../config.js';
 import { one, query } from '../db.js';
 import { renderInvite, type LinkKind } from '../mail/invite.js';
-import { mailConfigured, sendMail } from '../mail/mailer.js';
+import { mailConfigured, sendAccountMail } from '../mail/mailer.js';
 
 /** How long each kind of link stays valid. New-password links are short-lived. */
 export const LINK_DAYS: Record<LinkKind, number> = { invite: 7, verify: 7, reset: 1 };
@@ -65,7 +65,7 @@ export async function sendLink(
   const url = linkUrl(token, kind);
   if (!mailConfigured()) return { kind, emailSent: false, link: url, error: 'Slanje e-maila nije podešeno (SMTP).' };
   try {
-    await sendMail({ to: u.email, ...renderInvite({ kind, name: u.name, url, inviter: invitedBy?.name || null, days: LINK_DAYS[kind] }) });
+    await sendAccountMail({ to: u.email, ...renderInvite({ kind, name: u.name, url, inviter: invitedBy?.name || null, days: LINK_DAYS[kind] }) });
     return { kind, emailSent: true };
   } catch (err) {
     return { kind, emailSent: false, link: url, error: (err as Error).message };

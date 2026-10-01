@@ -55,6 +55,11 @@ const schema = z.object({
   // Accept a self-signed certificate (the server's own Exim on VestaCP/myVesta)
   SMTP_TLS_INSECURE: bool(false),
   MAIL_FROM: z.string().default('Kockolov <no-reply@kockolov.rs>'),
+  // Account e-mails (sign-up confirmation, new password, invitation) from their own address.
+  // Empty = same as MAIL_FROM. With ACCOUNT_SMTP_USER set they log in to SMTP as that mailbox.
+  ACCOUNT_MAIL_FROM: z.string().optional(),
+  ACCOUNT_SMTP_USER: z.string().optional(),
+  ACCOUNT_SMTP_PASS: z.string().optional(),
   ADMIN_ALERT_EMAIL: z.string().optional(),
 });
 
