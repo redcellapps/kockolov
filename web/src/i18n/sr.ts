@@ -310,6 +310,8 @@ export const sr = {
   'title.notFound': 'Stranica nije pronađena',
   'footer.privacy': 'Politika privatnosti',
   'footer.contact': 'Kontakt',
+  'footer.madeBy': 'Made by',
+  'footer.poweredBy': 'Powered by',
   'privacy.title': 'Politika privatnosti',
   'privacy.updated': 'Poslednja izmena: 1. oktobar 2026.',
   'privacy.intro':

@@ -5,7 +5,7 @@ import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { ago } from '../lib/format';
-import { CONTACT_EMAIL } from '../lib/site';
+import { CONTACT_EMAIL, CREDITS } from '../lib/site';
 import { ClockIcon, HeartIcon } from './icons';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Logo } from './Logo';
@@ -167,6 +167,19 @@ function Footer() {
             </a>
           </nav>
           <p className="mt-4 text-xs leading-relaxed text-ink-3">{t('footer.disclaimer')}</p>
+        </div>
+      </div>
+      <div className="border-t border-line">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-4 text-xs text-ink-3 sm:px-6">
+          <p>
+            {t('footer.madeBy')} <span className="font-semibold text-ink-2">{CREDITS.author}</span>
+          </p>
+          <p>
+            {t('footer.poweredBy')}{' '}
+            <a href={CREDITS.studioUrl} target="_blank" rel="noopener" className="font-semibold text-ink-2 hover:text-ink hover:underline">
+              {CREDITS.studio}
+            </a>
+          </p>
         </div>
       </div>
     </footer>
