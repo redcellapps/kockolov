@@ -5,6 +5,7 @@ import { one, query } from '../../db.js';
 import { isCrawlRunning, runCrawl } from '../../crawler/pipeline.js';
 import { refreshSets } from '../../crawler/refresh.js';
 import { computeDeals } from '../../deals/engine.js';
+import { sendLink } from '../invites.js';
 import { hashPassword, normalizeEmail } from '../auth.js';
 
 async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
@@ -62,29 +63,43 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
   app.get('/api/admin/users', async () =>
-    query('SELECT id, email, name, role, digest_enabled, created_at, last_login_at FROM users ORDER BY created_at'),
+    query(
+      `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.created_at, u.last_login_at, u.accepted_at,
+              (SELECT max(t.created_at) FROM user_tokens t WHERE t.user_id = u.id AND t.kind = 'invite') AS invited_at
+         FROM users u ORDER BY u.created_at`,
+    ),
   );
 
+  // Adds the account and e-mails an invitation; the person sets their own password from the link.
   app.post('/api/admin/users', async (req, reply) => {
     const body = z
       .object({
         email: z.string().email(),
         name: z.string().max(80).optional(),
         role: z.enum(['user', 'admin']).default('user'),
-        password: z.string().min(8).max(200).optional(),
       })
       .safeParse(req.body);
-    if (!body.success) return reply.code(400).send({ error: 'Neispravni podaci (lozinka bar 8 karaktera).' });
+    if (!body.success) return reply.code(400).send({ error: 'Unesite ispravan e-mail.' });
     const email = normalizeEmail(body.data.email);
     if (await one('SELECT 1 FROM users WHERE email = $1', [email])) {
       return reply.code(409).send({ error: 'Korisnik sa ovim e-mailom već postoji.' });
     }
-    const password = body.data.password ?? randomBytes(9).toString('base64url');
-    await query('INSERT INTO users (email, name, role, password_hash) VALUES ($1, $2, $3, $4)', [
-      email, body.data.name ?? '', body.data.role, await hashPassword(password),
-    ]);
-    // the generated password is shown once so the admin can hand it over
-    return { ok: true, password: body.data.password ? undefined : password };
+    // unusable random password until the invitation is accepted
+    const user = await one<{ id: number }>(
+      'INSERT INTO users (email, name, role, password_hash) VALUES ($1, $2, $3, $4) RETURNING id',
+      [email, body.data.name ?? '', body.data.role, await hashPassword(randomBytes(24).toString('base64url'))],
+    );
+    const result = await sendLink(user!.id, { id: req.user!.id, name: req.user!.name });
+    return { ok: true, email, ...result };
+  });
+
+  // Sends the invitation again (pending accounts) or a new-password link (accepted accounts).
+  app.post<{ Params: { id: string } }>('/api/admin/users/:id/invite', async (req, reply) => {
+    const id = Number(req.params.id);
+    const u = await one<{ email: string }>('SELECT email FROM users WHERE id = $1', [id]);
+    if (!u) return reply.code(404).send({ error: 'Korisnik ne postoji.' });
+    const result = await sendLink(id, { id: req.user!.id, name: req.user!.name });
+    return { ok: true, email: u.email, ...result };
   });
 
   app.delete<{ Params: { id: string } }>('/api/admin/users/:id', async (req, reply) => {

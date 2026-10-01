@@ -6,7 +6,7 @@ import { t } from '../i18n';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
-function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+export function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   const { label, ...rest } = props;
   return (
     <label className="block">

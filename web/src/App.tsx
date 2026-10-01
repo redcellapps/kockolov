@@ -6,6 +6,7 @@ import { useAuth } from './lib/auth';
 import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
 import Home from './pages/Home';
+import InvitePage from './pages/Invite';
 import LoginPage from './pages/Login';
 import { DealsPage, NotFoundPage, ThemesPage, WatchlistPage } from './pages/Other';
 import SearchPage from './pages/Search';
@@ -46,6 +47,7 @@ export default function App() {
       <Routes>
         <Route path="/prijava" element={<LoginRoute />} />
         <Route path="/registracija" element={<LoginRoute />} />
+        <Route path="/poziv/:token" element={<InvitePage />} />
         <Route path="/" element={<Gate><Home /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />

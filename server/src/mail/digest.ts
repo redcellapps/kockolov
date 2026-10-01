@@ -152,7 +152,7 @@ export async function sendDigests(opts: { dryRun?: boolean; onlyEmail?: string; 
   }
   const users = await query<{ id: number; email: string; name: string }>(
     `SELECT u.id, u.email, u.name FROM users u
-      WHERE u.digest_enabled ${opts.onlyEmail ? 'AND u.email = $2' : ''}
+      WHERE u.digest_enabled ${opts.onlyEmail ? 'AND u.email = $2' : 'AND u.accepted_at IS NOT NULL'}
         AND NOT EXISTS (SELECT 1 FROM digest_log l WHERE l.user_id = u.id AND l.day = $1 AND l.status = 'sent')`,
     opts.onlyEmail ? [day, opts.onlyEmail.toLowerCase()] : [day],
   );

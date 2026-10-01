@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { config } from '../../config.js';
-import { one } from '../../db.js';
+import { one, tx } from '../../db.js';
+import { hashToken, validLink } from '../invites.js';
 import {
   createSession,
   destroySession,
@@ -54,10 +55,47 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: 'Nalog sa ovim e-mailom već postoji.' });
     }
     const user = await one<{ id: number }>(
-      'INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id',
+      'INSERT INTO users (email, name, password_hash, accepted_at) VALUES ($1, $2, $3, now()) RETURNING id',
       [email, body.data.name ?? '', await hashPassword(body.data.password)],
     );
     await createSession(reply, user!.id);
+    return { ok: true };
+  });
+
+  // Invitation / new-password links (public: the person isn't logged in yet)
+  const GONE = 'Ovaj link je istekao ili je već iskorišćen. Zatraži novi od administratora.';
+
+  app.get<{ Params: { token: string } }>('/api/auth/invite/:token', async (req, reply) => {
+    const link = await validLink(req.params.token);
+    if (!link) return reply.code(410).send({ error: GONE });
+    return { email: link.email, name: link.name, kind: link.kind };
+  });
+
+  app.post<{ Params: { token: string } }>('/api/auth/invite/:token', async (req, reply) => {
+    const body = z.object({ password: z.string().min(8).max(200), name: z.string().max(80).optional() }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Lozinka mora imati bar 8 karaktera.' });
+    const passwordHash = await hashPassword(body.data.password);
+    const userId = await tx(async (c) => {
+      // claim the link atomically, so it can only be used once
+      const t = await c.query(
+        `UPDATE user_tokens SET used_at = now()
+          WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() RETURNING user_id`,
+        [hashToken(req.params.token)],
+      );
+      if (!t.rows.length) return null;
+      const id = t.rows[0].user_id as number;
+      await c.query(
+        `UPDATE users SET password_hash = $2, name = coalesce(nullif($3, ''), name),
+                accepted_at = coalesce(accepted_at, now()), last_login_at = now()
+          WHERE id = $1`,
+        [id, passwordHash, body.data.name?.trim() ?? ''],
+      );
+      // a new password signs out other sessions
+      await c.query('DELETE FROM sessions WHERE user_id = $1', [id]);
+      return id;
+    });
+    if (!userId) return reply.code(410).send({ error: GONE });
+    await createSession(reply, userId);
     return { ok: true };
   });
 }

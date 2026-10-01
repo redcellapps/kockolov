@@ -86,7 +86,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
   it('requires login while the site is private', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/sets' });
     expect(r.statusCode).toBe(401);
-    await query("INSERT INTO users (email, name, role, password_hash) VALUES ('milan@example.com', 'Milan', 'admin', $1)", [
+    await query("INSERT INTO users (email, name, role, password_hash, accepted_at) VALUES ('milan@example.com', 'Milan', 'admin', $1, now())", [
       await hashPassword('tajna-lozinka'),
     ]);
     const bad = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'milan@example.com', password: 'x' } });
@@ -141,6 +141,57 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     await app.inject({ method: 'PUT', url: '/api/me/watchlist/76476', headers: { cookie } });
     const w = await app.inject({ method: 'GET', url: '/api/me/watchlist', headers: { cookie } });
     expect(w.json().items.map((i: { set_num: string }) => i.set_num)).toEqual(['76476']);
+  });
+
+  it('invites a user by link: one-time use, logs in, then the morning e-mail starts', async () => {
+    // no SMTP in tests, so the admin gets the link back to pass on by hand
+    const add = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: { cookie },
+      payload: { email: 'Ana@Example.com', name: 'Ana' },
+    });
+    expect(add.statusCode).toBe(200);
+    expect(add.json()).toMatchObject({ ok: true, email: 'ana@example.com', kind: 'invite', emailSent: false });
+    const link: string = add.json().link;
+    const token = link.split('/poziv/')[1];
+    expect(token.length).toBeGreaterThan(30);
+
+    const users = (await app.inject({ method: 'GET', url: '/api/admin/users', headers: { cookie } })).json();
+    expect(users.find((u: { email: string }) => u.email === 'ana@example.com')).toMatchObject({ accepted_at: null });
+    // pending accounts can't log in and don't get the morning e-mail yet
+    const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'ana@example.com', password: 'anything' } });
+    expect(login.statusCode).toBe(401);
+    expect(await one("SELECT 1 AS x FROM users WHERE email = 'ana@example.com' AND accepted_at IS NOT NULL")).toBeNull();
+
+    const info = await app.inject({ method: 'GET', url: `/api/auth/invite/${token}` });
+    expect(info.json()).toEqual({ email: 'ana@example.com', name: 'Ana', kind: 'invite' });
+    const short = await app.inject({ method: 'POST', url: `/api/auth/invite/${token}`, payload: { password: 'kratka' } });
+    expect(short.statusCode).toBe(400);
+    const accept = await app.inject({ method: 'POST', url: `/api/auth/invite/${token}`, payload: { password: 'anina-lozinka', name: 'Ana P.' } });
+    expect(accept.statusCode).toBe(200);
+    const anaCookie = String(accept.headers['set-cookie']).split(';')[0];
+    const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie: anaCookie } });
+    expect(me.json().user).toMatchObject({ email: 'ana@example.com', name: 'Ana P.', role: 'user' });
+
+    // the link works only once
+    const again = await app.inject({ method: 'POST', url: `/api/auth/invite/${token}`, payload: { password: 'druga-lozinka' } });
+    expect(again.statusCode).toBe(410);
+    expect((await app.inject({ method: 'GET', url: `/api/auth/invite/${token}` })).statusCode).toBe(410);
+    const relogin = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'ana@example.com', password: 'anina-lozinka' } });
+    expect(relogin.statusCode).toBe(200);
+
+    // for an accepted account the admin sends a new-password link; a newer link replaces the older one
+    const id = users.find((u: { email: string }) => u.email === 'ana@example.com').id;
+    const r1 = (await app.inject({ method: 'POST', url: `/api/admin/users/${id}/invite`, headers: { cookie } })).json();
+    const r2 = (await app.inject({ method: 'POST', url: `/api/admin/users/${id}/invite`, headers: { cookie } })).json();
+    expect(r2.kind).toBe('reset');
+    expect((await app.inject({ method: 'GET', url: `/api/auth/invite/${r1.link.split('/poziv/')[1]}` })).statusCode).toBe(410);
+    expect((await app.inject({ method: 'GET', url: `/api/auth/invite/${r2.link.split('/poziv/')[1]}` })).json().kind).toBe('reset');
+
+    // expired links don't work
+    await query("UPDATE user_tokens SET expires_at = now() - interval '1 minute' WHERE used_at IS NULL");
+    expect((await app.inject({ method: 'GET', url: `/api/auth/invite/${r2.link.split('/poziv/')[1]}` })).statusCode).toBe(410);
   });
 
   it('records price changes and marks vanished listings as unavailable on the next run', async () => {

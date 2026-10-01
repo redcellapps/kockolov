@@ -183,7 +183,7 @@ async function main() {
 
   const pw = await hashPassword('demo1234');
   await query(
-    `INSERT INTO users (email, name, role, password_hash) VALUES ('demo@kockolov.local', 'Milan', 'admin', $1)
+    `INSERT INTO users (email, name, role, password_hash, accepted_at) VALUES ('demo@kockolov.local', 'Milan', 'admin', $1, now())
      ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
     [pw],
   );

@@ -40,6 +40,16 @@ interface AdminUser {
   role: string;
   digest_enabled: boolean;
   last_login_at: string | null;
+  accepted_at: string | null;
+  invited_at: string | null;
+}
+
+interface LinkResult {
+  email: string;
+  kind: 'invite' | 'reset';
+  emailSent: boolean;
+  link?: string;
+  error?: string;
 }
 
 const STATUS: Record<string, string> = {
@@ -75,12 +85,19 @@ export default function AdminPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
   });
   const [newUser, setNewUser] = useState({ email: '', name: '', role: 'user' });
-  const [created, setCreated] = useState('');
+  const [linkResult, setLinkResult] = useState<LinkResult | null>(null);
   const addUser = useMutation({
-    mutationFn: () => api<{ password?: string }>('/api/admin/users', { method: 'POST', json: newUser }),
+    mutationFn: () => api<LinkResult>('/api/admin/users', { method: 'POST', json: newUser }),
     onSuccess: (r) => {
-      setCreated(r.password ? t('admin.users.created', { password: r.password }) : '');
+      setLinkResult(r);
       setNewUser({ email: '', name: '', role: 'user' });
+      void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+  });
+  const resend = useMutation({
+    mutationFn: (id: number) => api<LinkResult>(`/api/admin/users/${id}/invite`, { method: 'POST', json: {} }),
+    onSuccess: (r) => {
+      setLinkResult(r);
       void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
     },
   });
@@ -110,19 +127,19 @@ export default function AdminPage() {
             </div>
             <dl className="mt-3 grid grid-cols-4 gap-2 text-sm">
               <div>
-                <dt className="text-xs text-ink-3">Aktivno</dt>
+                <dt className="text-xs text-ink-3">{t('admin.shop.active')}</dt>
                 <dd className="tabular font-bold">{num(s.active_offers)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-ink-3">Nepovezano</dt>
+                <dt className="text-xs text-ink-3">{t('admin.shop.unmatched')}</dt>
                 <dd className="tabular font-bold">{num(s.unmatched)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-ink-3">Nije set</dt>
+                <dt className="text-xs text-ink-3">{t('admin.shop.merch')}</dt>
                 <dd className="tabular font-bold">{num(s.merch)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-ink-3">Po nazivu</dt>
+                <dt className="text-xs text-ink-3">{t('admin.shop.byName')}</dt>
                 <dd className="tabular font-bold">{num(s.name_matched)}</dd>
               </div>
             </dl>
@@ -135,15 +152,15 @@ export default function AdminPage() {
           <table className="w-full min-w-[720px] text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-ink-3">
               <tr>
-                <th className="py-2">Prodavnica</th>
-                <th>Status</th>
-                <th>Početak</th>
-                <th className="text-right">Str.</th>
-                <th className="text-right">Ponuda</th>
-                <th className="text-right">Povezano</th>
-                <th className="text-right">Novih</th>
-                <th className="text-right">Promena cene</th>
-                <th className="pl-4">Napomena</th>
+                <th className="py-2">{t('admin.runs.shop')}</th>
+                <th>{t('admin.runs.status')}</th>
+                <th>{t('admin.runs.started')}</th>
+                <th className="text-right">{t('admin.runs.pages')}</th>
+                <th className="text-right">{t('admin.runs.items')}</th>
+                <th className="text-right">{t('admin.runs.matched')}</th>
+                <th className="text-right">{t('admin.runs.new')}</th>
+                <th className="text-right">{t('admin.runs.priceChanges')}</th>
+                <th className="pl-4">{t('admin.runs.note')}</th>
               </tr>
             </thead>
             <tbody>
@@ -189,13 +206,13 @@ export default function AdminPage() {
           <input
             required
             type="email"
-            placeholder="e-mail"
+            placeholder={t('admin.users.email')}
             value={newUser.email}
             onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
             className="h-10 min-w-56 flex-1 rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-ink"
           />
           <input
-            placeholder="ime"
+            placeholder={t('admin.users.name')}
             value={newUser.name}
             onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
             className="h-10 w-40 rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-ink"
@@ -205,28 +222,51 @@ export default function AdminPage() {
             onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
             className="h-10 rounded-xl border border-line bg-surface px-3 text-sm"
           >
-            <option value="user">korisnik</option>
-            <option value="admin">administrator</option>
+            <option value="user">{t('admin.users.role.user')}</option>
+            <option value="admin">{t('admin.users.role.admin')}</option>
           </select>
           <Button size="sm" className="h-10" type="submit" disabled={addUser.isPending}>
             {t('admin.users.add')}
           </Button>
         </form>
-        {created && <p className="mb-3 rounded-xl bg-save-soft px-3 py-2 text-sm font-semibold text-save">{created}</p>}
-        {addUser.isError && <p className="mb-3 text-sm font-semibold text-deal">{(addUser.error as Error).message}</p>}
-        <table className="w-full text-sm">
-          <tbody>
-            {users.data?.map((u) => (
-              <tr key={u.id} className="border-t border-line">
-                <td className="py-2 font-semibold">{u.email}</td>
-                <td className="text-ink-2">{u.name}</td>
-                <td className="text-ink-2">{u.role}</td>
-                <td className="text-ink-3">{u.digest_enabled ? 'e-mail uključen' : 'bez e-maila'}</td>
-                <td className="text-right text-ink-3">{u.last_login_at ? ago(u.last_login_at) : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <p className="-mt-1 mb-3 text-xs text-ink-3">{t('admin.users.inviteHint')}</p>
+        {linkResult && <LinkNotice r={linkResult} />}
+        {(addUser.isError || resend.isError) && (
+          <p className="mb-3 text-sm font-semibold text-deal">{((addUser.error ?? resend.error) as Error).message}</p>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <tbody>
+              {users.data?.map((u) => (
+                <tr key={u.id} className="border-t border-line align-middle">
+                  <td className="py-2.5 pr-3 font-semibold">{u.email}</td>
+                  <td className="pr-3 text-ink-2">{u.name}</td>
+                  <td className="pr-3 text-ink-2">{u.role === 'admin' ? t('admin.users.role.admin') : t('admin.users.role.user')}</td>
+                  <td className="pr-3">
+                    {u.accepted_at ? (
+                      <span className="text-ink-3">{u.digest_enabled ? t('admin.users.digestOn') : t('admin.users.digestOff')}</span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-brand/30 px-2 py-0.5 text-xs font-bold text-ink">
+                        {u.invited_at ? t('admin.users.pending', { when: ago(u.invited_at) }) : t('admin.users.pendingNoInvite')}
+                      </span>
+                    )}
+                  </td>
+                  <td className="pr-3 text-right text-ink-3">{u.last_login_at ? ago(u.last_login_at) : '—'}</td>
+                  <td className="whitespace-nowrap text-right">
+                    <button
+                      type="button"
+                      onClick={() => resend.mutate(u.id)}
+                      disabled={resend.isPending}
+                      className="cursor-pointer rounded-lg px-2 py-1 text-xs font-bold text-accent hover:bg-surface-2 disabled:opacity-50"
+                    >
+                      {u.accepted_at ? t('admin.users.reset') : t('admin.users.resend')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Box>
     </div>
   );
@@ -256,13 +296,45 @@ function UnmatchedRow({ o, onMatch }: { o: Unmatched; onMatch: (setNum: string) 
         <input
           value={v}
           onChange={(e) => setV(e.target.value)}
-          placeholder="npr. 60384"
+          placeholder={t('admin.match.placeholder')}
           className="tabular h-9 w-28 rounded-lg border border-line bg-surface px-2 text-sm outline-none focus:border-ink"
         />
         <Button size="sm" variant="outline" type="submit">
           {t('admin.match')}
         </Button>
       </form>
+    </div>
+  );
+}
+
+/** Result of sending an invitation or new-password link; shows the link itself when no e-mail went out. */
+function LinkNotice({ r }: { r: LinkResult }) {
+  const [copied, setCopied] = useState(false);
+  if (r.emailSent) {
+    return (
+      <p role="status" className="mb-3 rounded-xl bg-save-soft px-3 py-2 text-sm font-semibold text-save">
+        {r.kind === 'invite' ? t('admin.users.invited', { email: r.email }) : t('admin.users.resetSent', { email: r.email })}
+      </p>
+    );
+  }
+  return (
+    <div role="status" className="mb-3 rounded-xl bg-brand/20 px-3 py-2.5 text-sm">
+      <p className="font-semibold">{t('admin.users.noMail', { email: r.email, error: r.error ?? '' })}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <code className="min-w-0 flex-1 break-all rounded-lg bg-surface px-2 py-1.5 text-xs">{r.link}</code>
+        <button
+          type="button"
+          className="cursor-pointer rounded-lg bg-ink px-3 py-1.5 text-xs font-bold text-bg"
+          onClick={() => {
+            navigator.clipboard?.writeText(r.link ?? '').then(
+              () => setCopied(true),
+              () => setCopied(false),
+            );
+          }}
+        >
+          {copied ? t('admin.users.copied') : t('admin.users.copy')}
+        </button>
+      </div>
     </div>
   );
 }

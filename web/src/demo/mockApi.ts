@@ -32,7 +32,7 @@ const state = {
   user: { ...snap.user } as Json | null,
   // a few sets already watched, so the watchlist page shows what it does
   watchlist: new Set<string>((snap.deals.items as Json[]).slice(0, 3).map((d) => d.set_num as string)),
-  users: [...(snap.admin.users as Json[])],
+  users: (snap.admin.users as Json[]).map((u): Json => ({ accepted_at: u.last_login_at ?? u.created_at, invited_at: null, ...u })),
   unmatched: [...(snap.admin.unmatched as Json[])],
 };
 
@@ -143,17 +143,26 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
       const email = String(body?.email ?? '').trim().toLowerCase();
       if (!/^\S+@\S+\.\S+$/.test(email)) return err(400, 'Unesite ispravan e-mail.');
       if (state.users.some((u) => u.email === email)) return err(409, 'Korisnik sa ovim e-mailom već postoji.');
-      const password = body?.password || Math.random().toString(36).slice(2, 12);
+      const now = new Date().toISOString();
       state.users.push({
         id: Math.max(...state.users.map((u) => u.id as number)) + 1,
         email,
         name: body?.name ?? '',
         role: body?.role === 'admin' ? 'admin' : 'user',
         digest_enabled: true,
-        created_at: new Date().toISOString(),
+        created_at: now,
         last_login_at: null,
+        accepted_at: null,
+        invited_at: now,
       });
-      return ok(body?.password ? { ok: true } : { ok: true, password });
+      return ok({ ok: true, email, kind: 'invite', emailSent: false, link: 'https://kockolov.rs/poziv/primer', error: 'u pregledu se e-mail ne šalje' });
+    }
+    const inviteUser = path.match(/^\/api\/admin\/users\/(\d+)\/invite$/);
+    if (inviteUser && method === 'POST') {
+      const u = state.users.find((x) => x.id === Number(inviteUser[1]));
+      if (!u) return err(404, 'Korisnik ne postoji.');
+      if (!u.accepted_at) u.invited_at = new Date().toISOString();
+      return ok({ ok: true, email: u.email, kind: u.accepted_at ? 'reset' : 'invite', emailSent: false, link: 'https://kockolov.rs/poziv/primer', error: 'u pregledu se e-mail ne šalje' });
     }
     const delUser = path.match(/^\/api\/admin\/users\/(\d+)$/);
     if (delUser && method === 'DELETE') {
