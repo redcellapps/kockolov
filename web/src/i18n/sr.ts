@@ -480,6 +480,7 @@ export const sr = {
   'title.notFound': 'Stranica nije pronađena',
   'footer.privacy': 'Politika privatnosti',
   'footer.blog': 'Blog',
+  'footer.copyright': '© {years} Kockolov',
   'footer.contact': 'Kontakt',
   'footer.madeBy': 'Made by',
   'footer.poweredBy': 'Powered by',

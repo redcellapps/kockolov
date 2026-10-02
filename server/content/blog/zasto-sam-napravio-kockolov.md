@@ -39,7 +39,7 @@ Kad sam počeo ozbiljnije da kupujem, shvatio sam još nešto. Kod nas je kupovi
 
 Razlike nisu male. Početkom jeseni 2026. set [LEGO Architecture Pariski Notr Dam (21061)](/set/21061) imao je jedanaest ponuda u devet prodavnica, od 22.072 do 30.951 dinar. Ista kutija, skoro 9.000 dinara razlike. Za toliko se kupi još jedan manji set.
 
-I onda kreneš: LEGO Store, pa Kockarium, pa Ananas, pa još pet sajtova. Dvadeset otvorenih tabova, a na kraju opet nisi siguran da si našao najbolju cenu. Tako sam kupovao i ja.
+I onda kreneš: [LEGO Store](https://lstore.rs), pa [Kockarium](https://www.kockarium.rs), pa [Ananas](https://ananas.rs), pa još pet sajtova. Dvadeset otvorenih tabova, a na kraju opet nisi siguran da si našao najbolju cenu. Tako sam kupovao i ja.
 
 ## Kockolov: poklon sebi, ali i vama
 
@@ -47,9 +47,9 @@ Zato sam napravio Kockolov. Iskreno, on je pre svega poklon onom dečaku ispred 
 
 Šta Kockolov radi:
 
-- Svako jutro proverava cene u LEGO Store-u, Kockariumu i Ananasu, a uz besplatan nalog i u još desetak prodavnica u Srbiji.
+- Svako jutro proverava cene u [LEGO Store-u](https://lstore.rs), [Kockariumu](https://www.kockarium.rs) i [Ananasu](https://ananas.rs), a uz besplatan nalog i u još desetak prodavnica u Srbiji.
 - Za svaki set pokazuje sve ponude na jednom mestu, od najjeftinije, sa istorijom cena. Odmah vidiš da li je akcija stvarno akcija.
-- Svakog dana izdvaja [ponude dana](/ponude): setove koji su tog jutra najpovoljniji u odnosu na cenu u LEGO Store-u i na svoje ranije cene.
+- Svakog dana izdvaja [ponude dana](/ponude): setove koji su tog jutra najpovoljniji u odnosu na cenu u [LEGO Store-u](https://lstore.rs) i na svoje ranije cene.
 - Setove koje želiš dodaš u Praćeno, a svako jutro u 7 sati stiže ti mejl sa najboljim ponudama.
 
 Kockolov ništa ne prodaje. Samo poredi cene i šalje te u prodavnicu gde je set u tom trenutku najpovoljniji.

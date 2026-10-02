@@ -181,6 +181,7 @@ function Footer() {
       </div>
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-4 text-xs text-ink-3 sm:px-6">
+          <p className="font-semibold text-ink-2">{t('footer.copyright', { years: copyrightYears() })}</p>
           <p>
             {t('footer.madeBy')} <span className="font-semibold text-ink-2">{CREDITS.author}</span>
           </p>
@@ -194,6 +195,13 @@ function Footer() {
       </div>
     </footer>
   );
+}
+
+const LAUNCH_YEAR = 2026;
+/** "2026", from next year "2026–2027": the year Kockolov started, through this one */
+function copyrightYears(): string {
+  const now = new Date().getFullYear();
+  return now > LAUNCH_YEAR ? `${LAUNCH_YEAR}–${now}` : String(LAUNCH_YEAR);
 }
 
 export function Layout({ children }: { children: ReactNode }) {
