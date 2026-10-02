@@ -13,15 +13,15 @@ Kockolov nije počeo prvom linijom koda. Počeo je mnogo ranije, u jednoj sobi u
 
 ## Nemački kanali i trideset sekundi sreće
 
-Kao klinac sam gledao nemačke kanale. Nemački nisam znao ali sam ga brzo preko TV naučio, i reklame sam razumeo savršeno. Duplo, Ravensburger, LEGO. Trideset sekundi sreće između dva crtaća.
+Kao klinac sam gledao nemačke kanale. Nemački nisam znao, ali sam ga brzo naučio preko TV-a, i reklame sam razumeo savršeno. Duplo, Ravensburger, LEGO. Trideset sekundi sreće između dva crtaća.
 
-Sedeo sam preblizu ekranu, kako to deca već rade, i upijao svaki detalj. Kockice koje škljocnu na svoje mesto. Zamak koji izraste iz kutije. Deca na reklami koja se smeju kao da je to najnormalnija stvar na svetu.
+Sedeo sam preblizu ekranu i upijao svaki detalj. Kockice koje kliknu na svoje mesto. Zamak koji izraste iz kutije. Deca na reklami koja se smeju kao da je to najnormalnija stvar na svetu.
 
 Za mene nije bila. Kod kuće se računao svaki dinar, i kutija LEGO kockica iz nemačke reklame jednostavno nije stala u taj račun. Nisam se žalio. Samo sam gledao, pamtio i u glavi slagao setove koje nisam imao.
 
 ## Obećanje koje sam dao sebi
 
-Negde tada sam sebi dao obećanje. Ono dečje, ozbiljno, kakvo se daje samo jednom: kad porastem i budem imao dovoljno para, kupiću sebi LEGO.
+U to vreme sam sebi dao obećanje. Ono dečje, ozbiljno, kakvo se daje samo jednom: kad porastem i budem imao dovoljno para, kupiću sebi LEGO.
 
 Nisam ga nikome rekao. Nije ni trebalo. Nosio sam ga kroz školu, kroz prve poslove, kroz godine kada su neke druge stvari bile važnije. Ponekad sam ga zaboravio na neko vreme, ali nikada potpuno.
 
@@ -35,7 +35,7 @@ Ko je to doživeo, zna o čemu pričam. Ko nije, neka mi veruje na reč: neke ž
 
 ## Kupovina LEGO setova kod nas: lutanje od sajta do sajta
 
-Kad sam počeo ozbiljnije da kupujem, shvatio sam još nešto. Kod nas je kupovina LEGO setova pravo lutanje. Isti set u jednoj prodavnici košta jedno, u drugoj drugo, u trećoj je akcija do sutra, a u četvrtoj ga nema na stanju.
+Ubrzo sam naleteo na problem koji verovatno poznaješ i ti: lutanje. Isti set u svakoj prodavnici ima drugačiju cenu, a teško je pronaći gde je najpovoljniji.
 
 Razlike nisu male. Početkom jeseni 2026. set [LEGO Architecture Pariski Notr Dam (21061)](/set/21061) imao je jedanaest ponuda u devet prodavnica, od 22.072 do 30.951 dinar. Ista kutija, skoro 9.000 dinara razlike. Za toliko se kupi još jedan manji set.
 
