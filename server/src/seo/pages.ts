@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { config } from '../config.js';
 import { one, query } from '../db.js';
+import { latestDeals } from '../api/audience.js';
 import { buildSearch } from '../api/search.js';
 import { escapeHtml, rsd, shopLabel } from '../mail/format.js';
 import { OG_HEIGHT, OG_WIDTH, plural } from './og.js';
@@ -64,14 +65,14 @@ export function loadSet(setNum: string): Promise<SetSeo | null> {
        FROM sets s
        LEFT JOIN themes t ON t.slug = s.theme_slug
        LEFT JOIN LATERAL (
-         SELECT price_rsd, shop_id, seller FROM offers o
+         SELECT price_rsd, shop_id, seller FROM public_offers o
           WHERE o.set_num = s.set_num AND o.active AND o.in_stock ORDER BY price_rsd LIMIT 1
        ) b ON true
        LEFT JOIN LATERAL (
          SELECT max(price_rsd) FILTER (WHERE in_stock) AS max_price, min(price_rsd) AS any_price,
                 count(*) FILTER (WHERE in_stock)::int AS offers_in_stock,
                 count(DISTINCT shop_id) FILTER (WHERE in_stock)::int AS shops_in_stock
-           FROM offers o WHERE o.set_num = s.set_num AND o.active
+           FROM public_offers o WHERE o.set_num = s.set_num AND o.active
        ) a ON true
       WHERE s.set_num = $1`,
     [setNum],
@@ -86,19 +87,19 @@ export interface Collection {
 
 async function siteStats() {
   return (await one<{ sets: number; shops: number; shop_names: string[]; deals: number; max_pct: number | null }>(
-    `SELECT (SELECT count(DISTINCT set_num)::int FROM offers WHERE active AND in_stock AND set_num IS NOT NULL) AS sets,
-            (SELECT count(*)::int FROM shops WHERE enabled) AS shops,
-            (SELECT coalesce(array_agg(name ORDER BY kind = 'official' DESC, name), '{}') FROM shops WHERE enabled) AS shop_names,
-            (SELECT count(*)::int FROM deals WHERE day = (SELECT max(day) FROM deals)) AS deals,
+    `SELECT (SELECT count(DISTINCT set_num)::int FROM public_offers WHERE active AND in_stock AND set_num IS NOT NULL) AS sets,
+            (SELECT count(*)::int FROM shops WHERE enabled AND NOT members_only) AS shops,
+            (SELECT coalesce(array_agg(name ORDER BY kind = 'official' DESC, name), '{}') FROM shops WHERE enabled AND NOT members_only) AS shop_names,
+            (SELECT count(*)::int FROM deals WHERE ${latestDeals('public')}) AS deals,
             (SELECT max(round(100.0 * (reference_price_rsd - best_price_rsd) / reference_price_rsd))::int
-               FROM deals WHERE day = (SELECT max(day) FROM deals) AND reference_price_rsd > best_price_rsd) AS max_pct`,
+               FROM deals WHERE ${latestDeals('public')} AND reference_price_rsd > best_price_rsd) AS max_pct`,
   ))!;
 }
 
 async function topDeals(n: number) {
   return query<{ image_url: string | null; best_price: number | null }>(
     `SELECT s.image_url, d.best_price_rsd AS best_price FROM deals d JOIN sets s ON s.set_num = d.set_num
-      WHERE d.day = (SELECT max(day) FROM deals) ORDER BY d.rank LIMIT $1`,
+      WHERE ${latestDeals('public', 'd')} ORDER BY d.rank LIMIT $1`,
     [n],
   );
 }
@@ -111,7 +112,7 @@ export async function loadCollection(kind: 'home' | 'deals' | 'theme', slug?: st
     const rows = await query<{ image_url: string | null; best_price: number | null; total: number }>(q.sql, q.params);
     const agg = await one<{ min: number | null; n: number }>(
       `SELECT min(o.price_rsd) AS min, count(DISTINCT o.set_num)::int AS n
-         FROM offers o JOIN sets s ON s.set_num = o.set_num
+         FROM public_offers o JOIN sets s ON s.set_num = o.set_num
         WHERE s.theme_slug = $1 AND o.active AND o.in_stock`,
       [slug],
     );
@@ -186,7 +187,7 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
     const st = await siteStats();
     const items = await topDeals(1);
     // the day of the list itself (before the morning crawl that is still yesterday's)
-    const latest = await one<{ day: string | null }>('SELECT max(day) AS day FROM deals');
+    const latest = await one<{ day: string | null }>("SELECT max(day) AS day FROM deals WHERE audience = 'public'");
     const day = latest?.day
       ? new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${latest.day}T12:00:00Z`))
       : null;
@@ -204,7 +205,7 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
 
   if (p === '/teme') {
     const top = await query<{ name: string }>(
-      `SELECT t.name FROM themes t JOIN sets s ON s.theme_slug = t.slug JOIN offers o ON o.set_num = s.set_num
+      `SELECT t.name FROM themes t JOIN sets s ON s.theme_slug = t.slug JOIN public_offers o ON o.set_num = s.set_num
         WHERE o.active AND o.in_stock GROUP BY t.name, t.sort_order ORDER BY count(DISTINCT s.set_num) DESC, t.sort_order LIMIT 3`,
     );
     return {

@@ -64,7 +64,7 @@ export function cleanTitle(title: string, setNum?: string | null): string {
 /** Age from text: "Uzrast 18+", "1.5+", "9+" -> number */
 export function ageFromText(text: string | null | undefined): number | null {
   if (!text) return null;
-  const m = text.match(/uzrast\s*(\d{1,2}(?:[.,]\d)?)\s*\+?/i) ?? text.match(/(?:^|\s)(\d{1,2}(?:[.,]5)?)\+(?:\s|$|,)/);
+  const m = text.match(/uzrast\s*:?\s*(\d{1,2}(?:[.,]\d)?)\s*\+?/i) ?? text.match(/(?:^|\s)(\d{1,2}(?:[.,]5)?)\+(?:\s|$|,)/);
   if (!m) return null;
   const n = parseFloat(m[1].replace(',', '.'));
   return n > 0 && n <= 18 ? n : null;

@@ -5,6 +5,8 @@ export interface ShopInfo {
   name: string;
   url: string;
   kind: 'official' | 'shop' | 'marketplace';
+  /** prices visible only to signed-in users */
+  membersOnly?: boolean;
 }
 
 /** What every adapter produces, regardless of how the shop exposes its data. */

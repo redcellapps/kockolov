@@ -1,0 +1,93 @@
+{
+ "data": {
+  "products": {
+   "total_count": 4,
+   "items": [
+    {
+     "sku": "1265890",
+     "name": "LEGO Kristijano Ronaldo – Fudbalski najbolji trenuci LE43012",
+     "url_key": "lego-kristijano-ronaldo-fudbalski-najbolji-trenuci-le43012-1265890",
+     "url_suffix": "",
+     "stock_status": "IN_STOCK",
+     "special_price": 3699,
+     "price_range": {
+      "minimum_price": {
+       "regular_price": {
+        "value": 4352
+       },
+       "final_price": {
+        "value": 3699
+       }
+      }
+     },
+     "small_image": {
+      "url": "https://www.tehnomanija.rs/media/catalog/product/cache/3a3318b1dcef935e678718ae153d6fca/1/2/12658901_d3a7fe29-63eb-4d03-9036-75ceab9f66a3.jpeg"
+     }
+    },
+    {
+     "sku": "1263903",
+     "name": "LEGO Minecraft Zombi tamnica  LE21587",
+     "url_key": "lego-minecraft-zombi-tamnica-le21587-1263903",
+     "url_suffix": "",
+     "stock_status": "IN_STOCK",
+     "special_price": 3999,
+     "price_range": {
+      "minimum_price": {
+       "regular_price": {
+        "value": 4705
+       },
+       "final_price": {
+        "value": 3999
+       }
+      }
+     },
+     "small_image": {
+      "url": "https://www.tehnomanija.rs/media/catalog/product/cache/3a3318b1dcef935e678718ae153d6fca/L/E/LE21587_12ed069c-9589-4789-891b-142535b71a1d.jpeg"
+     }
+    },
+    {
+     "sku": "1263913",
+     "name": "LEGO Trkački automobil Technic Ferrari FXX K LE42212",
+     "url_key": "lego-trkacki-automobil-technic-ferrari-fxx-k-le42212-1263913",
+     "url_suffix": "",
+     "stock_status": "IN_STOCK",
+     "special_price": 8399,
+     "price_range": {
+      "minimum_price": {
+       "regular_price": {
+        "value": 9881
+       },
+       "final_price": {
+        "value": 8399
+       }
+      }
+     },
+     "small_image": {
+      "url": "https://www.tehnomanija.rs/media/catalog/product/cache/3a3318b1dcef935e678718ae153d6fca/L/E/LE42212_58089408-a3ce-4c57-b470-8d26c6c29364.jpeg"
+     }
+    },
+    {
+     "sku": "1263914",
+     "name": "LEGO Automobil Ford Bronco SUVLE42213",
+     "url_key": "lego-automobil-ford-bronco-suvle42213-1263914",
+     "url_suffix": "",
+     "stock_status": "IN_STOCK",
+     "special_price": 4199,
+     "price_range": {
+      "minimum_price": {
+       "regular_price": {
+        "value": 4940
+       },
+       "final_price": {
+        "value": 4199
+       }
+      }
+     },
+     "small_image": {
+      "url": "https://www.tehnomanija.rs/media/catalog/product/cache/3a3318b1dcef935e678718ae153d6fca/L/E/LE42213_0b1c.jpeg"
+     }
+    }
+   ]
+  }
+ }
+}

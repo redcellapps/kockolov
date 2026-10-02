@@ -40,6 +40,8 @@ const schema = z.object({
   LSTORE_BASE_URL: z.string().default('https://lstore.rs'),
   KOCKARIUM_BASE_URL: z.string().default('https://www.kockarium.rs'),
   ANANAS_BASE_URL: z.string().default('https://ananas.rs'),
+  // Other shops' addresses for tests or a proxy: "dexy=http://127.0.0.1:4000,kocka=http://…"
+  SHOP_BASE_URLS: z.string().optional(),
 
   // Euro display: NBS middle rate, refreshed daily; the fallback is used until the first fetch works
   FX_URL: z.string().default('https://kurs.resenje.org/api/v1/currencies/eur/rates/today'),

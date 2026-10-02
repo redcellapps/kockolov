@@ -13,6 +13,8 @@ const MERCH = [
   'casa ', 'casa sa', 'glava za odlaganje', 'glave za odlaganje', 'set za uzinu', 'markeri', 'gel olovke', 'boca',
   'fioka', 'stona fioka', 'stonih fioka', 'ram za slike', 'dnevnik', 'kutija za razvrstavanje', 'vreca', 'drustvena igra',
   'kutija za baterije', 'kuka', 'kuke za kacenje',
+  // seen on the members-only shops (Oct 2026)
+  'narukvice', 'privesci', 'pernice', 'rancic', 'lampica', 'svetleca cigla', 'baterijska lampa',
 ];
 
 export function isMerch(title: string): boolean {

@@ -4,6 +4,7 @@ import { todayLocal } from '../lib/time.js';
 import { escapeHtml, reasonText, rsd, shopLabel, type Reason } from './format.js';
 import { mailConfigured, sendMail } from './mailer.js';
 import { eurRate, moneyFormatter } from '../fx.js';
+import { latestDeals } from '../api/audience.js';
 
 interface DealRow {
   rank: number;
@@ -34,7 +35,7 @@ export async function loadDigestData(userId: number, limit = 10) {
        FROM deals d JOIN sets s ON s.set_num = d.set_num
        LEFT JOIN themes t ON t.slug = s.theme_slug
        LEFT JOIN offers o ON o.id = d.best_offer_id
-      WHERE d.day = (SELECT max(day) FROM deals)
+      WHERE ${latestDeals('members', 'd')}
       ORDER BY d.rank LIMIT $1`,
     [limit],
   );
@@ -170,7 +171,7 @@ export async function currencyOpts(currency: 'RSD' | 'EUR') {
 export async function sendDigests(opts: { dryRun?: boolean; onlyEmail?: string; log?: (m: string) => void } = {}) {
   const log = opts.log ?? console.log;
   const day = todayLocal();
-  const hasDeals = await one<{ n: number }>('SELECT count(*)::int AS n FROM deals WHERE day = $1', [day]);
+  const hasDeals = await one<{ n: number }>("SELECT count(*)::int AS n FROM deals WHERE day = $1 AND audience = 'members'", [day]);
   if (!hasDeals?.n) log(`digest: za ${day} još nema izračunatih ponuda — šaljem poslednje dostupne`);
   if (!mailConfigured() && !opts.dryRun) {
     log('digest: SMTP nije podešen (SMTP_HOST) — preskačem slanje');

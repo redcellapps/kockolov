@@ -1,4 +1,5 @@
 import { normalizeText } from '../lib/normalize.js';
+import { latestDeals, offersFor, type Audience } from './audience.js';
 
 export interface SearchFilters {
   q?: string;
@@ -13,6 +14,8 @@ export interface SearchFilters {
   sort?: string;
   page?: number;
   size?: number;
+  /** public shops only (default) or every shop for signed-in users */
+  audience?: Audience;
 }
 
 export const AGE_BUCKETS: Record<string, [number, number]> = {
@@ -35,12 +38,12 @@ class Params {
 }
 
 /** CTEs computing, per set, the best current offer (optionally limited to some shops). */
-function ctes(p: Params, shops?: string[]): string {
+function ctes(p: Params, shops: string[] | undefined, audience: Audience = 'public'): string {
   const shopCond = shops?.length ? `AND shop_id = ANY(${p.add(shops)}::text[])` : '';
   return `
   WITH o AS (
     SELECT id, set_num, shop_id, seller, price_rsd, regular_price_rsd, in_stock
-      FROM offers WHERE active AND set_num IS NOT NULL ${shopCond}
+      FROM ${offersFor(audience)} WHERE active AND set_num IS NOT NULL ${shopCond}
   ),
   agg AS (
     SELECT set_num,
@@ -57,7 +60,7 @@ function ctes(p: Params, shops?: string[]): string {
       FROM o WHERE in_stock ORDER BY set_num, price_rsd, shop_id
   ),
   latest_deals AS (
-    SELECT set_num, score, rank FROM deals WHERE day = (SELECT max(day) FROM deals)
+    SELECT set_num, score, rank FROM deals WHERE ${latestDeals(audience)}
   ),
   base AS (
     SELECT s.set_num, s.name, s.theme_slug, s.image_url, s.rrp_rsd, s.age_min, s.created_at, s.search_text,
@@ -119,7 +122,7 @@ function orderBy(p: Params, sort: string, qNorm: string): string {
 
 export function buildSearch(f: SearchFilters) {
   const p = new Params();
-  const head = ctes(p, f.shops);
+  const head = ctes(p, f.shops, f.audience);
   const w = where(p, f, null);
   const sort = f.sort && (SORTS as readonly string[]).includes(f.sort) ? f.sort : w.qNorm ? 'relevance' : 'deal';
   const order = orderBy(p, sort, w.qNorm);
@@ -137,7 +140,7 @@ export function buildSearch(f: SearchFilters) {
 /** Theme counts for the current filters (ignoring the theme filter itself). */
 export function buildThemeFacet(f: SearchFilters) {
   const p = new Params();
-  const head = ctes(p, f.shops);
+  const head = ctes(p, f.shops, f.audience);
   const w = where(p, f, 'theme');
   return {
     sql: `${head} SELECT theme_slug AS slug, count(*)::int AS count FROM base ${w.sql} GROUP BY theme_slug`,
@@ -148,7 +151,7 @@ export function buildThemeFacet(f: SearchFilters) {
 /** How many matching sets each shop has in stock (ignoring the shop filter). */
 export function buildShopFacet(f: SearchFilters) {
   const p = new Params();
-  const head = ctes(p, undefined);
+  const head = ctes(p, undefined, f.audience);
   const w = where(p, f, null);
   return {
     sql: `${head} SELECT sh AS id, count(*)::int AS count FROM base CROSS JOIN LATERAL unnest(base.shops) sh ${w.sql} GROUP BY sh`,

@@ -1,5 +1,6 @@
 import { query, tx } from '../db.js';
 import { todayLocal } from '../lib/time.js';
+import { offersFor, type Audience } from '../api/audience.js';
 
 export type DealReason =
   | { type: 'vs_rrp'; pct: number; amount: number }
@@ -97,15 +98,27 @@ export function scoreSet(set: SetInfo, offers: OfferRow[]): DealCandidate | null
   };
 }
 
-/** Build today's "best buy" list from current prices and history. */
+/**
+ * Build today's "best buy" lists from current prices and history: one from the public shops
+ * (what everyone sees) and one from every shop (for signed-in users).
+ */
 export async function computeDeals(opts: { day?: string; limit?: number; log?: (m: string) => void } = {}) {
+  const lists: Record<Audience, DealCandidate[]> = { public: [], members: [] };
+  for (const audience of ['public', 'members'] as const) {
+    lists[audience] = await computeFor(audience, opts);
+  }
+  return lists.public;
+}
+
+async function computeFor(audience: Audience, opts: { day?: string; limit?: number; log?: (m: string) => void }) {
   const day = opts.day ?? todayLocal();
   const limit = opts.limit ?? 40;
   const log = opts.log ?? console.log;
+  const source = offersFor(audience);
 
   const offers = await query<OfferRow>(
     `SELECT id, set_num, shop_id, seller, price_rsd, regular_price_rsd
-       FROM offers WHERE active AND in_stock AND set_num IS NOT NULL`,
+       FROM ${source} WHERE active AND in_stock AND set_num IS NOT NULL`,
   );
   const sets = await query<SetInfo>(
     `SELECT s.set_num, s.rrp_rsd, h.low90, h.history_days
@@ -114,10 +127,10 @@ export async function computeDeals(opts: { day?: string; limit?: number; log?: (
          SELECT min(ph.price_rsd) FILTER (WHERE ph.in_stock AND ph.recorded_at >= now() - interval '90 days'
                                             AND ph.recorded_at < date_trunc('day', now())) AS low90,
                 extract(day FROM now() - min(ph.recorded_at))::int AS history_days
-           FROM price_history ph JOIN offers o ON o.id = ph.offer_id
+           FROM price_history ph JOIN ${source} o ON o.id = ph.offer_id
           WHERE o.set_num = s.set_num
        ) h ON true
-      WHERE EXISTS (SELECT 1 FROM offers o WHERE o.set_num = s.set_num AND o.active AND o.in_stock)`,
+      WHERE EXISTS (SELECT 1 FROM ${source} o WHERE o.set_num = s.set_num AND o.active AND o.in_stock)`,
   );
   const bySet = new Map<string, OfferRow[]>();
   for (const o of offers) {
@@ -131,16 +144,16 @@ export async function computeDeals(opts: { day?: string; limit?: number; log?: (
     .slice(0, limit);
 
   await tx(async (db) => {
-    await db.query('DELETE FROM deals WHERE day = $1', [day]);
+    await db.query('DELETE FROM deals WHERE day = $1 AND audience = $2', [day, audience]);
     let rank = 1;
     for (const c of candidates) {
       await db.query(
-        `INSERT INTO deals (day, set_num, rank, score, best_offer_id, best_price_rsd, reference_price_rsd, reasons)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [day, c.setNum, rank++, c.score, c.bestOfferId, c.bestPrice, c.referencePrice, JSON.stringify(c.reasons)],
+        `INSERT INTO deals (day, audience, set_num, rank, score, best_offer_id, best_price_rsd, reference_price_rsd, reasons)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [day, audience, c.setNum, rank++, c.score, c.bestOfferId, c.bestPrice, c.referencePrice, JSON.stringify(c.reasons)],
       );
     }
   });
-  log(`deals: ${candidates.length} ponuda za ${day}`);
+  log(`deals (${audience === 'public' ? 'javno' : 'prijavljeni'}): ${candidates.length} ponuda za ${day}`);
   return candidates;
 }

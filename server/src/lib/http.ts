@@ -3,6 +3,7 @@ import { config } from '../config.js';
 
 interface Robots {
   isAllowed(url: string, ua?: string): boolean | undefined;
+  getCrawlDelay(ua?: string): number | undefined;
 }
 // robots-parser is CommonJS; normalise the default export for ESM + TypeScript
 const robotsParser = ((robotsParserModule as any).default ?? robotsParserModule) as (url: string, txt: string) => Robots;
@@ -40,6 +41,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export class PoliteFetcher {
   private robots = new Map<string, Promise<Robots | null>>();
   private lastHit = new Map<string, number>();
+  /** Crawl-delay from robots.txt per host (ms), when longer than our own delay */
+  private hostDelay = new Map<string, number>();
   private opts: Required<FetcherOptions>;
   public requests = 0;
 
@@ -75,7 +78,7 @@ export class PoliteFetcher {
 
   private async throttle(host: string) {
     const last = this.lastHit.get(host) ?? 0;
-    const wait = last + this.opts.delayMs - Date.now();
+    const wait = last + Math.max(this.opts.delayMs, this.hostDelay.get(host) ?? 0) - Date.now();
     if (wait > 0) await sleep(wait);
     this.lastHit.set(host, Date.now());
   }
@@ -100,6 +103,8 @@ export class PoliteFetcher {
     if (this.opts.respectRobots) {
       const robots = await this.robotsFor(u.origin);
       if (robots && robots.isAllowed(url, this.opts.userAgent) === false) throw new RobotsDisallowed(url);
+      const crawlDelay = robots?.getCrawlDelay(this.opts.userAgent);
+      if (crawlDelay && crawlDelay > 0) this.hostDelay.set(u.host, Math.min(crawlDelay, 30) * 1000);
     }
     let attempt = 0;
     for (;;) {

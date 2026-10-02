@@ -49,6 +49,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     config.LSTORE_BASE_URL = mock.base;
     config.KOCKARIUM_BASE_URL = mock.base;
     config.ANANAS_BASE_URL = mock.base;
+    config.CRAWLER_SHOPS = 'lstore,kockarium,ananas'; // the members-only shops get their own test below
     app = await buildApp({ logger: false });
   });
 
@@ -476,6 +477,59 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       mail.on = false;
       await app.inject({ method: 'PATCH', url: '/api/me', headers: { cookie }, payload: { currency: 'RSD' } });
     }
+  });
+
+  it('shows members-only shops to signed-in users only', async () => {
+    const card = (id: string, name: string, price: string, prev: string, code: string) =>
+      `<div class="product-item" data-productid="${id}" data-productname="${name}" data-productprice="${price}"
+         data-productprevprice="${prev}" data-productcode="${code}" data-productcat="LEGO® Technic">
+         <a href="/lego/${id}-${code.toLowerCase()}"><img src="/files/images/slike_proizvoda/${id}.jpg"></a></div>`;
+    const shop = await startMockShops({
+      '/lego-kocke': () =>
+        `<html><body>${card('501', 'LEGO ICONS BUKET CVECA', '6.999,00', '6.999,00', 'LE10280')}${card('502', 'LEGO TECHNIC NEOM MCLAREN EXTREME E', '8.999,00', '10.999,00', 'LE42166')}</body></html>`,
+      '/lego-kocke/page-1': () => null,
+    });
+    config.SHOP_BASE_URLS = `dexy=${shop.base}`;
+    try {
+      const [d] = await runCrawl({ shops: ['dexy'], log });
+      expect(d).toMatchObject({ status: 'ok', items: 2, matched: 2 });
+    } finally {
+      config.SHOP_BASE_URLS = undefined;
+      await shop.close();
+    }
+    const get = async (url: string, signedIn: boolean) =>
+      (await app.inject({ method: 'GET', url, headers: signedIn ? { cookie } : {} })).json();
+
+    config.PUBLIC_MODE = true;
+    try {
+      // visitors: the public best price, the set page tells them how many offers they are missing
+      expect((await get('/api/sets?q=10280', false)).items[0]).toMatchObject({ best_price: 7319, best_shop: 'ananas' });
+      const page = await get('/api/sets/10280', false);
+      expect(page.offers.map((o: { shop_id: string }) => o.shop_id)).not.toContain('dexy');
+      expect(page).toMatchObject({ hidden_offers: 1, hidden_shops: 1 });
+      expect((await get('/api/sets?q=42166&stock=0', false)).total).toBe(0);
+      expect((await get('/api/sets/42166', false))).toMatchObject({ offers: [], hidden_offers: 1 });
+      expect((await get('/api/shops', false)).map((s: { id: string }) => s.id)).not.toContain('dexy');
+      expect(await get('/api/stats', false)).toMatchObject({ shops: 3, members_shops: 14 });
+      const pubDeal = (await get('/api/deals', false)).items.find((i: { set_num: string }) => i.set_num === '10280');
+      expect(pubDeal.best_shop).toBe('ananas');
+      const map = await app.inject({ method: 'GET', url: '/sitemap.xml' });
+      expect(map.body).not.toContain('42166');
+      const head = await app.inject({ method: 'GET', url: '/set/10280' });
+      expect(head.body).not.toContain('6999');
+    } finally {
+      config.PUBLIC_MODE = false;
+    }
+
+    // signed in: every shop
+    expect((await get('/api/sets?q=10280', true)).items[0]).toMatchObject({ best_price: 6999, best_shop: 'dexy' });
+    const full = await get('/api/sets/10280', true);
+    expect(full.offers[0]).toMatchObject({ shop_id: 'dexy', shop_name: 'Dexy Co', price_rsd: 6999 });
+    expect(full.hidden_offers).toBe(0);
+    expect((await get('/api/sets?q=42166', true)).items[0]).toMatchObject({ set_num: '42166', name: 'Technic Neom Mclaren Extreme E' });
+    expect((await get('/api/shops', true)).find((s: { id: string }) => s.id === 'dexy')).toMatchObject({ members_only: true, offers_in_stock: 2 });
+    const memDeal = (await get('/api/deals', true)).items.find((i: { set_num: string }) => i.set_num === '10280');
+    expect(memDeal).toMatchObject({ best_shop: 'dexy', best_price_rsd: 6999 });
   });
 
   it('records price changes and marks vanished listings as unavailable on the next run', async () => {

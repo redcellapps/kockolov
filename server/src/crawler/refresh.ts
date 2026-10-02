@@ -27,7 +27,19 @@ interface SetRow {
 }
 
 // Which shop's data we trust most for each field
-const NAME_ORDER = ['lstore', 'kockarium', 'ananas'];
+// (members-only shops after the public ones, roughly by how clean their titles are)
+const NAME_ORDER = [
+  'lstore', 'kockarium', 'ananas', 'kocka', 'bigbang', 'ekupi', 'eplaneta', 'abckocka', 'shoppster', 'tehnomanija',
+  'kliklak', 'toyzzz', 'oddo', 'pertini', 'kockalend', 'dexy', 'babypark',
+];
+
+/** A members-only shop's title as a set name: no number, shop code or brand; no ALL CAPS. */
+export function tidyName(title: string, setNum: string): string {
+  let s = title.replace(new RegExp(`^${setNum}\\s*[-–:]?\\s*`), '').replace(new RegExp(`\\bLE${setNum}\\b`, 'gi'), ' ');
+  s = cleanTitle(s, setNum).replace(/^\(\s*\)$|\(\s*\)/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  if (s && !/\p{Ll}/u.test(s)) s = s.toLowerCase().replace(/(^|[\s(–-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 const THEME_ORDER = ['kockarium', 'ananas', 'lstore'];
 const IMAGE_ORDER = ['lstore', 'kockarium', 'ananas'];
 
@@ -48,6 +60,7 @@ export function deriveSet(set: SetRow, offers: OfferRow[]): Partial<SetRow> {
   let name = top.title;
   if (top.shop_id === 'kockarium') name = name.replace(new RegExp(`^${set.set_num}\\s*[-–:]?\\s*`), '');
   if (top.shop_id === 'ananas') name = cleanTitle(name, set.set_num);
+  else if (!['lstore', 'kockarium'].includes(top.shop_id)) name = tidyName(name, set.set_num);
   name = name.trim() || set.name;
   if (name !== set.name) out.name = name;
 

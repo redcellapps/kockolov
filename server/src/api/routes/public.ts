@@ -94,11 +94,11 @@ export async function publicRoutes(app: FastifyInstance) {
     if (!config.PUBLIC_MODE) return reply.code(404).send('');
     const sets = await query<{ set_num: string; updated: string }>(
       `SELECT o.set_num, to_char(max(o.price_changed_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS updated
-         FROM offers o WHERE o.set_num IS NOT NULL AND o.active
+         FROM public_offers o WHERE o.set_num IS NOT NULL AND o.active
         GROUP BY o.set_num ORDER BY o.set_num`,
     );
     const themes = await query<{ slug: string }>(
-      `SELECT DISTINCT s.theme_slug AS slug FROM sets s JOIN offers o ON o.set_num = s.set_num
+      `SELECT DISTINCT s.theme_slug AS slug FROM sets s JOIN public_offers o ON o.set_num = s.set_num
         WHERE s.theme_slug IS NOT NULL AND o.active AND o.in_stock ORDER BY 1`,
     );
     const url = (path: string, lastmod?: string) =>

@@ -1,0 +1,113 @@
+[
+ {
+  "id": 21041,
+  "name": "LEGO® Speed Champions 77264 Jaguar Project 7 i Land Rover Defender",
+  "slug": "x",
+  "permalink": "https://abckocka.com/product/21041/",
+  "sku": "77264",
+  "short_description": "",
+  "description": "<p>Uzrast: 9+</p>",
+  "prices": {
+   "price": "649000",
+   "regular_price": "649000",
+   "sale_price": "649000",
+   "currency_code": "RSD",
+   "currency_symbol": "рсд",
+   "currency_minor_unit": 2
+  },
+  "is_in_stock": true,
+  "is_purchasable": true,
+  "low_stock_remaining": 1,
+  "images": [
+   {
+    "id": 1,
+    "src": "https://i0.wp.com/abckocka.com/wp-content/uploads/2026/09/77264_box1_v29.webp?fit=1700%2C1700&ssl=1"
+   }
+  ],
+  "categories": [
+   {
+    "id": 0,
+    "name": "LEGO® modeli za odrasle"
+   },
+   {
+    "id": 1,
+    "name": "LEGO® Speed Champions"
+   },
+   {
+    "id": 2,
+    "name": "Vozila"
+   }
+  ],
+  "tags": []
+ },
+ {
+  "id": 20877,
+  "name": "LEGO® Star Wars sw0360 Battle Droid Pilot &#8211; Blue Torso with Tan Insignia",
+  "slug": "x",
+  "permalink": "https://abckocka.com/product/20877/",
+  "sku": "sw0360",
+  "short_description": "",
+  "description": "<p>Uzrast: 9+</p>",
+  "prices": {
+   "price": "39000",
+   "regular_price": "39000",
+   "sale_price": "39000",
+   "currency_code": "RSD",
+   "currency_symbol": "рсд",
+   "currency_minor_unit": 2
+  },
+  "is_in_stock": true,
+  "is_purchasable": true,
+  "low_stock_remaining": 1,
+  "images": [
+   {
+    "id": 1,
+    "src": "https://i0.wp.com/abckocka.com/wp-content/uploads/2026/08/sw0360.jpg"
+   }
+  ],
+  "categories": [
+   {
+    "id": 0,
+    "name": "LEGO® Star Wars™"
+   },
+   {
+    "id": 1,
+    "name": "Minifigure"
+   }
+  ],
+  "tags": []
+ },
+ {
+  "id": 20511,
+  "name": "LEGO® Technic 42151 Bugatti Bolide",
+  "slug": "x",
+  "permalink": "https://abckocka.com/product/20511/",
+  "sku": "42151",
+  "short_description": "",
+  "description": "<p>Uzrast: 9+</p>",
+  "prices": {
+   "price": "399000",
+   "regular_price": "459000",
+   "sale_price": "399000",
+   "currency_code": "RSD",
+   "currency_symbol": "рсд",
+   "currency_minor_unit": 2
+  },
+  "is_in_stock": true,
+  "is_purchasable": false,
+  "low_stock_remaining": null,
+  "images": [
+   {
+    "id": 1,
+    "src": "https://i0.wp.com/abckocka.com/wp-content/uploads/2026/05/42151_box1_v29.webp"
+   }
+  ],
+  "categories": [
+   {
+    "id": 0,
+    "name": "LEGO® Technic™"
+   }
+  ],
+  "tags": []
+ }
+]

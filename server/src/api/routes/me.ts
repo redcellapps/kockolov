@@ -54,7 +54,7 @@ export async function meRoutes(app: FastifyInstance) {
     );
     if (!nums.length) return { items: [] };
     // reuse the search query so cards look identical everywhere
-    const s = buildSearch({ setNums: nums, stock: false, sort: 'price_asc', size: 96 });
+    const s = buildSearch({ setNums: nums, stock: false, sort: 'price_asc', size: 96, audience: 'members' });
     const rows = await query(s.sql, s.params);
     return { items: rows.map(({ total, search_text, created_at, ...r }) => r) };
   });
