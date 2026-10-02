@@ -13,7 +13,7 @@ import { parsePertiniPage, setNumFromPertiniImage } from '../src/crawler/adapter
 import { parseShoppsterPage, shoppsterAdapter, shoppsterRetry } from '../src/crawler/adapters/shoppster.js';
 import { parseTehnomanija, setNumFromTehnomanijaName } from '../src/crawler/adapters/tehnomanija.js';
 import { setNumFromImage, wooProductToOffer, wooStoreAdapter } from '../src/crawler/adapters/woocommerce.js';
-import { matchOffer } from '../src/crawler/matching.js';
+import { buildNameIndex, matchOffer, plausiblePrice } from '../src/crawler/matching.js';
 import type { CrawlContext, PageResult, RawOffer } from '../src/crawler/types.js';
 import type { PoliteFetcher } from '../src/lib/http.js';
 
@@ -165,8 +165,9 @@ describe('Kocka.rs', () => {
 
 describe('Pertini Toys', () => {
   const offers = parsePertiniPage(fx('pertini/page1.html'), 'https://www.pertinitoys.com');
-  it('takes the set number from the image name', () => {
-    expect(offers.map((o) => o.sku)).toEqual(['42238', '77006', null]);
+  it('takes a guess at the set number from the image name', () => {
+    expect(offers.map((o) => o.skuGuess)).toEqual(['42238', '77006', null]);
+    expect(offers.every((o) => !o.sku)).toBe(true);
     expect(byId(offers, 'lego-technic-ducati-desmo450-mx-factory-oqo')).toMatchObject({
       title: 'LEGO TECHNIC Ducati Desmo450 MX Factory',
       priceRsd: 6999,
@@ -174,6 +175,44 @@ describe('Pertini Toys', () => {
     });
     expect(setNumFromPertiniImage('/fajlovi/product/lego-ideas-21348-box1-v29_69baacd9f3710.jpg?size=md')).toBe('21348');
     expect(setNumFromPertiniImage('/fajlovi/product/kocke-sa-12345abc_69baacd9f3710.jpg')).toBeNull();
+  });
+});
+
+describe('guessed set numbers and implausible prices', () => {
+  // real cases from Pertini, 2 Oct 2026
+  const sets = new Map([
+    ['21358', { names: ['Automat s mini-figurama'], theme: 'ideas', rrp: 21999 }],
+    ['43290', { names: ['Kevin i Dag'], theme: 'disney', rrp: 4799 }],
+    ['21064', { names: ['Pariz – grad ljubavi'], theme: 'architecture', rrp: 10899 }],
+    ['11380', { names: ['Road Bike'], theme: 'icons', rrp: 15599 }],
+    ['75440', { names: ['AT-AT'], theme: 'star-wars', rrp: 9999 }],
+    ['76354', { names: ['Helikerijer Šilda'], theme: 'marvel', rrp: 59999 }],
+    ['60497', { names: ['Automatska auto-perionica'], theme: 'city', rrp: 7399 }],
+  ]);
+  const full = { known: new Set(sets.keys()), names: buildNameIndex([{ set_num: '21064', names: ['Pariz – grad ljubavi'] }]), sets };
+  const offer = (title: string, skuGuess: string, priceRsd = 9999): RawOffer => ({ externalId: title, title, url: 'x', priceRsd, inStock: true, skuGuess });
+
+  it('drops a guess the title contradicts, and falls back to the name', () => {
+    expect(matchOffer(offer('LEGO Star Wars Pasaana potera', '21358', 7799), full)).toBeNull();
+    expect(matchOffer(offer('LEGO ARCHITECTURE Pariz grad ljubavi', '43290', 10399), full)).toEqual({ setNum: '21064', method: 'name' });
+  });
+  it('keeps guesses whose names are translated differently but the theme agrees', () => {
+    expect(matchOffer(offer('LEGO ICONS Trkački bicikl', '11380'), full)?.setNum).toBe('11380');
+    expect(matchOffer(offer('LEGO STAR WARS At-at', '75440'), full)?.setNum).toBe('75440');
+    expect(matchOffer(offer('LEGO SUPER HEROES MARVEL S.H.I.E.L.D. Helicarrier', '76354'), full)?.setNum).toBe('76354');
+    expect(matchOffer(offer('LEGO CITY Automatska auto-perionica', '60497'), full)?.setNum).toBe('60497');
+  });
+  it('does not invent a set from a guess it cannot check', () => {
+    expect(matchOffer(offer('LEGO CITY Nešto novo', '60999'), full)).toBeNull();
+  });
+  it('leaves an offer unmatched when its price is far from the LEGO Store price', () => {
+    expect(plausiblePrice(7799, 21999)).toBe(false);
+    expect(plausiblePrice(13999, 21999)).toBe(true);
+    expect(plausiblePrice(99999, 21999)).toBe(false);
+    expect(plausiblePrice(500, null)).toBe(true);
+    const wrong: RawOffer = { externalId: 'x', title: 'LEGO 21358', url: 'x', priceRsd: 7799, inStock: true, sku: '21358' };
+    expect(matchOffer(wrong, full)).toEqual({ setNum: '21358', method: 'sku' });
+    expect(matchOffer(wrong, full, { checkPrice: true })).toBeNull();
   });
 });
 

@@ -22,6 +22,8 @@ export interface RawOffer {
   stockQty?: number | null;
   /** set number if the shop states it explicitly (SKU) */
   sku?: string | null;
+  /** set number read from a weaker source (an image file name); used only if the title doesn't contradict it */
+  skuGuess?: string | null;
   themeRaw?: string[];
   ageMin?: number | null;
 }

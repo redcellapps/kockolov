@@ -39,7 +39,8 @@ export function parsePertiniPage(html: string, baseUrl: string): RawOffer[] {
       priceRsd: price,
       regularPriceRsd: null,
       inStock: true,
-      sku: setNumFromPertiniImage(img),
+      // the picture's name usually carries the set number, but not always (old internal codes)
+      skuGuess: setNumFromPertiniImage(img),
     });
   });
   return [...out.values()];

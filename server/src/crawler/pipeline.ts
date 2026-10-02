@@ -33,12 +33,19 @@ interface ExistingOffer {
 }
 
 async function loadMatchIndex(): Promise<MatchIndex> {
-  const rows = await query<{ set_num: string; names: (string | null)[] }>(
-    `SELECT s.set_num, array_remove(array_agg(DISTINCT o.title), NULL) || ARRAY[s.name, s.name_en] AS names
+  const rows = await query<{ set_num: string; names: (string | null)[]; theme_slug: string | null; rrp_rsd: number | null }>(
+    `SELECT s.set_num, s.theme_slug, s.rrp_rsd,
+            array_remove(array_agg(DISTINCT o.title), NULL) || ARRAY[s.name, s.name_en] AS names
        FROM sets s LEFT JOIN offers o ON o.set_num = s.set_num AND o.shop_id IN ('lstore', 'kockarium')
       GROUP BY s.set_num`,
   );
-  return { known: new Set(rows.map((r) => r.set_num)), names: buildNameIndex(rows) };
+  return {
+    known: new Set(rows.map((r) => r.set_num)),
+    names: buildNameIndex(rows),
+    sets: new Map(
+      rows.map((r) => [r.set_num, { names: r.names.filter((n): n is string => !!n), theme: r.theme_slug, rrp: r.rrp_rsd }]),
+    ),
+  };
 }
 
 function initialSetName(shopId: string, o: RawOffer, setNum: string): string {
@@ -81,7 +88,7 @@ export async function crawlShop(adapter: ShopAdapter, log: (m: string) => void, 
             setNum = prev.set_num;
             method = 'manual';
           } else {
-            const m = matchOffer(o, idx);
+            const m = matchOffer(o, idx, { checkPrice: adapter.shop.kind !== 'official' });
             if (m) {
               setNum = m.setNum;
               method = m.method;

@@ -1,5 +1,6 @@
 import { normalizeText } from '../lib/normalize.js';
 import { cleanTitle, setNumFromSku, setNumFromTitle } from '../lib/setnum.js';
+import { THEMES, themeFromRaw } from '../lib/themes.js';
 import type { RawOffer } from './types.js';
 
 // Things sold under the LEGO brand that are not building sets
@@ -27,10 +28,63 @@ export interface MatchResult {
   method: 'sku' | 'title' | 'name';
 }
 
+export interface SetFacts {
+  /** the set's names (LEGO Store, Kockarium titles, name in the catalogue) */
+  names: string[];
+  theme: string | null;
+  /** LEGO Store price */
+  rrp: number | null;
+}
+
 export interface MatchIndex {
   known: Set<string>;
   /** normalized set name -> set number (only unambiguous, reasonably long names) */
   names: Map<string, string>;
+  /** per set number, to check a guessed number and a price against what we know */
+  sets?: Map<string, SetFacts>;
+}
+
+// themes the shops and the LEGO Store file differently ("Super Heroes" vs Marvel, Botanicals under Icons)
+const THEME_FAMILIES = [
+  ['marvel', 'dc', 'super-heroes'],
+  ['icons', 'botanicals', 'creator', 'iconic'],
+];
+const sameFamily = (a: string, b: string) => a === b || THEME_FAMILIES.some((f) => f.includes(a) && f.includes(b));
+
+const THEME_WORDS = new Set(THEMES.flatMap((t) => t.match.flatMap((m) => m.split(' '))));
+const FILLER = new Set(['lego', 'sa', 'za', 'od', 'the', 'and', 'with', 'set', 'kocke', 'kocka']);
+
+/** Words that say what a set is, without brand, theme or filler words */
+function nameWords(s: string): Set<string> {
+  return new Set(
+    normalizeText(s)
+      .split(' ')
+      .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !FILLER.has(w) && !THEME_WORDS.has(w)),
+  );
+}
+
+/**
+ * A set number guessed from an image name is trusted unless the title clearly describes another
+ * set: not one word in common with any of the set's names, and a different theme. (Pertini named
+ * the picture of "Star Wars Pasaana potera" with an old internal code that is now LEGO set 21358.)
+ */
+export function guessFits(title: string, facts: SetFacts | undefined): boolean {
+  if (!facts) return false; // a set we don't know: can't check, so don't invent it
+  const words = nameWords(title);
+  if (facts.names.some((n) => [...nameWords(n)].some((w) => words.has(w)))) return true;
+  const theme = themeFromRaw(title);
+  return !theme || !facts.theme || sameFamily(theme, facts.theme);
+}
+
+/**
+ * A price far from the LEGO Store price usually means the offer was linked to the wrong set
+ * (a 7.799 RSD Star Wars set shown as a 21.999 RSD set at −65%). Such offers wait in the admin's
+ * review list instead.
+ */
+export function plausiblePrice(price: number, rrp: number | null | undefined): boolean {
+  if (!rrp || rrp <= 0) return true;
+  const ratio = price / rrp;
+  return ratio >= 0.4 && ratio <= 3;
 }
 
 export function buildNameIndex(rows: { set_num: string; names: (string | null)[] }[]): Map<string, string> {
@@ -48,11 +102,24 @@ export function buildNameIndex(rows: { set_num: string; names: (string | null)[]
   return map;
 }
 
-export function matchOffer(offer: RawOffer, idx: MatchIndex): MatchResult | null {
+/**
+ * Links an offer to a set number. With checkPrice (every shop except the LEGO Store itself) a
+ * match whose price is implausible next to the LEGO Store price is dropped.
+ */
+export function matchOffer(offer: RawOffer, idx: MatchIndex, opts: { checkPrice?: boolean } = {}): MatchResult | null {
+  const m = matchBy(offer, idx);
+  if (m && opts.checkPrice && !plausiblePrice(offer.priceRsd, idx.sets?.get(m.setNum)?.rrp)) return null;
+  return m;
+}
+
+function matchBy(offer: RawOffer, idx: MatchIndex): MatchResult | null {
   const fromSku = setNumFromSku(offer.sku);
   if (fromSku) return { setNum: fromSku, method: 'sku' };
   if (offer.sku) return null; // shop gave a non-set SKU (keychains, clothing...)
   if (isMerch(offer.title)) return null;
+
+  const guess = setNumFromSku(offer.skuGuess);
+  if (guess && guessFits(offer.title, idx.sets?.get(guess))) return { setNum: guess, method: 'sku' };
 
   const fromTitle = setNumFromTitle(offer.title, (n) => idx.known.has(n));
   if (fromTitle && (fromTitle.length === 5 || idx.known.has(fromTitle))) {
