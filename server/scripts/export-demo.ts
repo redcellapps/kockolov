@@ -10,6 +10,8 @@ import { buildApp } from '../src/api/app.js';
 import { config } from '../src/config.js';
 import { latestDeals as latestDealsSql } from '../src/api/audience.js';
 import { pool, query } from '../src/db.js';
+import sharp from 'sharp';
+import { BLOG_DIR } from '../src/blog/posts.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webDir = path.resolve(here, '..', '..', 'web');
@@ -73,6 +75,25 @@ async function main() {
     images[f.replace(/\.svg$/, '')] = `data:image/svg+xml,${encodeURIComponent(readFileSync(path.join(imgDir, f), 'utf8'))}`;
   }
 
+  // blog posts with their pictures embedded (smaller copies; the preview has no server for /media)
+  const blogList = (await anon('/api/blog')).items as { slug: string; image: { url: string } | null }[];
+  const embed = async (img: { url: string } | null) => {
+    if (!img) return img;
+    const buf = await sharp(path.join(BLOG_DIR, path.basename(img.url))).resize({ width: 640 }).jpeg({ quality: 78, mozjpeg: true }).toBuffer();
+    return { ...img, url: `data:image/jpeg;base64,${buf.toString('base64')}` };
+  };
+  const blog = {
+    items: await Promise.all(blogList.map(async (p) => ({ ...p, image: await embed(p.image) }))),
+    posts: Object.fromEntries(
+      await Promise.all(
+        blogList.map(async (p) => {
+          const full = await anon(`/api/blog/${p.slug}`);
+          return [p.slug, { ...full, image: await embed(full.image) }];
+        }),
+      ),
+    ),
+  };
+
   const me = await get('/api/auth/me');
   const snapshot = {
     exportedAt: new Date().toISOString(),
@@ -86,6 +107,7 @@ async function main() {
     membersShops,
     latestDeals,
     details,
+    blog,
     admin: {
       overview: await get('/api/admin/overview'),
       unmatched: (await get('/api/admin/unmatched')).items.map((o: { shop_id: string; url: string }) => ({ ...o, url: realUrl(o) })),

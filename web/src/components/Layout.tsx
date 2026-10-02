@@ -159,6 +159,9 @@ function Footer() {
         </div>
         <div className="max-w-xl">
           <nav aria-label={t('footer.privacy')} className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold">
+            <Link to="/blog" className="text-ink-2 hover:text-ink hover:underline">
+              {t('footer.blog')}
+            </Link>
             <Link to="/privatnost" className="text-ink-2 hover:text-ink hover:underline">
               {t('footer.privacy')}
             </Link>

@@ -272,6 +272,14 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
     }
   }
 
+  // blog posts, exported with the snapshot
+  if (path === '/api/blog') return ok({ items: snap.blog?.items ?? [] });
+  const blogPost = path.match(/^\/api\/blog\/([a-z0-9-]+)$/);
+  if (blogPost) {
+    const post = snap.blog?.posts?.[blogPost[1]];
+    return post ? ok(post) : err(404, 'Tekst nije pronađen.');
+  }
+
   if (path.startsWith('/api/admin/')) {
     if (state.user!.role !== 'admin') return err(403, 'Samo za administratore.');
     if (path === '/api/admin/overview') {

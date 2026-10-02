@@ -337,6 +337,69 @@ export async function renderCollectionCard(c: CollectionCard): Promise<Buffer> {
   );
 }
 
+// ---- blog post card: title on the left, the post's picture as a tilted print on the right ----
+export interface BlogCard {
+  title: string;
+  /** the post's short description, under the title */
+  subtitle: string;
+  /** "Milan Đorđević · 2. oktobar 2026." */
+  byline: string;
+  /** the post's picture file on disk */
+  imageFile: string | null;
+}
+
+export async function renderBlogCard(c: BlogCard): Promise<Buffer> {
+  const W = 372;
+  const H = 465;
+  const photo = c.imageFile
+    ? `data:image/jpeg;base64,${(await sharp(c.imageFile).resize(W * 2, H * 2, { fit: 'cover', position: 'top' }).jpeg({ quality: 82 }).toBuffer()).toString('base64')}`
+    : null;
+  const titleSize = c.title.length > 60 ? 52 : c.title.length > 40 ? 60 : 70;
+  return render(
+    background(
+      h(
+        'div',
+        { position: 'absolute', left: 72, top: 64, width: photo ? 620 : 1056, height: 502, flexDirection: 'column' },
+        h(
+          'div',
+          { alignItems: 'center', gap: 18 },
+          brand(46),
+          h('div', { backgroundColor: C.ink, color: C.yellow, fontSize: 24, fontWeight: 800, padding: '6px 16px', borderRadius: 999 }, 'BLOG'),
+        ),
+        h(
+          'div',
+          { marginTop: 38, fontSize: titleSize, fontWeight: 800, lineHeight: 1.04, letterSpacing: -2.5, display: 'block', lineClamp: 4 },
+          c.title,
+        ),
+        c.subtitle
+          ? h('div', { marginTop: 22, fontSize: 25, fontWeight: 500, lineHeight: 1.35, color: C.muted, display: 'block', lineClamp: 4 }, c.subtitle)
+          : null,
+        h('div', { flexGrow: 1 }),
+        h('div', { fontSize: 26, fontWeight: 700 }, c.byline),
+      ),
+      photo
+        ? h(
+            'div',
+            {
+              position: 'absolute',
+              left: 752,
+              top: 76,
+              width: W + 10,
+              height: H + 10,
+              backgroundColor: C.paper,
+              border: `5px solid ${C.ink}`,
+              borderRadius: 26,
+              boxShadow: `14px 14px 0 ${C.ink}`,
+              overflow: 'hidden',
+              transform: 'rotate(3deg)',
+            },
+            img(photo, W, H, { objectFit: 'cover' }),
+          )
+        : null,
+    ),
+  );
+}
+
 // ---- rendered images, kept in memory (the key changes whenever the content does) ----
 const rendered = new Map<string, Promise<Buffer>>();
 export function cached(key: string, make: () => Promise<Buffer>): Promise<Buffer> {

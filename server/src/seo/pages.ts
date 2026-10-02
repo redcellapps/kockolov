@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import { one, query } from '../db.js';
 import { latestDeals } from '../api/audience.js';
 import { buildSearch } from '../api/search.js';
+import { getPost, listPosts, type BlogPost } from '../blog/posts.js';
 import { escapeHtml, rsd, shopLabel } from '../mail/format.js';
 import { OG_HEIGHT, OG_WIDTH, plural } from './og.js';
 
@@ -23,8 +24,9 @@ export interface PageMeta {
   canonical?: string;
   robots?: string;
   image?: { url: string; alt: string };
-  type?: 'website' | 'product';
+  type?: 'website' | 'product' | 'article';
   product?: { price: number; availability: 'instock' | 'oos' };
+  article?: { published: string; author: string };
   jsonLd?: object[];
 }
 
@@ -231,12 +233,86 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
     };
   }
 
+  if (p === '/blog') return blogIndex();
+  const blogMatch = /^\/blog\/([a-z0-9-]+)$/.exec(p);
+  if (blogMatch) return blogPost(blogMatch[1]);
+
   if (p === '/privatnost') {
     return { ...DEFAULT, path: p, canonical: p, title: `Politika privatnosti | ${SITE}`, description: 'Koje podatke Kockolov čuva, zašto i kako da ostvariš svoja prava.' };
   }
 
   // anything else: the app shows "not found", search engines get a real 404
   return { ...DEFAULT, status: 404, path: p, title: `Stranica nije pronađena | ${SITE}`, robots: 'noindex' };
+}
+
+const blogCard = (post: BlogPost) => ({
+  url: `/og/blog/${post.slug}.jpg?v=${version(post.title, post.description, post.date, post.author, post.image?.file)}`,
+  alt: post.title,
+});
+
+async function blogIndex(): Promise<PageMeta> {
+  const posts = await listPosts();
+  return {
+    ...DEFAULT,
+    path: '/blog',
+    canonical: '/blog',
+    title: `Blog | ${SITE}`,
+    description: 'Priče iza Kockolova i saveti za pametniju kupovinu LEGO setova u Srbiji.',
+    image: posts[0] ? blogCard(posts[0]) : undefined,
+    jsonLd: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Blog',
+        name: `${SITE} blog`,
+        url: `${site()}/blog`,
+        inLanguage: 'sr-Latn',
+        blogPost: posts.map((post) => ({ '@type': 'BlogPosting', headline: post.title, url: `${site()}/blog/${post.slug}`, datePublished: post.date })),
+      },
+    ],
+  };
+}
+
+async function blogPost(slug: string): Promise<PageMeta> {
+  const post = await getPost(slug);
+  const path = `/blog/${slug}`;
+  if (!post) return { ...DEFAULT, status: 404, path, title: `Tekst nije pronađen | ${SITE}`, robots: 'noindex' };
+  return {
+    status: 200,
+    path,
+    canonical: path,
+    title: post.seoTitle,
+    description: post.description,
+    type: 'article',
+    article: { published: post.date, author: post.author },
+    image: blogCard(post),
+    jsonLd: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Kockolov', item: `${site()}/` },
+          { '@type': 'ListItem', position: 2, name: 'Blog', item: `${site()}/blog` },
+          { '@type': 'ListItem', position: 3, name: post.title, item: `${site()}${path}` },
+        ],
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description: post.description,
+        datePublished: post.date,
+        dateModified: post.date,
+        author: { '@type': 'Person', name: post.author },
+        publisher: { '@type': 'Organization', name: SITE, url: `${site()}/` },
+        ...(post.image ? { image: [abs(post.image.url)] } : {}),
+        mainEntityOfPage: `${site()}${path}`,
+        inLanguage: 'sr-Latn',
+        ...(post.keywords.length ? { keywords: post.keywords.join(', ') } : {}),
+        wordCount: post.text.split(/\s+/).filter(Boolean).length,
+        articleBody: post.text,
+      },
+    ],
+  };
 }
 
 async function themePage(slug: string): Promise<PageMeta> {
@@ -343,7 +419,7 @@ export function injectHead(template: string, m: PageMeta): string {
     m.robots ? `<meta name="robots" content="${attr(m.robots)}" />` : '',
     `<meta property="og:site_name" content="${SITE}" />`,
     `<meta property="og:locale" content="sr_RS" />`,
-    `<meta property="og:type" content="${m.type === 'product' ? 'product' : 'website'}" />`,
+    `<meta property="og:type" content="${m.type ?? 'website'}" />`,
     `<meta property="og:title" content="${attr(ogTitle)}" />`,
     `<meta property="og:description" content="${attr(m.description)}" />`,
     `<meta property="og:url" content="${attr(url)}" />`,
@@ -361,6 +437,12 @@ export function injectHead(template: string, m: PageMeta): string {
           `<meta property="product:price:amount" content="${m.product.price}" />`,
           `<meta property="product:price:currency" content="RSD" />`,
           `<meta property="product:availability" content="${m.product.availability === 'instock' ? 'in stock' : 'out of stock'}" />`,
+        ]
+      : []),
+    ...(m.article
+      ? [
+          `<meta property="article:published_time" content="${attr(m.article.published)}" />`,
+          `<meta property="article:author" content="${attr(m.article.author)}" />`,
         ]
       : []),
     `<meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}" />`,

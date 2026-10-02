@@ -9,6 +9,7 @@ import { config } from '../config.js';
 import { pool } from '../db.js';
 import { type SessionUser, userFromRequest } from './auth.js';
 import { adminRoutes } from './routes/admin.js';
+import { blogRoutes } from './routes/blog.js';
 import { publicRoutes } from './routes/public.js';
 import { injectHead, pageMeta } from '../seo/pages.js';
 import { authRoutes } from './routes/auth.js';
@@ -64,6 +65,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(meRoutes);
   await app.register(adminRoutes);
   await app.register(publicRoutes);
+  await app.register(blogRoutes);
 
   const dist = webDistDir();
   if (existsSync(dist)) {

@@ -261,3 +261,86 @@ body {
 .demo-login {
   opacity: 0.8;
 }
+
+/* Blog article text (HTML rendered from the post's Markdown) */
+.article {
+  font-size: 1.125rem;
+  line-height: 1.75;
+  color: var(--ink-2);
+}
+.article > * + * {
+  margin-top: 1.15em;
+}
+.article > p:first-child {
+  font-size: 1.3rem;
+  line-height: 1.6;
+  font-weight: 600;
+  color: var(--ink);
+}
+.article h2 {
+  margin-top: 2.1em;
+  font-size: 1.6rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.article h2 + * {
+  margin-top: 0.7em;
+}
+.article h3 {
+  margin-top: 1.8em;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.article ul,
+.article ol {
+  padding-left: 1.4em;
+}
+.article ul {
+  list-style: disc;
+}
+.article ol {
+  list-style: decimal;
+}
+.article li + li {
+  margin-top: 0.5em;
+}
+.article li::marker {
+  color: var(--ink-3);
+}
+.article a {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--brand);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
+}
+.article a:hover {
+  text-decoration-color: currentColor;
+}
+.article strong {
+  color: var(--ink);
+}
+.article blockquote {
+  border-left: 4px solid var(--brand);
+  padding-left: 1em;
+  font-style: italic;
+}
+.article img {
+  border-radius: 1rem;
+}
+@media (max-width: 639px) {
+  .article {
+    font-size: 1.0625rem;
+  }
+  .article > p:first-child {
+    font-size: 1.175rem;
+  }
+  .article h2 {
+    font-size: 1.375rem;
+  }
+}

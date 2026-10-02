@@ -179,3 +179,27 @@ export interface MeResponse {
   /** NBS middle rate: RSD for 1 EUR (day is null while only the fallback is known) */
   fx?: { eur: { rate: number; day: string | null } };
 }
+
+export interface BlogImage {
+  url: string;
+  width: number;
+  height: number;
+  alt: string;
+}
+
+export interface BlogSummary {
+  slug: string;
+  title: string;
+  description: string;
+  /** YYYY-MM-DD */
+  date: string;
+  author: string;
+  image: BlogImage | null;
+  minutes: number;
+}
+
+export interface BlogPost extends BlogSummary {
+  /** the article, already rendered from Markdown on the server */
+  html: string;
+  keywords: string[];
+}

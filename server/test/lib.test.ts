@@ -3,6 +3,7 @@ import { normalizeText, parseRsd } from '../src/lib/normalize.js';
 import { ageFromText, cleanTitle, setNumFromSku, setNumFromTitle } from '../src/lib/setnum.js';
 import { refineSuperHeroes, themeFromList, themeFromRaw } from '../src/lib/themes.js';
 import { isMerch, linkDoubts, matchOffer, buildNameIndex } from '../src/crawler/matching.js';
+import { htmlToText, parseFrontmatter, parsePost, readingMinutes } from '../src/blog/posts.js';
 
 describe('normalizeText', () => {
   it('strips diacritics, trademarks and punctuation', () => {
@@ -135,6 +136,24 @@ describe('doubtful links (admin table of offers)', () => {
   it('flags a title with no word in common with the set, and a far-off price', () => {
     expect(linkDoubts({ title: 'LEGO Botanicals Orhideja', price: 7499 }, '10280', idx)).toEqual([{ kind: 'name' }]);
     expect(linkDoubts({ title: 'LEGO Buket cveća', price: 1999 }, '10280', idx)).toEqual([{ kind: 'price' }]);
+  });
+});
+
+describe('blog posts', () => {
+  it('reads the header and renders the Markdown', async () => {
+    const raw = '---\ntitle: Naslov: sa dvotačkom\ndate: 2026-10-02\ndescription: Kratko\nkeywords: lego, cene\n---\nUvod.\n\n## Deo\n\n- [set](/set/10280)\n- [LEGO](https://www.lego.com)\n';
+    expect(parseFrontmatter(raw).meta).toMatchObject({ title: 'Naslov: sa dvotačkom', date: '2026-10-02' });
+    const post = await parsePost('probni', raw);
+    expect(post).toMatchObject({ slug: 'probni', title: 'Naslov: sa dvotačkom', seoTitle: 'Naslov: sa dvotačkom | Kockolov', keywords: ['lego', 'cene'], image: null, minutes: 1 });
+    expect(post.html).toContain('<h2>Deo</h2>');
+    expect(post.html).toContain('<a href="/set/10280">set</a>');
+    expect(post.html).toContain('<a href="https://www.lego.com" target="_blank" rel="noopener">LEGO</a>');
+    expect(post.text).toBe('Uvod.\nDeo\nset\nLEGO');
+    await expect(parsePost('los', '---\ntitle: Bez datuma\n---\nx')).rejects.toThrow(/date/);
+  });
+  it('counts reading time at about 200 words a minute', () => {
+    expect(readingMinutes('reč '.repeat(700))).toBe(4);
+    expect(htmlToText('<p>A &amp; B</p><ul><li>C</li></ul>')).toBe('A & B\nC');
   });
 });
 

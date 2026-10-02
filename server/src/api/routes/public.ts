@@ -4,6 +4,7 @@ import { one, query } from '../../db.js';
 import { shopLabel } from '../../mail/format.js';
 import { cached, renderCollectionCard, renderSetCard, type SetCard } from '../../seo/og.js';
 import { loadCollection, loadSet, version } from '../../seo/pages.js';
+import { listPosts } from '../../blog/posts.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const site = () => config.APP_URL.replace(/\/$/, '');
@@ -106,6 +107,7 @@ export async function publicRoutes(app: FastifyInstance) {
       `SELECT DISTINCT s.theme_slug AS slug FROM sets s JOIN public_offers o ON o.set_num = s.set_num
         WHERE s.theme_slug IS NOT NULL AND o.active AND o.in_stock ORDER BY 1`,
     );
+    const posts = await listPosts();
     const url = (path: string, lastmod?: string) =>
       `<url><loc>${site()}${path}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ''}</url>`;
     const body = [
@@ -116,6 +118,8 @@ export async function publicRoutes(app: FastifyInstance) {
       url('/teme'),
       url('/pretraga'),
       url('/privatnost'),
+      url('/blog', posts[0]?.date),
+      ...posts.map((post) => url(`/blog/${post.slug}`, post.date)),
       ...themes.map((t) => url(`/pretraga?theme=${encodeURIComponent(t.slug)}`)),
       ...sets.map((s) => url(`/set/${encodeURIComponent(s.set_num)}`, s.updated)),
       '</urlset>',

@@ -6,6 +6,7 @@ import { useAuth } from './lib/auth';
 import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
 import AdminOffersPage from './pages/AdminOffers';
+import { BlogListPage, BlogPostPage } from './pages/Blog';
 import Home from './pages/Home';
 import InvitePage from './pages/Invite';
 import LoginPage from './pages/Login';
@@ -55,6 +56,8 @@ export default function App() {
         <Route path="/potvrda/:token" element={<InvitePage />} />
         <Route path="/odjava/:token" element={<UnsubscribePage />} />
         <Route path="/privatnost" element={<PrivacyPage />} />
+        <Route path="/blog" element={<Gate><BlogListPage /></Gate>} />
+        <Route path="/blog/:slug" element={<Gate><BlogPostPage /></Gate>} />
         <Route path="/" element={<Gate><Home /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />

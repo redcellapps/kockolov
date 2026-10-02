@@ -705,6 +705,54 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     }
   });
 
+  it('publishes blog posts with their picture, link-preview card, structured data and sitemap entry', async () => {
+    const { pageMeta, injectHead } = await import('../src/seo/pages.js');
+    const sharp = (await import('sharp')).default;
+    const slug = 'zasto-sam-napravio-kockolov';
+
+    // while the site is private the blog, like everything else, needs a login
+    expect((await app.inject({ method: 'GET', url: '/api/blog' })).statusCode).toBe(401);
+    const list = (await app.inject({ method: 'GET', url: '/api/blog', headers: { cookie } })).json();
+    const first = list.items.find((p: { slug: string }) => p.slug === slug);
+    expect(first).toMatchObject({ title: expect.stringContaining('Kockolov'), date: '2026-10-02', image: { url: `/media/blog/${slug}.jpg` } });
+    expect(first.minutes).toBeGreaterThan(0);
+    expect(first.html).toBeUndefined();
+
+    const post = (await app.inject({ method: 'GET', url: `/api/blog/${slug}`, headers: { cookie } })).json();
+    expect(post.html).toContain('<h2>');
+    expect(post.html).toContain('<a href="/set/21061">');
+    expect((await app.inject({ method: 'GET', url: '/api/blog/nema-ga', headers: { cookie } })).statusCode).toBe(404);
+
+    const pic = await app.inject({ method: 'GET', url: `/media/blog/${slug}.jpg` });
+    expect([pic.statusCode, pic.headers['content-type']]).toEqual([200, 'image/jpeg']);
+    expect((await app.inject({ method: 'GET', url: '/media/blog/..%2Fpackage.json' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: `/og/blog/${slug}.jpg` })).statusCode).toBe(404); // site still private
+
+    config.PUBLIC_MODE = true;
+    try {
+      const m = await pageMeta(`/blog/${slug}`, new URLSearchParams());
+      expect(m).toMatchObject({ status: 200, canonical: `/blog/${slug}`, type: 'article', title: 'Zašto sam napravio Kockolov | LEGO cene u Srbiji' });
+      const html = injectHead('<html><head><meta name="description" content="x" /><title>x</title></head><body></body></html>', m);
+      expect(html).toContain('<meta property="og:type" content="article" />');
+      expect(html).toContain('<meta property="article:published_time" content="2026-10-02" />');
+      expect(html).toContain(`/og/blog/${slug}.jpg?v=`);
+      expect(html).toContain('"@type":"BlogPosting"');
+      expect(html).toContain('"articleBody":"Kockolov nije počeo');
+      expect((await pageMeta('/blog/nema-ga', new URLSearchParams())).status).toBe(404);
+      expect((await pageMeta('/blog', new URLSearchParams())).image?.url).toContain(`/og/blog/${slug}.jpg`);
+
+      const card = await app.inject({ method: 'GET', url: `/og/blog/${slug}.jpg` });
+      expect(card.headers['content-type']).toBe('image/jpeg');
+      expect(await sharp(card.rawPayload).metadata()).toMatchObject({ width: 1200, height: 630 });
+
+      const map = (await app.inject({ method: 'GET', url: '/sitemap.xml' })).body;
+      expect(map).toContain('/blog</loc>');
+      expect(map).toContain(`/blog/${slug}</loc><lastmod>2026-10-02</lastmod>`);
+    } finally {
+      config.PUBLIC_MODE = false;
+    }
+  });
+
   it('lists every offer with its set, and lets the admin fix a mistyped set number', async () => {
     const admin = (method: 'GET' | 'POST', url: string, payload?: object) =>
       app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
