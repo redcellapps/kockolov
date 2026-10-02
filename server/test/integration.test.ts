@@ -510,7 +510,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect((await get('/api/sets?q=42166&stock=0', false)).total).toBe(0);
       expect((await get('/api/sets/42166', false))).toMatchObject({ offers: [], hidden_offers: 1 });
       expect((await get('/api/shops', false)).map((s: { id: string }) => s.id)).not.toContain('dexy');
-      expect(await get('/api/stats', false)).toMatchObject({ shops: 3, members_shops: 14 });
+      expect(await get('/api/stats', false)).toMatchObject({ shops: 3, members_shops: 1 }); // only shops that have offers count
       const pubDeal = (await get('/api/deals', false)).items.find((i: { set_num: string }) => i.set_num === '10280');
       expect(pubDeal.best_shop).toBe('ananas');
       const map = await app.inject({ method: 'GET', url: '/sitemap.xml' });

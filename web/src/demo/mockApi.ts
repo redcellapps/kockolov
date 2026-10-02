@@ -25,13 +25,21 @@ const snap = withImages(rest, images) as Json;
 
 export const DEMO_EMAIL = snap.user?.email ?? 'demo@kockolov.local';
 export const DEMO_PASSWORD = 'demo1234';
-export const DEMO_DATE = snap.stats?.last_update as string | undefined;
+export const DEMO_DATE = snap.stats?.members?.last_update as string | undefined;
 
-const catalog = new DemoCatalog(snap.sets as DemoSet[], snap.offers as DemoOffer[], snap.latestDeals as DemoDeal[]);
+// Like the live site: visitors see the public shops, signed-in users every shop.
+type Audience = 'public' | 'members';
+const membersShops = new Set<string>(snap.membersShops ?? []);
+const allOffers = snap.offers as DemoOffer[];
+const catalogs: Record<Audience, DemoCatalog> = {
+  public: new DemoCatalog(snap.sets as DemoSet[], allOffers.filter((o) => !membersShops.has(o.shop_id)), snap.latestDeals.public as DemoDeal[]),
+  members: new DemoCatalog(snap.sets as DemoSet[], allOffers, snap.latestDeals.members as DemoDeal[]),
+};
 const state = {
-  user: { ...snap.user } as Json | null,
+  // the preview starts as a visitor; signing in shows the members-only shops
+  user: null as Json | null,
   // a few sets already watched, so the watchlist page shows what it does
-  watchlist: new Set<string>((snap.deals.items as Json[]).slice(0, 3).map((d) => d.set_num as string)),
+  watchlist: new Set<string>((snap.deals.members.items as Json[]).slice(0, 3).map((d) => d.set_num as string)),
   users: (snap.admin.users as Json[]).map((u): Json => ({ accepted_at: u.last_login_at ?? u.created_at, invited_at: null, ...u })),
   unmatched: [...(snap.admin.unmatched as Json[])],
 };
@@ -64,7 +72,7 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
 
   if (path === '/api/health') return ok({ ok: true });
   if (path === '/api/auth/me' && method === 'GET')
-    return ok({ user: state.user, publicMode: false, registrationOpen: false, fx: { eur: { rate: 117.2, day: null } } });
+    return ok({ user: state.user, publicMode: true, registrationOpen: false, fx: { eur: { rate: 117.2, day: null } } });
   if (path === '/api/auth/login' && method === 'POST') {
     const email = String(body?.email ?? '').trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email) || !body?.password) return err(400, 'Unesite ispravan e-mail i lozinku.');
@@ -80,15 +88,15 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
   // no mail in the preview; pretend the link went out
   if ((path === '/api/auth/forgot' || path === '/api/auth/resend') && method === 'POST') return ok({ ok: true });
 
-  // private mode: everything else needs a session
-  if (!state.user) return err(401, 'Potrebna je prijava.');
-
-  if (path === '/api/stats') return ok(snap.stats);
-  if (path === '/api/shops') return ok(snap.shops);
-  if (path === '/api/themes') return ok(snap.themes);
+  // public mode: visitors may browse
+  const audience: Audience = state.user ? 'members' : 'public';
+  const catalog = catalogs[audience];
+  if (path === '/api/stats') return ok(snap.stats[audience]);
+  if (path === '/api/shops') return ok(snap.shops[audience]);
+  if (path === '/api/themes') return ok(snap.themes[audience]);
   if (path === '/api/deals') {
     const limit = Math.min(Number(p.get('limit') ?? 40) || 40, 40);
-    return ok({ day: snap.deals.day, items: (snap.deals.items as Json[]).slice(0, limit) });
+    return ok({ day: snap.deals[audience].day, items: (snap.deals[audience].items as Json[]).slice(0, limit) });
   }
   if (path === '/api/sets') {
     const f = filtersFrom(p);
@@ -97,7 +105,7 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
   const setMatch = path.match(/^\/api\/sets\/([^/]+)$/);
   if (setMatch) {
     const num = decodeURIComponent(setMatch[1]);
-    const d = snap.details[num] as Json | undefined;
+    const d = (snap.details[num] as Json | undefined)?.[audience] as Json | undefined;
     if (!d) return err(404, 'Set nije pronađen');
     const related = d.set.theme_slug
       ? catalog
@@ -105,8 +113,11 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
           .items.filter((r) => r.set_num !== num)
           .slice(0, 8)
       : [];
-    return ok({ ...d, related, watched: state.watchlist.has(num) });
+    return ok({ ...d, related, watched: !!state.user && state.watchlist.has(num) });
   }
+
+  // everything else needs a session
+  if (!state.user) return err(401, 'Potrebna je prijava.');
 
   if (path === '/api/me' && method === 'PATCH') {
     if (typeof body?.name === 'string') state.user!.name = body.name;
@@ -183,7 +194,7 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
     if (path === '/api/admin/crawl') {
       return err(409, 'U ovom pregledu se cene ne preuzimaju: prikazane su cene sa sajtova prodavnica od 28. 9. 2026.');
     }
-    if (path === '/api/admin/deals') return ok({ ok: true, count: (snap.deals.items as Json[]).length });
+    if (path === '/api/admin/deals') return ok({ ok: true, count: (snap.deals.members.items as Json[]).length });
   }
 
   return err(404, 'Nije pronađeno');

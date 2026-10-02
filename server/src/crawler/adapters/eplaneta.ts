@@ -44,7 +44,8 @@ export function parseEplanetaPage(html: string, baseUrl: string): RawOffer[] {
     const title = it.name?.replace(/\s+/g, ' ').trim();
     const price = parseRsd(it.offers?.price ?? null);
     if (!url || !title || !price) continue;
-    const id = url.match(/-(\d+)\.html$/)?.[1] ?? url.replace(/^.*\//, '').replace(/\.html$/, '');
+    // "…-84144.html", marketplace products "…-ep3092728.html"
+    const id = url.match(/-((?:ep)?\d+)\.html$/i)?.[1] ?? url.replace(/^.*\//, '').replace(/\.html$/, '');
     if (out.has(id)) continue;
     const regular = old.get(url) ?? null;
     out.set(id, {

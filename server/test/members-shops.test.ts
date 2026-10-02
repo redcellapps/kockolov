@@ -5,12 +5,12 @@ import { parseBigbangPage } from '../src/crawler/adapters/bigbang.js';
 import { parseEkupiPage } from '../src/crawler/adapters/ekupi.js';
 import { parseEplanetaPage } from '../src/crawler/adapters/eplaneta.js';
 import { allAdapters } from '../src/crawler/adapters/index.js';
-import { parseKliklakPage } from '../src/crawler/adapters/kliklak.js';
+import { kliklakAdapter, parseKliklakPage } from '../src/crawler/adapters/kliklak.js';
 import { parseKockaPage } from '../src/crawler/adapters/kocka.js';
 import { kockalendAdapter, dexyAdapter, parseNbshopPage } from '../src/crawler/adapters/nbshop.js';
 import { parseOddoPage } from '../src/crawler/adapters/oddo.js';
 import { parsePertiniPage, setNumFromPertiniImage } from '../src/crawler/adapters/pertini.js';
-import { parseShoppsterPage } from '../src/crawler/adapters/shoppster.js';
+import { parseShoppsterPage, shoppsterAdapter, shoppsterRetry } from '../src/crawler/adapters/shoppster.js';
 import { parseTehnomanija, setNumFromTehnomanijaName } from '../src/crawler/adapters/tehnomanija.js';
 import { setNumFromImage, wooProductToOffer, wooStoreAdapter } from '../src/crawler/adapters/woocommerce.js';
 import { matchOffer } from '../src/crawler/matching.js';
@@ -193,7 +193,30 @@ describe('Shoppster (Angular transfer state)', () => {
     expect(parseShoppsterPage(fx('shoppster/page1-escaped.html'), base).offers).toEqual(offers);
   });
   it('returns nothing for a page without the state', () => {
-    expect(parseShoppsterPage('<html><body>Održavanje</body></html>', base)).toEqual({ offers: [], totalPages: 0 });
+    expect(parseShoppsterPage('<html><body>Održavanje</body></html>', base)).toEqual({ offers: [], totalPages: 0, found: false });
+  });
+  it('asks again for a page that came without data, and fails the run if it never gets any', async () => {
+    shoppsterRetry.pauseMs = 0;
+    const shell = '<html><body><app-root></app-root></body></html>';
+    const asked: string[] = [];
+    const serve = (answers: string[]) => {
+      const http = {
+        get: async (url: string) => {
+          asked.push(url);
+          return { status: 200, text: answers.shift() ?? shell };
+        },
+      } as unknown as PoliteFetcher;
+      return { http, log: () => {}, maxPages: 1 } satisfies CrawlContext;
+    };
+    const got: PageResult[] = [];
+    for await (const p of shoppsterAdapter(base).crawl(serve([shell, fx('shoppster/page1.html')]))) got.push(p);
+    expect(got.map((p) => p.offers.length)).toEqual([3]);
+    // a stable order: the default one repeats and skips products between pages
+    expect(asked).toEqual([`${base}/c/F1412?sortCode=name-asc`, `${base}/c/F1412?sortCode=name-asc`]);
+    const never = async () => {
+      for await (const _ of shoppsterAdapter(base).crawl(serve([]))) void _;
+    };
+    await expect(never()).rejects.toThrow(/bez podataka/);
   });
 });
 
@@ -254,7 +277,7 @@ describe('Tehnomanija (Magento GraphQL)', () => {
 describe('ePlaneta (JSON-LD)', () => {
   const offers = parseEplanetaPage(fx('eplaneta/page1.html'), 'https://eplaneta.rs');
   it('reads the ItemList and old prices from the cards', () => {
-    expect(offers.map((o) => o.externalId)).toEqual(['84144', '272184', '301122']);
+    expect(offers.map((o) => o.externalId)).toEqual(['84144', '272184', 'ep3092710']); // marketplace items: "ep…"
     expect(byId(offers, '272184')).toMatchObject({ priceRsd: 1800, regularPriceRsd: 1850, inStock: true });
     expect(byId(offers, '84144')).toMatchObject({
       title: 'LEGO 10914 Deluks kutija kocki',
@@ -297,6 +320,20 @@ describe('Kliklak', () => {
       'https://c.cdnmp.net/241860914/p/t/8/lego-srednja-kofica-kreativnih-kockica-10696~806059.jpg',
     );
     expect(matchOffer(byId(offers, '615592'), idx)).toEqual({ setNum: '10698', method: 'title' });
+  });
+  it('waits longer for its slow listing pages', async () => {
+    const base = 'https://www.kliklak.rs';
+    const calls: { url: string; opts: { timeoutMs?: number } }[] = [];
+    const http = {
+      async get(url: string, opts: { timeoutMs?: number } = {}) {
+        calls.push({ url, opts });
+        return url === `${base}/lego` ? { status: 200, text: fx('kliklak/page1.html') } : { status: 404, text: '' };
+      },
+    } as unknown as PoliteFetcher;
+    const pages = await collect(kliklakAdapter(base).crawl({ http, log: () => {}, maxPages: 5 }));
+    expect(pages.map((p) => p.offers.length)).toEqual([2]);
+    expect(calls.map((c) => c.url)).toEqual([`${base}/lego`, `${base}/lego/p2`]);
+    expect(calls.every((c) => c.opts.timeoutMs === 120_000)).toBe(true);
   });
 });
 

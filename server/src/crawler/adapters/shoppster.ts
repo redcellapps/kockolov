@@ -4,9 +4,12 @@ import type { CrawlContext, PageResult, RawOffer, ShopAdapter } from '../types.j
 // search result as Angular transfer state: <script id="ng-state" type="application/json">, at
 // ["cx-state"].product.search.results → { products: [...], pagination: { currentPage (0-based),
 // totalPages, totalResults } }. "Lego kocke" is category F1412, 36 products per page; the URL
-// takes ?currentPage=N (1-based, page 1 without the parameter). robots.txt forbids /rest/*,
-// /search/* and /offers/*, so we only read /c/ pages. It is a marketplace: in October 2026 every
-// LEGO listing was sold by Kockarium doo (often with a Shoppster promo price).
+// takes ?currentPage=N (1-based). The default "relevance" order shifts between requests (on
+// 2 Oct 2026 four pages repeated 20 of 144 products and missed as many), so we ask for
+// sortCode=name-asc, which pages cleanly (and is usually served from the shop's cache).
+// robots.txt forbids /rest/*, /search/* and /offers/*, so we only read /c/ pages. It is a
+// marketplace: in October 2026 every LEGO listing was sold by Kockarium doo (often with a
+// Shoppster promo price).
 
 const CATEGORY = '/c/F1412';
 
@@ -70,12 +73,16 @@ export function shoppsterProductToOffer(p: CxProduct, baseUrl: string): RawOffer
   };
 }
 
-export function parseShoppsterPage(html: string, baseUrl: string): { offers: RawOffer[]; totalPages: number } {
+export function parseShoppsterPage(html: string, baseUrl: string): { offers: RawOffer[]; totalPages: number; found: boolean } {
   const res = extractShoppsterResults(html);
-  if (!res) return { offers: [], totalPages: 0 };
+  if (!res) return { offers: [], totalPages: 0, found: false };
   const offers = res.products.map((p) => shoppsterProductToOffer(p, baseUrl)).filter((o): o is RawOffer => !!o);
-  return { offers, totalPages: res.pagination?.totalPages ?? 1 };
+  return { offers, totalPages: res.pagination?.totalPages ?? 1, found: true };
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** pause before asking again for a page that came without data (tests set it to 0) */
+export const shoppsterRetry = { attempts: 3, pauseMs: 5000 };
 
 export function shoppsterAdapter(baseUrl = 'https://www.shoppster.rs'): ShopAdapter {
   return {
@@ -84,13 +91,25 @@ export function shoppsterAdapter(baseUrl = 'https://www.shoppster.rs'): ShopAdap
       const seen = new Set<string>();
       let totalPages = 1;
       for (let page = 1; page <= Math.min(totalPages, ctx.maxPages); page++) {
-        const res = await ctx.http.get(page === 1 ? `${baseUrl}${CATEGORY}` : `${baseUrl}${CATEGORY}?currentPage=${page}`, {
-          allow404: true,
-        });
-        if (res.status === 404) return;
-        const parsed = parseShoppsterPage(res.text, baseUrl);
+        const url = `${baseUrl}${CATEGORY}?${page === 1 ? '' : `currentPage=${page}&`}sortCode=name-asc`;
+        // When the shop's server-side rendering is slow it sends the bare app shell without the
+        // embedded data (seen on 2 Oct 2026, page 18 of 28). Ask again a little later; if it still
+        // has no data, fail the run so that nothing is marked unavailable.
+        let parsed: ReturnType<typeof parseShoppsterPage> | null = null;
+        for (let attempt = 1; attempt <= shoppsterRetry.attempts; attempt++) {
+          const res = await ctx.http.get(url, { allow404: true });
+          if (res.status === 404) return;
+          const p = parseShoppsterPage(res.text, baseUrl);
+          if (p.found) {
+            parsed = p;
+            break;
+          }
+          ctx.log(`stranica ${page} je stigla bez podataka (pokušaj ${attempt}/${shoppsterRetry.attempts})`);
+          if (attempt < shoppsterRetry.attempts) await sleep(shoppsterRetry.pauseMs * attempt);
+        }
+        if (!parsed) throw new Error(`Shoppster: stranica ${page} je stigla bez podataka i posle ${shoppsterRetry.attempts} pokušaja`);
         if (page === 1) totalPages = parsed.totalPages;
-        // the default sort can shift a little between requests; keep each product once
+        // keep each product once, in case the order still shifts a little
         const offers = parsed.offers.filter((o) => !seen.has(o.externalId));
         offers.forEach((o) => seen.add(o.externalId));
         if (!parsed.offers.length) return;

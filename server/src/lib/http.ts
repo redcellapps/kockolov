@@ -64,7 +64,7 @@ export class PoliteFetcher {
         origin,
         (async () => {
           try {
-            const res = await this.raw(url);
+            const res = await this.raw(url, this.opts.timeoutMs);
             if (!res.ok) return null; // no robots.txt -> everything allowed
             return robotsParser(url, await res.text());
           } catch {
@@ -83,7 +83,7 @@ export class PoliteFetcher {
     this.lastHit.set(host, Date.now());
   }
 
-  private async raw(url: string): Promise<Response> {
+  private async raw(url: string, timeoutMs: number): Promise<Response> {
     const host = new URL(url).host;
     await this.throttle(host);
     this.requests++;
@@ -94,11 +94,12 @@ export class PoliteFetcher {
         'Accept-Language': 'sr-RS,sr;q=0.9,en;q=0.6',
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(this.opts.timeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   }
 
-  async get(url: string, { allow404 = false } = {}): Promise<{ status: number; text: string } > {
+  /** timeoutMs: for shops whose pages are known to be slow (default CRAWLER_TIMEOUT_MS) */
+  async get(url: string, { allow404 = false, timeoutMs = this.opts.timeoutMs } = {}): Promise<{ status: number; text: string }> {
     const u = new URL(url);
     if (this.opts.respectRobots) {
       const robots = await this.robotsFor(u.origin);
@@ -110,7 +111,7 @@ export class PoliteFetcher {
     for (;;) {
       attempt++;
       try {
-        const res = await this.raw(url);
+        const res = await this.raw(url, timeoutMs);
         if (res.status === 404 && allow404) return { status: 404, text: '' };
         if (res.status === 429 || res.status >= 500) {
           if (attempt > this.opts.retries) throw new HttpError(res.status, url);

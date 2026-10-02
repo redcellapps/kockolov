@@ -1,16 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
-import { ChevronRight, ClockIcon, SparkIcon, StoreIcon, TagIcon } from '../components/icons';
+import { ChevronRight, ClockIcon, LockIcon, SparkIcon, StoreIcon, TagIcon } from '../components/icons';
 import { Hero } from '../components/home/Hero';
 import { DealCard, ProductImage } from '../components/SetCard';
 import { CardSkeleton, EmptyState, SectionHeader } from '../components/ui';
 import { t, tn } from '../i18n';
 import { api, type Deal, type Shop, type Stats, type Theme } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { num, SHOPS } from '../lib/format';
 import { usePageTitle } from '../lib/title';
 
 export default function Home() {
   usePageTitle(null);
+  const { user, registrationOpen } = useAuth();
   const deals = useQuery({ queryKey: ['deals', 12], queryFn: () => api<{ day: string | null; items: Deal[] }>('/api/deals?limit=12') });
   const themes = useQuery({ queryKey: ['themes'], queryFn: () => api<Theme[]>('/api/themes'), staleTime: 600_000 });
   const stats = useQuery({ queryKey: ['stats'], queryFn: () => api<Stats>('/api/stats'), staleTime: 300_000 });
@@ -90,14 +92,28 @@ export default function Home() {
         {shops.data && (
           <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-5 py-4">
             <StoreIcon size={18} className="text-ink-3" />
-            {shops.data.map((s) => (
+            {shops.data.filter((s) => s.offers_in_stock > 0).map((s) => (
               <span key={s.id} className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1.5 text-sm font-semibold">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: SHOPS[s.id]?.dot }} />
                 {s.name}
                 <span className="tabular font-normal text-ink-3">{num(s.offers_in_stock)}</span>
                 {s.sellers > 1 && <span className="font-normal text-ink-3">· {tn('shop.sellers', s.sellers)}</span>}
+                {s.members_only && (
+                  <span title={t('members.badge')} className="text-ink-3">
+                    <LockIcon size={13} />
+                    <span className="sr-only">{t('members.badge')}</span>
+                  </span>
+                )}
               </span>
             ))}
+            {!user && !!stats.data?.members_shops && (
+              <Link
+                to={registrationOpen ? '/registracija' : '/prijava'}
+                className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-ink-3/50 px-3 py-1.5 text-sm font-bold text-ink hover:border-ink"
+              >
+                <LockIcon size={14} /> {tn('members.moreShops', stats.data.members_shops)}
+              </Link>
+            )}
           </div>
         )}
       </section>

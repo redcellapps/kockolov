@@ -106,6 +106,9 @@ export interface SetDetail {
   deal: { day: string; rank: number; score: number; best_price_rsd: number; reference_price_rsd: number | null; reasons: Reason[] } | null;
   related: SetSummary[];
   watched: boolean;
+  /** visitors only: in-stock offers from members-only shops they can't see, and from how many shops */
+  hidden_offers?: number;
+  hidden_shops?: number;
 }
 
 export interface Deal {
@@ -141,6 +144,8 @@ export interface Shop {
   name: string;
   url: string;
   kind: string;
+  /** prices shown to signed-in users only */
+  members_only?: boolean;
   offers_in_stock: number;
   sellers: number;
   last_crawl: string | null;
@@ -153,6 +158,8 @@ export interface Stats {
   sellers: number;
   last_update: string | null;
   deals_today: number;
+  /** shops whose prices only signed-in users see */
+  members_shops?: number;
 }
 
 export interface User {

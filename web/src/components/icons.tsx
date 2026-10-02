@@ -108,3 +108,9 @@ export const ClockIcon = (p: P) => (
     <path d="M12 7v5l3 2" />
   </svg>
 );
+export const LockIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+    <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+  </svg>
+);

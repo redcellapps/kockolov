@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { t, type TKey } from '../i18n';
 import { api, type SearchResponse, type Shop, type Theme } from '../lib/api';
 import { displayCurrency, fromDisplay, num, toDisplay, type Currency } from '../lib/format';
-import { CheckIcon } from './icons';
+import { CheckIcon, LockIcon } from './icons';
 import { Chip, ShopDot, Toggle, cx } from './ui';
 
 export interface FilterState {
@@ -225,10 +225,16 @@ export function Filters({
 
       <Section title={t('filters.shop')}>
         <div className="space-y-0.5">
-          {(shops.data ?? []).map((s) => (
+          {(shops.data ?? []).filter((s) => s.offers_in_stock > 0 || value.shops.includes(s.id)).map((s) => (
             <CheckRow key={s.id} checked={value.shops.includes(s.id)} onChange={() => toggle('shops', s.id)} count={shopCounts.get(s.id) ?? (facets ? 0 : s.offers_in_stock)}>
               <span className="inline-flex items-center gap-2">
                 <ShopDot shop={s.id} /> {s.name}
+                {s.members_only && (
+                  <span title={t('members.badge')} className="text-ink-3">
+                    <LockIcon size={12} />
+                    <span className="sr-only">{t('members.badge')}</span>
+                  </span>
+                )}
               </span>
             </CheckRow>
           ))}

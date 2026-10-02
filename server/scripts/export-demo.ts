@@ -7,6 +7,8 @@ import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildApp } from '../src/api/app.js';
+import { config } from '../src/config.js';
+import { latestDeals as latestDealsSql } from '../src/api/audience.js';
 import { pool, query } from '../src/db.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +17,7 @@ const EMAIL = process.env.DEMO_EMAIL ?? 'demo@kockolov.local';
 const PASSWORD = process.env.DEMO_PASSWORD ?? 'demo1234';
 
 async function main() {
+  config.PUBLIC_MODE = true; // visitors' view (public shops only) next to the signed-in one
   const app = await buildApp({ logger: false });
   const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: EMAIL, password: PASSWORD } });
   if (login.statusCode !== 200) throw new Error(`login failed (${login.statusCode}): run the demo script first`);
@@ -24,6 +27,12 @@ async function main() {
     if (res.statusCode !== 200) throw new Error(`${url} -> ${res.statusCode}`);
     return res.json();
   };
+  const anon = async (url: string) => {
+    const res = await app.inject({ method: 'GET', url });
+    if (res.statusCode !== 200) throw new Error(`${url} (visitor) -> ${res.statusCode}`);
+    return res.json();
+  };
+  const both = async (url: string) => ({ public: await anon(url), members: await get(url) });
 
   const sets = await query(
     `SELECT s.set_num, s.name, s.theme_slug, t.name AS theme_name, s.image_url, s.rrp_rsd, s.age_min,
@@ -34,7 +43,11 @@ async function main() {
     `SELECT id, set_num, shop_id, seller, price_rsd, regular_price_rsd, in_stock
        FROM offers WHERE active AND set_num IS NOT NULL ORDER BY id`,
   );
-  const latestDeals = await query(`SELECT set_num, score, rank FROM deals WHERE day = (SELECT max(day) FROM deals)`);
+  const latestDeals = {
+    public: await query(`SELECT set_num, score, rank FROM deals WHERE ${latestDealsSql('public')}`),
+    members: await query(`SELECT set_num, score, rank FROM deals WHERE ${latestDealsSql('members')}`),
+  };
+  const membersShops = (await query<{ id: string }>('SELECT id FROM shops WHERE members_only')).map((r) => r.id);
 
   // The demo crawled fake local shops that mirror the real URL paths; point links at the real shops.
   const SHOP_BASE: Record<string, string> = {
@@ -46,9 +59,12 @@ async function main() {
 
   const details: Record<string, unknown> = {};
   for (const s of sets) {
-    const { related: _r, watched: _w, ...d } = await get(`/api/sets/${encodeURIComponent(s.set_num)}`);
-    d.offers = d.offers.map((o: { shop_id: string; url: string }) => ({ ...o, url: realUrl(o) }));
-    details[s.set_num] = d;
+    const url = `/api/sets/${encodeURIComponent(s.set_num)}`;
+    const clean = ({ related: _r, watched: _w, ...d }: Record<string, any>) => ({
+      ...d,
+      offers: d.offers.map((o: { shop_id: string; url: string }) => ({ ...o, url: realUrl(o) })),
+    });
+    details[s.set_num] = { public: clean(await anon(url)), members: clean(await get(url)) };
   }
 
   const imgDir = path.join(webDir, 'public', 'demo-img');
@@ -61,12 +77,13 @@ async function main() {
   const snapshot = {
     exportedAt: new Date().toISOString(),
     user: me.user,
-    stats: await get('/api/stats'),
-    shops: await get('/api/shops'),
-    themes: await get('/api/themes'),
-    deals: await get('/api/deals?limit=40'),
+    stats: await both('/api/stats'),
+    shops: await both('/api/shops'),
+    themes: await both('/api/themes'),
+    deals: await both('/api/deals?limit=40'),
     sets,
     offers,
+    membersShops,
     latestDeals,
     details,
     admin: {

@@ -48,6 +48,21 @@ export const SHOPS: Record<string, { name: string; short: string; dot: string }>
   lstore: { name: 'LEGO® Store', short: 'LEGO Store', dot: '#ffcf00' },
   kockarium: { name: 'Kockarium', short: 'Kockarium', dot: '#2f6fdf' },
   ananas: { name: 'Ananas', short: 'Ananas', dot: '#19a35b' },
+  // prices shown to signed-in users only
+  bigbang: { name: 'BigBang', short: 'BigBang', dot: '#e3262f' },
+  ekupi: { name: 'eKupi', short: 'eKupi', dot: '#ff7a1a' },
+  dexy: { name: 'Dexy Co', short: 'Dexy', dot: '#8b46d6' },
+  kockalend: { name: 'Kockalend', short: 'Kockalend', dot: '#13a8c4' },
+  kocka: { name: 'Kocka.rs', short: 'Kocka.rs', dot: '#a5761f' },
+  tehnomanija: { name: 'Tehnomanija', short: 'Tehnomanija', dot: '#1d2f78' },
+  shoppster: { name: 'Shoppster', short: 'Shoppster', dot: '#d4148c' },
+  toyzzz: { name: 'Toyzzz', short: 'Toyzzz', dot: '#7cc242' },
+  pertini: { name: 'Pertini Toys', short: 'Pertini', dot: '#a16207' },
+  abckocka: { name: 'ABC Kocka', short: 'ABC Kocka', dot: '#0f766e' },
+  babypark: { name: 'Baby Park', short: 'Baby Park', dot: '#f06ba8' },
+  eplaneta: { name: 'ePlaneta', short: 'ePlaneta', dot: '#4f46e5' },
+  oddo: { name: 'ODDO igračke', short: 'ODDO', dot: '#2dd4bf' },
+  kliklak: { name: 'Kliklak', short: 'Kliklak', dot: '#64748b' },
 };
 
 export function shopName(id: string | null | undefined): string {

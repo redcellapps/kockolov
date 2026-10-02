@@ -6,6 +6,8 @@
  * Serves a snapshot of real listings (LEGO Store, Kockarium, Ananas — captured 28 Sep 2026,
  * ~190 sets) as if it were the three shops, runs the normal crawl pipeline against it three
  * times with shifted dates so there is price history, and creates demo@kockolov.local / demo1234.
+ * The members-only shops get a smaller sample (60 of those sets, real prices of 2 Oct 2026,
+ * demo-data/members.txt) fed through the same pipeline.
  * Product images are replaced by generated placeholders (the real CDNs are not contacted).
  * --keep-server keeps the fake shops running; --reset wipes the database first.
  */
@@ -16,7 +18,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashPassword } from '../src/api/auth.js';
 import { config } from '../src/config.js';
-import { runCrawl } from '../src/crawler/pipeline.js';
+import { allAdapters } from '../src/crawler/adapters/index.js';
+import { crawlShop, runCrawl } from '../src/crawler/pipeline.js';
+import { refreshSets } from '../src/crawler/refresh.js';
+import type { RawOffer, ShopAdapter } from '../src/crawler/types.js';
 import { computeDeals } from '../src/deals/engine.js';
 import { migrate, pool, query } from '../src/db.js';
 
@@ -30,6 +35,7 @@ const read = (f: string) =>
 const lstore = read('lstore.txt'); // id|sku|title|handle|type|price|available|img
 const kockarium = read('kockarium.txt'); // id|sku|title|price|regular|stock|adult|cats|slug
 const ananas = read('ananas.txt'); // id|price|base|stock|qty|seller|title|cat
+const members = read('members.txt'); // shop|id|set|price|regular|stock|path (on the shop's site)|seller (marketplaces)
 
 // Deterministic "yesterday's prices": some offers were more expensive (or cheaper) before
 function shift(id: string, price: number, day: number): number {
@@ -54,6 +60,31 @@ function placeholder(label: string): string {
 <rect x="110" y="84" width="60" height="44" rx="10" fill="${c}"/><rect x="230" y="84" width="60" height="44" rx="10" fill="${c}"/>
 <text x="200" y="222" font-family="Arial,Helvetica,sans-serif" font-size="46" font-weight="700" fill="#fff" text-anchor="middle">${esc(label)}</text>
 </svg>`;
+}
+
+/** A members-only shop replayed from demo-data/members.txt (prices shifted like the others). */
+function membersShop(id: string, day: number): ShopAdapter {
+  const real = allAdapters().find((a) => a.shop.id === id);
+  if (!real) throw new Error(`unknown shop ${id}`);
+  const names = new Map(lstore.map(([, sku, title]) => [sku, title]));
+  const offers: RawOffer[] = members
+    .filter(([shop]) => shop === id)
+    .map(([, extId, set, price, regular, stock, p, seller]) => ({
+      externalId: extId,
+      seller: seller || undefined,
+      title: `LEGO ${names.get(set) ?? ''} ${set}`.replace(/\s+/g, ' '),
+      url: new URL(p, real.shop.url).toString(),
+      priceRsd: shift(`${id}:${extId}`, Number(price), day),
+      regularPriceRsd: regular ? Number(regular) : null,
+      inStock: stock === '1',
+      sku: set,
+    }));
+  return {
+    shop: real.shop,
+    async *crawl() {
+      yield { page: 1, offers };
+    },
+  };
 }
 
 function startFakeShops(day: number) {
@@ -159,7 +190,8 @@ async function main() {
     config.LSTORE_BASE_URL = base;
     config.KOCKARIUM_BASE_URL = base;
     config.ANANAS_BASE_URL = base;
-    const res = await runCrawl({ log: () => {} });
+    const res = await runCrawl({ shops: ['lstore', 'kockarium', 'ananas'], log: () => {} });
+    for (const id of [...new Set(members.map(([shop]) => shop))]) res.push(await crawlShop(membersShop(id, day === 3 ? 0 : day), () => {}));
     log(`preuzimanje (pre ${ago} dana): ${res.map((r) => `${r.shop} ${r.items}/${r.matched}`).join(', ')}`);
     if (ago > 0) {
       // pretend this crawl happened `ago` days ago
@@ -171,6 +203,7 @@ async function main() {
     if (day === 3 && args.includes('--keep-server')) log(`lažne prodavnice ostaju na ${base}`);
     else server.close();
   }
+  await refreshSets(() => {});
   await computeDeals({ log });
 
   // Placeholder pictures that work offline: web/public/demo-img/<set>.svg (git-ignored)
