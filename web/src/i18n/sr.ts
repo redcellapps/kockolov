@@ -6,6 +6,7 @@ export const sr = {
   'nav.deals': 'Ponude dana',
   'nav.search': 'Svi setovi',
   'nav.themes': 'Teme',
+  'nav.blog': 'Blog',
   'nav.watchlist': 'Praćeno',
   'nav.account': 'Nalog',
   'nav.admin': 'Administracija',

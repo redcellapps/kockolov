@@ -99,6 +99,9 @@ function Header() {
           <NavLink to="/teme" className={link}>
             {t('nav.themes')}
           </NavLink>
+          <NavLink to="/blog" className={link}>
+            {t('nav.blog')}
+          </NavLink>
         </nav>
         <div className="flex-1">{!isHome && <SearchBox className="mx-auto hidden max-w-xl sm:block" />}</div>
         {user && (
@@ -119,6 +122,9 @@ function Header() {
           </NavLink>
           <NavLink to="/teme" className={link}>
             {t('nav.themes')}
+          </NavLink>
+          <NavLink to="/blog" className={link}>
+            {t('nav.blog')}
           </NavLink>
           {user && (
             <NavLink to="/pracenje" className={link}>
