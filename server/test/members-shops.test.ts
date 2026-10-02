@@ -39,6 +39,16 @@ async function collect(gen: AsyncGenerator<PageResult>) {
   return out;
 }
 
+describe('shop names in e-mails', () => {
+  it('names every shop, not just the first three', async () => {
+    const { shopLabel } = await import('../src/mail/format.js');
+    expect(shopLabel('lstore')).toBe('LEGO® Store');
+    expect(shopLabel('ekupi')).toBe('eKupi');
+    expect(shopLabel('shoppster', 'Kockarium doo')).toBe('Shoppster · Kockarium doo');
+    for (const a of allAdapters()) expect(shopLabel(a.shop.id)).not.toBe(a.shop.id);
+  });
+});
+
 describe('every new shop is members-only', () => {
   it('marks all shops except the original three', () => {
     const shops = allAdapters().map((a) => a.shop);
