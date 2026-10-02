@@ -6,7 +6,15 @@ import { config } from '../src/config.js';
 import { startMockShops } from './mockShops.js';
 
 // Outgoing mail is captured instead of sent; off by default, like a server without SMTP
-type Sent = { to: string; subject: string; text: string; headers?: Record<string, string>; sender?: 'morning' | 'account' };
+type Sent = {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  headers?: Record<string, string>;
+  replyTo?: string;
+  sender?: 'morning' | 'account';
+};
 const mail = vi.hoisted(() => ({ on: false, fail: false, sent: [] as Sent[] }));
 vi.mock('../src/mail/mailer.js', () => ({
   mailConfigured: () => mail.on,
@@ -298,14 +306,14 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       });
       expect(mail.sent[0].text).toContain(`/odjava/${unsub}`);
-      expect((await app.inject({ method: 'GET', url: `/api/unsubscribe/${unsub}` })).json()).toEqual({ email: 'pera@example.com', digestEnabled: true });
+      expect((await app.inject({ method: 'GET', url: `/api/unsubscribe/${unsub}` })).json()).toEqual({ email: 'pera@example.com', digestEnabled: true, newsEnabled: true });
       const oneClick = await app.inject({
         method: 'POST',
         url: `/api/unsubscribe/${unsub}`,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         payload: 'List-Unsubscribe=One-Click',
       });
-      expect(oneClick.json()).toEqual({ ok: true, digestEnabled: false });
+      expect(oneClick.json()).toEqual({ ok: true, digestEnabled: false, newsEnabled: true });
       expect((await one("SELECT digest_enabled FROM users WHERE email = 'pera@example.com'"))!.digest_enabled).toBe(false);
       expect((await app.inject({ method: 'POST', url: `/api/unsubscribe/${unsub}?on=1` })).json().digestEnabled).toBe(true);
       expect((await app.inject({ method: 'GET', url: '/api/unsubscribe/nije-dobar' })).statusCode).toBe(404);
@@ -530,6 +538,100 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     expect((await get('/api/shops', true)).find((s: { id: string }) => s.id === 'dexy')).toMatchObject({ members_only: true, offers_in_stock: 2 });
     const memDeal = (await get('/api/deals', true)).items.find((i: { set_num: string }) => i.set_num === '10280');
     expect(memDeal).toMatchObject({ best_shop: 'dexy', best_price_rsd: 6999 });
+  });
+
+  it('lets the admin send a news e-mail to everyone who wants news, after a test copy', async () => {
+    const { listAnnouncements } = await import('../src/mail/announce.js');
+    config.ANNOUNCE_DELAY_MS = 0;
+    const admin = (method: 'GET' | 'POST', url: string, payload?: object) =>
+      app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    const draft = {
+      subject: 'Nove prodavnice na Kockolovu',
+      body: 'Od danas vidiš cene iz još 11 prodavnica.\n\n- BigBang i eKupi\n- **Dexy** i Kockalend\n\nPogledaj [ponude dana](https://kockolov.rs/ponude).',
+    };
+    await query(
+      `INSERT INTO users (email, name, role, password_hash, accepted_at, news_enabled) VALUES
+         ('vesti-da@example.com', 'Vesna', 'user', 'x', now(), true),
+         ('vesti-ne@example.com', 'Nenad', 'user', 'x', now(), false),
+         ('vesti-nepotvrdjen@example.com', '', 'user', 'x', NULL, true)`,
+    );
+    const wants = await query<{ email: string }>('SELECT email FROM users WHERE accepted_at IS NOT NULL AND news_enabled ORDER BY email');
+    expect(wants.map((u) => u.email)).toContain('vesti-da@example.com');
+
+    // admins only
+    expect((await app.inject({ method: 'GET', url: '/api/admin/announcements' })).statusCode).toBe(401);
+    const info = (await admin('GET', '/api/admin/announcements')).json();
+    expect(info).toMatchObject({ recipients: wants.length, mailConfigured: false, adminEmail: 'milan@example.com', items: [] });
+
+    // the preview renders paragraphs, a list, bold and links, with the admin's name
+    const prev = (await admin('POST', '/api/admin/announcements/preview', draft)).json();
+    expect(prev.html).toContain('Ćao Milan,');
+    expect(prev.html).toContain('<li style="margin:0 0 6px"><strong>Dexy</strong> i Kockalend</li>');
+    expect(prev.html).toContain('<a href="https://kockolov.rs/ponude" style="color:#1d5fd1">ponude dana</a>');
+
+    // without SMTP nothing can be sent
+    expect((await admin('POST', '/api/admin/announcements', { ...draft, expected: wants.length })).statusCode).toBe(503);
+    mail.on = true;
+    mail.sent.length = 0;
+    try {
+      expect((await admin('POST', '/api/admin/announcements/test', { subject: 'x', body: draft.body })).json()).toMatchObject({
+        error: 'Naslov je prekratak.',
+      });
+      // a test copy to the admin first
+      const test = await admin('POST', '/api/admin/announcements/test', draft);
+      expect(test.json()).toEqual({ ok: true, email: 'milan@example.com' });
+      expect(mail.sent).toHaveLength(1);
+      expect(mail.sent[0]).toMatchObject({ to: 'milan@example.com', subject: '[proba] Nove prodavnice na Kockolovu', sender: 'account', replyTo: 'kontakt@kockolov.rs' });
+      expect(await one('SELECT count(*)::int AS n FROM announcements')).toEqual({ n: 0 });
+
+      // the confirmation named a number of recipients: refuse if it has changed
+      const stale = await admin('POST', '/api/admin/announcements', { ...draft, expected: wants.length + 1 });
+      expect(stale.statusCode).toBe(409);
+      expect(stale.json().recipients).toBe(wants.length);
+
+      mail.sent.length = 0;
+      const send = await admin('POST', '/api/admin/announcements', { ...draft, expected: wants.length });
+      expect(send.json()).toMatchObject({ ok: true, recipients: wants.length });
+      await vi.waitFor(async () => expect((await listAnnouncements())[0].status).toBe('sent'));
+      expect((await listAnnouncements())[0]).toMatchObject({ subject: draft.subject, total: wants.length, sent: wants.length, failed: 0, author: 'Milan' });
+      expect(mail.sent.map((m) => m.to).sort()).toEqual(wants.map((u) => u.email));
+      const vesna = mail.sent.find((m) => m.to === 'vesti-da@example.com')!;
+      expect(vesna.text).toContain('Ćao Vesna,');
+      expect(vesna.text).toContain('- BigBang i eKupi');
+      expect(vesna.text).toContain('Pogledaj ponude dana (https://kockolov.rs/ponude).');
+      const token = (await one<{ unsubscribe_token: string }>("SELECT unsubscribe_token FROM users WHERE email = 'vesti-da@example.com'"))!
+        .unsubscribe_token;
+      expect(vesna.headers?.['List-Unsubscribe']).toBe(`<${config.APP_URL.replace(/\/$/, '')}/api/unsubscribe/${token}?list=news>`);
+      expect(vesna.text).toContain(`/odjava/${token}?lista=novosti`);
+
+      // one click in the mail app turns news off, the morning e-mail stays as it was
+      const off = await app.inject({ method: 'POST', url: `/api/unsubscribe/${token}?list=news` });
+      expect(off.json()).toMatchObject({ ok: true, newsEnabled: false, digestEnabled: true });
+      expect((await app.inject({ method: 'GET', url: `/api/unsubscribe/${token}` })).json()).toMatchObject({ newsEnabled: false, digestEnabled: true });
+      expect((await admin('GET', '/api/admin/announcements')).json().recipients).toBe(wants.length - 1);
+
+      // the mail server fails: deliveries are marked, and a retry sends just those
+      mail.fail = true;
+      const second = await admin('POST', '/api/admin/announcements', { ...draft, subject: 'Druga vest', expected: wants.length - 1 });
+      const id = second.json().id;
+      await vi.waitFor(async () => expect((await listAnnouncements())[0]).toMatchObject({ id, status: 'sent', failed: wants.length - 1 }));
+      mail.fail = false;
+      mail.sent.length = 0;
+      expect((await admin('POST', `/api/admin/announcements/${id}/retry`)).json()).toEqual({ ok: true, retried: wants.length - 1 });
+      await vi.waitFor(async () => expect((await listAnnouncements())[0]).toMatchObject({ id, status: 'sent', sent: wants.length - 1, failed: 0 }));
+      expect(mail.sent).toHaveLength(wants.length - 1);
+
+      // a user turns news off in the settings
+      const vlogin = await query("UPDATE users SET news_enabled = true WHERE email = 'vesti-da@example.com' RETURNING id");
+      expect(vlogin).toHaveLength(1);
+      await app.inject({ method: 'PATCH', url: '/api/me', headers: { cookie }, payload: { newsEnabled: false } });
+      expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })).json().user).toMatchObject({ news_enabled: false });
+      await app.inject({ method: 'PATCH', url: '/api/me', headers: { cookie }, payload: { newsEnabled: true } });
+    } finally {
+      mail.on = false;
+      mail.fail = false;
+      await query("DELETE FROM users WHERE email LIKE 'vesti-%@example.com'");
+    }
   });
 
   it('records price changes and marks vanished listings as unavailable on the next run', async () => {

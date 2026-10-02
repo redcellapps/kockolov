@@ -66,6 +66,44 @@ function filtersFrom(p: URLSearchParams): SearchFilters {
   };
 }
 
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+/** Simplified copy of the server's news e-mail (server/src/mail/announce.ts), for the preview only */
+function newsPreview(subject: string, body: string, name: string): string {
+  const inline = (l: string) =>
+    esc(l)
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" style="color:#1d5fd1">$1</a>');
+  const blocks: string[] = [];
+  let para: string[] = [];
+  let list: string[] = [];
+  const flush = () => {
+    if (para.length) blocks.push(`<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#333">${para.map(inline).join('<br>')}</p>`);
+    if (list.length) blocks.push(`<ul style="padding-left:22px;font-size:15px;line-height:1.5;color:#333">${list.map((l) => `<li>${inline(l)}</li>`).join('')}</ul>`);
+    para = [];
+    list = [];
+  };
+  for (const line of (body.trim() || 'Ovde će biti tekst obaveštenja.').split('\n')) {
+    if (!line.trim()) flush();
+    else if (/^#{1,3}[ \t]+/.test(line)) {
+      flush();
+      blocks.push(`<div style="margin:18px 0 8px;font-size:17px;font-weight:800">${inline(line.replace(/^#{1,3}[ \t]+/, ''))}</div>`);
+    } else if (/^[ \t]*[-*•][ \t]+/.test(line)) {
+      if (para.length) flush();
+      list.push(line.replace(/^[ \t]*[-*•][ \t]+/, ''));
+    } else {
+      if (list.length) flush();
+      para.push(line);
+    }
+  }
+  flush();
+  return `<!doctype html><html lang="sr"><body style="margin:0;background:#f6f4ee;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a"><div style="padding:24px 12px"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden">
+<div style="background:#ffcf00;padding:20px 24px"><div style="font-size:22px;font-weight:800">Kockolov</div><div style="font-size:13px;color:#3a3a3a">Novosti na sajtu</div></div>
+<div style="padding:24px 24px 4px"><div style="font-size:20px;font-weight:800">${esc(subject.trim() || 'Naslov obaveštenja')}</div><p style="margin:14px 0;font-size:15px;color:#333">${name ? `Ćao ${esc(name)},` : 'Ćao,'}</p>${blocks.join('')}</div>
+<div style="padding:8px 24px 24px"><span style="display:inline-block;background:#1a1a1a;color:#ffcf00;font-weight:800;font-size:15px;padding:13px 20px;border-radius:12px">Otvori Kockolov</span></div>
+<div style="padding:0 24px 24px;font-size:12px;color:#8a8a8a">Ovo je povremeno obaveštenje o novostima na Kockolovu. Ne želiš ih više? Odjavi se od novosti; jutarnji pregled ponuda ostaje kakav jeste.</div></div></div></body></html>`;
+}
+
 function handle(method: string, url: URL, body: Json | null): { status: number; body: unknown } {
   const path = url.pathname;
   const p = url.searchParams;
@@ -122,6 +160,7 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
   if (path === '/api/me' && method === 'PATCH') {
     if (typeof body?.name === 'string') state.user!.name = body.name;
     if (typeof body?.digestEnabled === 'boolean') state.user!.digest_enabled = body.digestEnabled;
+    if (typeof body?.newsEnabled === 'boolean') state.user!.news_enabled = body.newsEnabled;
     if (body?.currency === 'RSD' || body?.currency === 'EUR') state.user!.currency = body.currency;
     return ok({ ok: true });
   }
@@ -195,6 +234,15 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
       return err(409, 'U ovom pregledu se cene ne preuzimaju: prikazane su cene sa sajtova prodavnica od 28. 9. 2026.');
     }
     if (path === '/api/admin/deals') return ok({ ok: true, count: (snap.deals.members.items as Json[]).length });
+    // news e-mails: the form and its preview work, nothing is sent
+    if (path === '/api/admin/announcements' && method === 'GET') {
+      const recipients = state.users.filter((u) => u.accepted_at && u.news_enabled !== false).length;
+      return ok({ recipients, mailConfigured: true, delayMs: 1500, adminEmail: state.user!.email, items: [] });
+    }
+    if (path === '/api/admin/announcements/preview') {
+      return ok({ subject: String(body?.subject ?? ''), html: newsPreview(String(body?.subject ?? ''), String(body?.body ?? ''), String(state.user!.name ?? '')) });
+    }
+    if (path.startsWith('/api/admin/announcements')) return err(409, 'U ovom pregledu se mejlovi ne šalju.');
   }
 
   return err(404, 'Nije pronađeno');

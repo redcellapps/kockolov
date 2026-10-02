@@ -15,8 +15,8 @@ export async function publicRoutes(app: FastifyInstance) {
 
   async function byToken(token: string) {
     if (!UUID.test(token)) return null;
-    return one<{ id: number; email: string; digest_enabled: boolean }>(
-      'SELECT id, email, digest_enabled FROM users WHERE unsubscribe_token = $1',
+    return one<{ id: number; email: string; digest_enabled: boolean; news_enabled: boolean }>(
+      'SELECT id, email, digest_enabled, news_enabled FROM users WHERE unsubscribe_token = $1',
       [token],
     );
   }
@@ -24,16 +24,21 @@ export async function publicRoutes(app: FastifyInstance) {
   app.get<{ Params: { token: string } }>('/api/unsubscribe/:token', async (req, reply) => {
     const u = await byToken(req.params.token);
     if (!u) return reply.code(404).send({ error: 'Link za odjavu nije ispravan.' });
-    return { email: u.email, digestEnabled: u.digest_enabled };
+    return { email: u.email, digestEnabled: u.digest_enabled, newsEnabled: u.news_enabled };
   });
 
-  // POST without a body = the "Odjavi me" button or a mail client's one-click unsubscribe
-  app.post<{ Params: { token: string }; Querystring: { on?: string } }>('/api/unsubscribe/:token', async (req, reply) => {
+  // POST without a body = the "Odjavi me" button or a mail client's one-click unsubscribe;
+  // ?list=news for the news e-mails, otherwise the morning digest
+  app.post<{ Params: { token: string }; Querystring: { on?: string; list?: string } }>('/api/unsubscribe/:token', async (req, reply) => {
     const u = await byToken(req.params.token);
     if (!u) return reply.code(404).send({ error: 'Link za odjavu nije ispravan.' });
     const on = req.query.on === '1';
+    if (req.query.list === 'news') {
+      await query('UPDATE users SET news_enabled = $2 WHERE id = $1', [u.id, on]);
+      return { ok: true, newsEnabled: on, digestEnabled: u.digest_enabled };
+    }
     await query('UPDATE users SET digest_enabled = $2 WHERE id = $1', [u.id, on]);
-    return { ok: true, digestEnabled: on };
+    return { ok: true, digestEnabled: on, newsEnabled: u.news_enabled };
   });
 
   app.get('/robots.txt', async (_req, reply) => {

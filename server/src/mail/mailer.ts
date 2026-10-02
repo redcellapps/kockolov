@@ -30,6 +30,7 @@ export interface MailMessage {
   html: string;
   text: string;
   headers?: Record<string, string>;
+  replyTo?: string;
 }
 
 /** Morning digest and admin alerts, from MAIL_FROM (jutro@…). */

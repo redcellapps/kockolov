@@ -168,6 +168,7 @@ export interface User {
   name: string;
   role: 'user' | 'admin';
   digest_enabled: boolean;
+  news_enabled?: boolean;
   currency?: 'RSD' | 'EUR';
 }
 

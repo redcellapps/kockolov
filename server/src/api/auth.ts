@@ -30,6 +30,7 @@ export interface SessionUser {
   name: string;
   role: 'user' | 'admin';
   digest_enabled: boolean;
+  news_enabled: boolean;
   currency: 'RSD' | 'EUR';
 }
 
@@ -57,7 +58,7 @@ export async function userFromRequest(req: FastifyRequest): Promise<SessionUser 
   const token = req.cookies[SESSION_COOKIE];
   if (!token) return null;
   return one<SessionUser>(
-    `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.currency
+    `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.news_enabled, u.currency
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()`,
     [hashToken(token)],

@@ -113,3 +113,19 @@ describe('matching', () => {
     ).toEqual({ setNum: '31999', method: 'name' });
   });
 });
+
+describe('news e-mail text', () => {
+  it('turns the plain text into safe HTML and readable text', async () => {
+    const { bodyToHtml, bodyToText } = await import('../src/mail/announce.js');
+    const body = '# Šta je novo\n\nCene <b>iz</b> 11 prodavnica & više.\nDrugi red.\n\n* jedan\n- dva https://kockolov.rs/ponude.';
+    const html = bodyToHtml(body);
+    expect(html).toContain('>Šta je novo</div>');
+    expect(html).toContain('Cene &lt;b&gt;iz&lt;/b&gt; 11 prodavnica &amp; više.<br>Drugi red.');
+    expect(html).toContain('<li style="margin:0 0 6px">dva <a href="https://kockolov.rs/ponude" style="color:#1d5fd1">https://kockolov.rs/ponude</a>.</li>');
+    expect(html).not.toContain('<b>');
+    // a heading followed straight by a list, then a paragraph right after the list
+    const tight = bodyToHtml('# Šta je novo\n- jedan\n- dva\nKraj.');
+    expect(tight).toMatch(/>Šta je novo<\/div>\n<ul[^>]*><li[^>]*>jedan<\/li><li[^>]*>dva<\/li><\/ul>\n<p[^>]*>Kraj\.<\/p>$/);
+    expect(bodyToText(body)).toBe('Šta je novo\n\nCene <b>iz</b> 11 prodavnica & više.\nDrugi red.\n\n- jedan\n- dva https://kockolov.rs/ponude.');
+  });
+});

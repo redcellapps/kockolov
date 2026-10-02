@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { Announcements } from '../components/admin/Announcements';
 import { Button, ShopDot, Spinner, cx } from '../components/ui';
 import { t } from '../i18n';
 import { api } from '../lib/api';
@@ -275,6 +276,8 @@ export default function AdminPage() {
           </table>
         </div>
       </Box>
+
+      <Announcements />
     </div>
   );
 }

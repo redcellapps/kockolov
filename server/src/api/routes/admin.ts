@@ -6,6 +6,16 @@ import { isCrawlRunning, runCrawl } from '../../crawler/pipeline.js';
 import { refreshSets } from '../../crawler/refresh.js';
 import { computeDeals } from '../../deals/engine.js';
 import { sendLink } from '../invites.js';
+import { config } from '../../config.js';
+import {
+  countRecipients,
+  createAnnouncement,
+  listAnnouncements,
+  renderAnnouncement,
+  retryAnnouncement,
+  sendTestAnnouncement,
+} from '../../mail/announce.js';
+import { mailConfigured } from '../../mail/mailer.js';
 import { hashPassword, normalizeEmail } from '../auth.js';
 
 async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
@@ -119,5 +129,67 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post('/api/admin/deals', async () => {
     const deals = await computeDeals({ log: () => {} });
     return { ok: true, count: deals.length };
+  });
+
+  // ---- news e-mail to every user ----
+  const draft = z.object({
+    subject: z.string().trim().min(3, 'Naslov je prekratak.').max(150, 'Naslov je predugačak (najviše 150 znakova).'),
+    body: z.string().trim().min(10, 'Tekst je prekratak.').max(20000, 'Tekst je predugačak.'),
+  });
+  const badDraft = (reply: FastifyReply, err: z.ZodError) => reply.code(400).send({ error: err.issues[0]?.message ?? 'Neispravan unos.' });
+
+  app.get('/api/admin/announcements', async (req) => ({
+    recipients: await countRecipients(),
+    mailConfigured: mailConfigured(),
+    delayMs: config.ANNOUNCE_DELAY_MS,
+    adminEmail: req.user!.email,
+    items: await listAnnouncements(),
+  }));
+
+  /** The e-mail as it will look (with the admin's own name), for the preview next to the form */
+  app.post('/api/admin/announcements/preview', async (req) => {
+    const body = z.object({ subject: z.string().max(150), body: z.string().max(20000) }).parse(req.body ?? {});
+    const m = renderAnnouncement({
+      subject: body.subject.trim() || 'Naslov obaveštenja',
+      body: body.body.trim() || 'Ovde će biti tekst obaveštenja.',
+      name: req.user!.name,
+      unsubscribe: `${config.APP_URL.replace(/\/$/, '')}/nalog`,
+    });
+    return { subject: m.subject, html: m.html };
+  });
+
+  app.post('/api/admin/announcements/test', async (req, reply) => {
+    const body = draft.safeParse(req.body ?? {});
+    if (!body.success) return badDraft(reply, body.error);
+    if (!mailConfigured()) return reply.code(503).send({ error: 'Slanje mejlova nije podešeno (SMTP_HOST).' });
+    try {
+      const email = await sendTestAnnouncement(body.data, req.user!.id);
+      return { ok: true, email };
+    } catch (err) {
+      return reply.code(502).send({ error: `Mejl nije poslat: ${(err as Error).message}` });
+    }
+  });
+
+  app.post('/api/admin/announcements', async (req, reply) => {
+    const parsed = draft.extend({ expected: z.number().int() }).safeParse(req.body ?? {});
+    if (!parsed.success) return badDraft(reply, parsed.error);
+    if (!mailConfigured()) return reply.code(503).send({ error: 'Slanje mejlova nije podešeno (SMTP_HOST).' });
+    // the confirmation named a number of recipients; don't send if it no longer holds
+    const now = await countRecipients();
+    if (now !== parsed.data.expected) {
+      return reply.code(409).send({ error: `Broj primalaca se u međuvremenu promenio (sada ${now}). Proveri i pošalji ponovo.`, recipients: now });
+    }
+    if (now === 0) return reply.code(400).send({ error: 'Nema korisnika koji primaju novosti.' });
+    const { subject, body } = parsed.data;
+    const res = await createAnnouncement({ subject, body }, req.user!.id, (m) => req.log.info(m));
+    return { ok: true, ...res };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/admin/announcements/:id/retry', async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(404).send({ error: 'Nije pronađeno' });
+    if (!mailConfigured()) return reply.code(503).send({ error: 'Slanje mejlova nije podešeno (SMTP_HOST).' });
+    const retried = await retryAnnouncement(id, (m) => req.log.info(m));
+    return { ok: true, retried };
   });
 }

@@ -67,6 +67,10 @@ const schema = z.object({
   ACCOUNT_SMTP_USER: z.string().optional(),
   ACCOUNT_SMTP_PASS: z.string().optional(),
   ADMIN_ALERT_EMAIL: z.string().optional(),
+  // News e-mails to all users (admin page): sent from the account address, replies go here
+  CONTACT_EMAIL: z.string().default('kontakt@kockolov.rs'),
+  // pause between two news e-mails, so the mail server isn't flooded
+  ANNOUNCE_DELAY_MS: z.coerce.number().default(1500),
 });
 
 const parsed = schema.parse(process.env);

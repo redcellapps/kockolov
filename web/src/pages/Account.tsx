@@ -23,16 +23,19 @@ export default function AccountPage() {
   usePageTitle(t('title.account'));
   const [name, setName] = useState(user?.name ?? '');
   const [digest, setDigest] = useState(user?.digest_enabled ?? true);
+  const [news, setNews] = useState(user?.news_enabled ?? true);
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
   const [delPw, setDelPw] = useState('');
   useEffect(() => {
     setName(user?.name ?? '');
     setDigest(user?.digest_enabled ?? true);
+    setNews(user?.news_enabled ?? true);
   }, [user]);
 
   const save = useMutation({
-    mutationFn: (body: { name?: string; digestEnabled?: boolean; currency?: 'RSD' | 'EUR' }) => api('/api/me', { method: 'PATCH', json: body }),
+    mutationFn: (body: { name?: string; digestEnabled?: boolean; newsEnabled?: boolean; currency?: 'RSD' | 'EUR' }) =>
+      api('/api/me', { method: 'PATCH', json: body }),
     onSuccess: () => refresh(),
   });
   const pw = useMutation({
@@ -79,7 +82,7 @@ export default function AccountPage() {
         </form>
       </Card>
 
-      <Card title={t('account.digest')}>
+      <Card title={t('account.emails')}>
         <Toggle
           checked={digest}
           onChange={(v) => {
@@ -88,7 +91,18 @@ export default function AccountPage() {
           }}
           label={t('account.digest')}
         />
-        <p className="mt-2 text-sm text-ink-3">{t('account.digest.hint')}</p>
+        <p className="mt-1 text-sm text-ink-3">{t('account.digest.hint')}</p>
+        <div className="mt-4 border-t border-line pt-4">
+          <Toggle
+            checked={news}
+            onChange={(v) => {
+              setNews(v);
+              save.mutate({ newsEnabled: v });
+            }}
+            label={t('account.news')}
+          />
+          <p className="mt-1 text-sm text-ink-3">{t('account.news.hint')}</p>
+        </div>
       </Card>
 
       <Card title={t('account.currency')}>
