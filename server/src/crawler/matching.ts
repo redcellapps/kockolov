@@ -16,11 +16,23 @@ const MERCH = [
   'kutija za baterije', 'kuka', 'kuke za kacenje',
   // seen on the members-only shops (Oct 2026)
   'narukvice', 'privesci', 'pernice', 'rancic', 'lampica', 'svetleca cigla', 'baterijska lampa',
+  // used items and bulk bricks are not comparable offers for a set
+  'polovn', 'polovan', 'koriscen',
 ];
 
 export function isMerch(title: string): boolean {
   const n = ` ${normalizeText(title)} `;
   return MERCH.some((w) => n.includes(` ${w}`));
+}
+
+/** BrickLink-style code of a single minifigure as a shop SKU: sw0360, frnd0660, col05-9, colspi-9 */
+export function isMinifigCode(sku: string | null | undefined): boolean {
+  return /^[a-z]{2,6}(?:\d{2,4}[a-z]?(?:-\d{1,2})?|-\d{1,2})$/i.test(sku?.trim() ?? '');
+}
+
+/** Sold under the LEGO brand but not a set: merchandise, used items, single minifigures */
+export function notASet(o: Pick<RawOffer, 'title' | 'sku'>): boolean {
+  return isMerch(o.title) || isMinifigCode(o.sku);
 }
 
 export interface MatchResult {

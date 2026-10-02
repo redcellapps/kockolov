@@ -12,8 +12,8 @@ import { parseOddoPage } from '../src/crawler/adapters/oddo.js';
 import { parsePertiniPage, setNumFromPertiniImage } from '../src/crawler/adapters/pertini.js';
 import { parseShoppsterPage, shoppsterAdapter, shoppsterRetry } from '../src/crawler/adapters/shoppster.js';
 import { parseTehnomanija, setNumFromTehnomanijaName } from '../src/crawler/adapters/tehnomanija.js';
-import { setNumFromImage, wooProductToOffer, wooStoreAdapter } from '../src/crawler/adapters/woocommerce.js';
-import { buildNameIndex, matchOffer, plausiblePrice } from '../src/crawler/matching.js';
+import { abckockaAdapter, setNumFromImage, wooProductToOffer, wooStoreAdapter } from '../src/crawler/adapters/woocommerce.js';
+import { buildNameIndex, isMinifigCode, matchOffer, notASet, plausiblePrice } from '../src/crawler/matching.js';
 import type { CrawlContext, PageResult, RawOffer } from '../src/crawler/types.js';
 import type { PoliteFetcher } from '../src/lib/http.js';
 
@@ -288,6 +288,7 @@ describe('WooCommerce Store API (Toyzzz, ABC Kocka)', () => {
     expect(fig.title).toBe('LEGO® Star Wars sw0360 Battle Droid Pilot – Blue Torso with Tan Insignia');
     expect(fig.sku).toBe('sw0360');
     expect(matchOffer(fig, idx)).toBeNull(); // a minifigure is not set "0360"
+    expect(notASet(fig)).toBe(true); // …and stays out of the admin's review list
     expect(off).toMatchObject({ inStock: false, priceRsd: 3990, regularPriceRsd: 4590, themeRaw: ['LEGO® Technic™'] });
   });
   it('walks every listing, merges by id and filters with keep()', async () => {
@@ -301,6 +302,25 @@ describe('WooCommerce Store API (Toyzzz, ABC Kocka)', () => {
     const pages = await collect(a.crawl(ctx));
     expect(pages.flatMap((p) => p.offers.map((o) => o.externalId))).toEqual(['37703', '48478']);
     expect(asked).toHaveLength(2); // short pages: no need to ask for page 2
+  });
+  it('keeps only LEGO products from ABC Kocka (it also sells Barbie and Nerf)', async () => {
+    const b = 'https://abc.test';
+    const [set, fig] = JSON.parse(fx('abckocka/products-p1.json'));
+    const barbie = { ...set, id: 9001, name: 'BARBIE Dreamtopia HLC25 Lutka balerina', sku: 'HLC25', categories: [{ name: 'Barbie' }] };
+    const nerf = { ...set, id: 9002, name: 'Hasbro NERF Mega Bulldog E2657', sku: 'E2657', categories: [{ name: 'Nerf' }] };
+    const disneyFig = { ...fig, id: 9003, name: 'Disney dis081 Haunted Mansion Butler', categories: [{ name: 'LEGO® Disney' }] };
+    const { ctx } = fakeCtx({ [`${b}/wp-json/wc/store/v1/products?per_page=100&page=1`]: JSON.stringify([set, barbie, fig, nerf, disneyFig]) });
+    const pages = await collect(abckockaAdapter(b).crawl(ctx));
+    expect(pages.flatMap((p) => p.offers.map((o) => o.externalId))).toEqual([String(set.id), String(fig.id), '9003']);
+  });
+});
+
+describe('not a set', () => {
+  it('recognises single minifigures by their code, used items and merchandise', () => {
+    for (const code of ['sw0360', 'frnd0660', 'sw0467b', 'col05-9', 'colspi-9', 'dis081']) expect(isMinifigCode(code), code).toBe(true);
+    for (const code of ['77264', '71051-7', 'LE60495', '', null]) expect(isMinifigCode(code), String(code)).toBe(false);
+    expect(notASet({ title: 'LEGO DUPLO Mix 1kg – polovno', sku: null })).toBe(true);
+    expect(notASet({ title: 'LEGO Technic Ducati Desmo450 MX Factory', sku: null })).toBe(false);
   });
 });
 

@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Announcements } from '../components/admin/Announcements';
+import { OfferReview } from '../components/admin/OfferReview';
 import { Button, ShopDot, Spinner, cx } from '../components/ui';
 import { t } from '../i18n';
 import { api } from '../lib/api';
-import { ago, num, rsd, shopName } from '../lib/format';
+import { ago, num, shopName } from '../lib/format';
 import { usePageTitle } from '../lib/title';
 
 interface Overview {
@@ -22,18 +23,18 @@ interface Overview {
     deactivated: number;
     error: string | null;
   }[];
-  shops: { id: string; name: string; enabled: boolean; active_offers: number; unmatched: number; merch: number; name_matched: number }[];
+  shops: {
+    id: string;
+    name: string;
+    enabled: boolean;
+    active_offers: number;
+    unmatched: number;
+    merch: number;
+    hidden: number;
+    name_matched: number;
+  }[];
   users: number;
   crawlRunning: boolean;
-}
-interface Unmatched {
-  id: number;
-  shop_id: string;
-  seller: string;
-  title: string;
-  url: string;
-  price_rsd: number;
-  in_stock: boolean;
 }
 interface AdminUser {
   id: number;
@@ -78,15 +79,10 @@ export default function AdminPage() {
   const qc = useQueryClient();
   usePageTitle(t('title.admin'));
   const ov = useQuery({ queryKey: ['admin', 'overview'], queryFn: () => api<Overview>('/api/admin/overview'), refetchInterval: 15_000 });
-  const um = useQuery({ queryKey: ['admin', 'unmatched'], queryFn: () => api<Unmatched[]>('/api/admin/unmatched') });
   const users = useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<AdminUser[]>('/api/admin/users') });
   const crawl = useMutation({
     mutationFn: () => api('/api/admin/crawl', { method: 'POST', json: {} }),
     onSettled: () => qc.invalidateQueries({ queryKey: ['admin'] }),
-  });
-  const match = useMutation({
-    mutationFn: ({ id, setNum }: { id: number; setNum: string | null }) => api(`/api/admin/offers/${id}/match`, { method: 'POST', json: { setNum } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
   });
   const [newUser, setNewUser] = useState({ email: '', name: '', role: 'user' });
   const [linkResult, setLinkResult] = useState<LinkResult | null>(null);
@@ -129,7 +125,7 @@ export default function AdminPage() {
             <div className="flex items-center gap-2 font-extrabold">
               <ShopDot shop={s.id} /> {s.name}
             </div>
-            <dl className="mt-3 grid grid-cols-4 gap-2 text-sm">
+            <dl className="mt-3 grid grid-cols-3 gap-x-2 gap-y-3 text-sm">
               <div>
                 <dt className="text-xs text-ink-3">{t('admin.shop.active')}</dt>
                 <dd className="tabular font-bold">{num(s.active_offers)}</dd>
@@ -141,6 +137,10 @@ export default function AdminPage() {
               <div>
                 <dt className="text-xs text-ink-3">{t('admin.shop.merch')}</dt>
                 <dd className="tabular font-bold">{num(s.merch)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-3">{t('admin.shop.hidden')}</dt>
+                <dd className="tabular font-bold">{num(s.hidden)}</dd>
               </div>
               <div>
                 <dt className="text-xs text-ink-3">{t('admin.shop.byName')}</dt>
@@ -190,14 +190,7 @@ export default function AdminPage() {
         </div>
       </Box>
 
-      <Box title={`${t('admin.unmatched')} (${um.data?.length ?? 0})`}>
-        <p className="-mt-2 mb-4 text-sm text-ink-3">{t('admin.unmatched.hint')}</p>
-        <div className="max-h-[480px] space-y-2 overflow-y-auto">
-          {um.data?.map((o) => (
-            <UnmatchedRow key={o.id} o={o} onMatch={(setNum) => match.mutate({ id: o.id, setNum })} />
-          ))}
-        </div>
-      </Box>
+      <OfferReview shops={ov.data?.shops} />
 
       <Box title={`${t('admin.users')} (${users.data?.length ?? 0})`}>
         <form
@@ -278,41 +271,6 @@ export default function AdminPage() {
       </Box>
 
       <Announcements />
-    </div>
-  );
-}
-
-function UnmatchedRow({ o, onMatch }: { o: Unmatched; onMatch: (setNum: string) => void }) {
-  const [v, setV] = useState('');
-  return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line px-3 py-2">
-      <ShopDot shop={o.shop_id} />
-      <div className="min-w-0 flex-1">
-        <a href={o.url} target="_blank" rel="noreferrer" className="block truncate text-sm font-semibold hover:underline">
-          {o.title}
-        </a>
-        <div className="text-xs text-ink-3">
-          {shopName(o.shop_id)}
-          {o.seller && ` · ${o.seller}`} · {rsd(o.price_rsd)}
-        </div>
-      </div>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (v.trim()) onMatch(v.trim());
-        }}
-      >
-        <input
-          value={v}
-          onChange={(e) => setV(e.target.value)}
-          placeholder={t('admin.match.placeholder')}
-          className="tabular h-9 w-28 rounded-lg border border-line bg-surface px-2 text-sm outline-none focus:border-ink"
-        />
-        <Button size="sm" variant="outline" type="submit">
-          {t('admin.match')}
-        </Button>
-      </form>
     </div>
   );
 }

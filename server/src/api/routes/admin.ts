@@ -16,7 +16,30 @@ import {
   sendTestAnnouncement,
 } from '../../mail/announce.js';
 import { mailConfigured } from '../../mail/mailer.js';
+import { applyRule, loadRules, normalizePhrase, releaseRule, type HideRule } from '../../crawler/hiding.js';
+import { normalizeText } from '../../lib/normalize.js';
 import { hashPassword, normalizeEmail } from '../auth.js';
+
+/** Offers waiting for a decision: not linked, not "not a set", not hidden */
+const OPEN = "match_method IS DISTINCT FROM 'merch' AND match_method IS DISTINCT FROM 'hidden' AND match_method IS DISTINCT FROM 'hidden_rule'";
+
+/** Rows whose title contains every word of q (any order, without diacritics) */
+function filterByWords<T extends { title: string }>(rows: T[], q: string | undefined): T[] {
+  const words = normalizeText(q).split(' ').filter(Boolean);
+  if (!words.length) return rows;
+  return rows.filter((r) => {
+    const n = ` ${normalizeText(r.title)} `;
+    return words.every((w) => n.includes(` ${w}`));
+  });
+}
+
+/** Hidden offers that were linked to sets: set data and today's best buys change */
+function refreshAfterHiding(log: { error: (e: unknown) => void }) {
+  void (async () => {
+    await refreshSets(() => {});
+    await computeDeals({ log: () => {} });
+  })().catch((err) => log.error(err));
+}
 
 async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
   if (!req.user) return reply.code(401).send({ error: 'Potrebna je prijava.' });
@@ -36,8 +59,9 @@ export async function adminRoutes(app: FastifyInstance) {
     const shops = await query(
       `SELECT sh.id, sh.name, sh.enabled,
               count(o.id) FILTER (WHERE o.active)::int AS active_offers,
-              count(o.id) FILTER (WHERE o.active AND o.set_num IS NULL AND o.match_method IS DISTINCT FROM 'merch')::int AS unmatched,
+              count(o.id) FILTER (WHERE o.active AND o.set_num IS NULL AND ${OPEN})::int AS unmatched,
               count(o.id) FILTER (WHERE o.active AND o.match_method = 'merch')::int AS merch,
+              count(o.id) FILTER (WHERE o.active AND o.match_method IN ('hidden', 'hidden_rule'))::int AS hidden,
               count(o.id) FILTER (WHERE o.active AND o.match_method = 'name')::int AS name_matched
          FROM shops sh LEFT JOIN offers o ON o.shop_id = sh.id GROUP BY sh.id ORDER BY sh.id`,
     );
@@ -45,14 +69,75 @@ export async function adminRoutes(app: FastifyInstance) {
     return { runs, shops, users: users?.count ?? 0, crawlRunning: isCrawlRunning() };
   });
 
+  /** Offers without a set that still need a decision: link them or hide them. ?q= filters by title words. */
   app.get('/api/admin/unmatched', async (req) => {
-    const { shop } = z.object({ shop: z.string().optional() }).parse(req.query);
-    return query(
-      `SELECT id, shop_id, seller, title, url, price_rsd, in_stock, match_method
-         FROM offers WHERE active AND set_num IS NULL AND match_method IS DISTINCT FROM 'merch' ${shop ? 'AND shop_id = $1' : ''}
-        ORDER BY in_stock DESC, price_rsd DESC LIMIT 300`,
+    const { shop, q } = z.object({ shop: z.string().optional(), q: z.string().max(80).optional() }).parse(req.query);
+    const rows = await query<{ id: number; shop_id: string; seller: string; title: string; url: string; price_rsd: number; in_stock: boolean }>(
+      `SELECT id, shop_id, seller, title, url, price_rsd, in_stock
+         FROM offers WHERE active AND set_num IS NULL AND ${OPEN} ${shop ? 'AND shop_id = $1' : ''}
+        ORDER BY in_stock DESC, price_rsd DESC`,
       shop ? [shop] : [],
     );
+    const items = filterByWords(rows, q);
+    return { total: items.length, items: items.slice(0, 300) };
+  });
+
+  // ---- hiding offers that are not LEGO sets (Barbie, Nerf, used items…) ----
+  /** Hides the given offers for good (also ones linked to a set: they leave the site). */
+  app.post('/api/admin/offers/hide', async (req) => {
+    const { ids } = z.object({ ids: z.array(z.number().int()).min(1).max(2000) }).parse(req.body);
+    const rows = await query<{ set_num: string | null }>(
+      "UPDATE offers o SET set_num = NULL, match_method = 'hidden' FROM offers old WHERE o.id = old.id AND o.id = ANY($1::bigint[]) RETURNING old.set_num",
+      [ids],
+    );
+    if (rows.some((r) => r.set_num)) refreshAfterHiding(req.log);
+    return { ok: true, hidden: rows.length };
+  });
+
+  /** Shows an offer hidden one by one again; the next crawl of its shop links it to a set. */
+  app.post<{ Params: { id: string } }>('/api/admin/offers/:id/restore', async (req, reply) => {
+    const o = await one<{ match_method: string | null }>('SELECT match_method FROM offers WHERE id = $1', [Number(req.params.id)]);
+    if (!o) return reply.code(404).send({ error: 'Ponuda nije pronađena' });
+    if (o.match_method === 'hidden_rule') return reply.code(409).send({ error: 'Ovu ponudu sakriva pravilo; obriši pravilo da je vratiš.' });
+    await query("UPDATE offers SET match_method = NULL WHERE id = $1 AND match_method = 'hidden'", [Number(req.params.id)]);
+    return { ok: true };
+  });
+
+  app.get('/api/admin/hidden', async (req) => {
+    const { q } = z.object({ q: z.string().max(80).optional() }).parse(req.query);
+    const rules = await query<HideRule & { created_at: string }>('SELECT id, phrase, shop_id, created_at FROM hide_rules ORDER BY phrase');
+    const rows = await query<{ id: number; shop_id: string; seller: string; title: string; url: string; price_rsd: number; match_method: string }>(
+      `SELECT id, shop_id, seller, title, url, price_rsd, match_method
+         FROM offers WHERE active AND match_method IN ('hidden', 'hidden_rule') ORDER BY shop_id, title`,
+    );
+    const items = filterByWords(rows, q);
+    return { rules, total: items.length, items: items.slice(0, 300) };
+  });
+
+  /** "Always hide offers with this phrase" (in one shop or everywhere); hides the current ones too. */
+  app.post('/api/admin/hide-rules', async (req, reply) => {
+    const body = z.object({ phrase: z.string().max(80), shopId: z.string().nullable().optional() }).parse(req.body);
+    const phrase = normalizePhrase(body.phrase);
+    if (phrase.length < 3) return reply.code(400).send({ error: 'Pravilo mora imati bar 3 slova.' });
+    const shopId = body.shopId || null;
+    const row = await one<HideRule>(
+      `INSERT INTO hide_rules (phrase, shop_id, created_by) VALUES ($1, $2, $3)
+       ON CONFLICT (phrase, coalesce(shop_id, '')) DO UPDATE SET phrase = EXCLUDED.phrase
+       RETURNING id, phrase, shop_id`,
+      [phrase, shopId, req.user!.id],
+    );
+    const res = await applyRule(row!);
+    if (res.hadSets) refreshAfterHiding(req.log);
+    return { ok: true, rule: row, hidden: res.hidden };
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/admin/hide-rules/:id', async (req, reply) => {
+    const rules = await loadRules();
+    const rule = rules.find((r) => r.id === Number(req.params.id));
+    if (!rule) return reply.code(404).send({ error: 'Pravilo nije pronađeno' });
+    await query('DELETE FROM hide_rules WHERE id = $1', [rule.id]);
+    const restored = await releaseRule(rule, rules.filter((r) => r.id !== rule.id));
+    return { ok: true, restored };
   });
 
   app.post<{ Params: { id: string } }>('/api/admin/offers/:id/match', async (req, reply) => {

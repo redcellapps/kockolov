@@ -3,6 +3,7 @@ import path from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config.js';
+import { normalizeText } from '../src/lib/normalize.js';
 import { startMockShops } from './mockShops.js';
 
 // Outgoing mail is captured instead of sent; off by default, like a server without SMTP
@@ -631,6 +632,76 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       mail.on = false;
       mail.fail = false;
       await query("DELETE FROM users WHERE email LIKE 'vesti-%@example.com'");
+    }
+  });
+
+  it('lets the admin hide offers that are not LEGO sets, one by one or by a phrase', async () => {
+    const admin = (method: 'GET' | 'POST' | 'DELETE', url: string, payload?: object) =>
+      app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    // listings like ABC Kocka's Barbie dolls and Nerf blasters
+    await query(
+      `INSERT INTO offers (shop_id, external_id, seller, title, url, price_rsd, in_stock) VALUES
+         ('ananas', 'toy-1', 'Prodavac', 'BARBIE Dreamtopia HLC25 Lutka balerina', 'https://x/1', 2999, true),
+         ('ananas', 'toy-2', 'Prodavac', 'NERF Elite 2.0 Flipshots F2551', 'https://x/2', 3999, true),
+         ('ananas', 'toy-3', 'Prodavac', 'Hasbro NERF Mega Bulldog E2657', 'https://x/3', 2499, true)`,
+    );
+    try {
+      expect((await app.inject({ method: 'GET', url: '/api/admin/unmatched' })).statusCode).toBe(401);
+      expect((await admin('GET', '/api/admin/unmatched?q=nerf')).json().total).toBe(2);
+      const barbie = (await admin('GET', '/api/admin/unmatched?q=Barbie%20lutka')).json().items;
+      expect(barbie.map((o: { title: string }) => o.title)).toEqual(['BARBIE Dreamtopia HLC25 Lutka balerina']);
+
+      // one by one
+      expect((await admin('POST', '/api/admin/offers/hide', { ids: [barbie[0].id] })).json()).toEqual({ ok: true, hidden: 1 });
+      expect((await admin('GET', '/api/admin/unmatched?q=barbie')).json().total).toBe(0);
+
+      // by a phrase: hides today's listings and future ones
+      const rule = (await admin('POST', '/api/admin/hide-rules', { phrase: 'NERF' })).json();
+      expect(rule).toMatchObject({ ok: true, hidden: 2, rule: { phrase: 'nerf', shop_id: null } });
+      expect((await admin('POST', '/api/admin/hide-rules', { phrase: 'ab' })).statusCode).toBe(400);
+      const hidden = (await admin('GET', '/api/admin/hidden')).json();
+      expect(hidden.rules.map((r: { phrase: string }) => r.phrase)).toEqual(['nerf']);
+      expect(hidden.items.map((o: { title: string; match_method: string }) => `${o.match_method}: ${o.title}`).sort()).toEqual([
+        'hidden: BARBIE Dreamtopia HLC25 Lutka balerina',
+        'hidden_rule: Hasbro NERF Mega Bulldog E2657',
+        'hidden_rule: NERF Elite 2.0 Flipshots F2551',
+      ]);
+      const nerf = hidden.items.find((o: { title: string }) => o.title.startsWith('NERF'));
+      expect((await admin('POST', `/api/admin/offers/${nerf.id}/restore`)).statusCode).toBe(409);
+      expect((await admin('GET', '/api/admin/overview')).json().shops.find((s: { id: string }) => s.id === 'ananas').hidden).toBe(3);
+
+      // deleting the rule brings its offers back to the review list; restoring brings back one
+      expect((await admin('DELETE', `/api/admin/hide-rules/${rule.rule.id}`)).json()).toEqual({ ok: true, restored: 2 });
+      expect((await admin('POST', `/api/admin/offers/${barbie[0].id}/restore`)).json()).toEqual({ ok: true });
+      expect((await admin('GET', '/api/admin/unmatched?q=nerf')).json().total).toBe(2);
+      expect((await admin('GET', '/api/admin/unmatched?q=barbie')).json().total).toBe(1);
+
+      // an offer linked to a set leaves the set page, and stays hidden on the next crawl
+      const real = (await one<{ id: number; set_num: string; title: string }>(
+        "SELECT id, set_num, title FROM offers WHERE shop_id = 'kockarium' AND set_num IS NOT NULL AND in_stock ORDER BY id LIMIT 1",
+      ))!;
+      await admin('POST', '/api/admin/offers/hide', { ids: [real.id] });
+      const page = (await admin('GET', `/api/sets/${real.set_num}`)).json();
+      expect(page.offers.map((o: { id: number }) => o.id)).not.toContain(real.id);
+      await runCrawl({ shops: ['kockarium'], log });
+      expect(await one('SELECT set_num, match_method FROM offers WHERE id = $1', [real.id])).toEqual({ set_num: null, match_method: 'hidden' });
+      await admin('POST', `/api/admin/offers/${real.id}/restore`);
+      await runCrawl({ shops: ['kockarium'], log });
+      expect((await one<{ set_num: string }>('SELECT set_num FROM offers WHERE id = $1', [real.id]))!.set_num).toBe(real.set_num);
+
+      // a rule for one shop also hides the listings that come with the next crawl
+      const word = normalizeText(real.title).split(' ').find((w) => w.length > 4 && !/^\d+$/.test(w) && w !== 'lego')!;
+      const shopRule = (await admin('POST', '/api/admin/hide-rules', { phrase: word, shopId: 'kockarium' })).json();
+      expect(shopRule.hidden).toBeGreaterThan(0);
+      await query("UPDATE offers SET match_method = NULL WHERE shop_id = 'kockarium' AND match_method = 'hidden_rule'"); // as if new
+      await runCrawl({ shops: ['kockarium'], log });
+      expect(await one('SELECT set_num, match_method FROM offers WHERE id = $1', [real.id])).toEqual({ set_num: null, match_method: 'hidden_rule' });
+      await admin('DELETE', `/api/admin/hide-rules/${shopRule.rule.id}`);
+      await runCrawl({ shops: ['kockarium'], log });
+      expect((await one<{ set_num: string }>('SELECT set_num FROM offers WHERE id = $1', [real.id]))!.set_num).toBe(real.set_num);
+    } finally {
+      await query("DELETE FROM offers WHERE shop_id = 'ananas' AND external_id LIKE 'toy-%'");
+      await query('DELETE FROM hide_rules');
     }
   });
 

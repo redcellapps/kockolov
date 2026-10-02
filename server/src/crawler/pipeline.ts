@@ -3,7 +3,8 @@ import { PoliteFetcher } from '../lib/http.js';
 import { cleanTitle } from '../lib/setnum.js';
 import { themeFromList } from '../lib/themes.js';
 import { adaptersFor } from './adapters/index.js';
-import { buildNameIndex, isMerch, matchOffer, type MatchIndex } from './matching.js';
+import { loadRules, ruleHides } from './hiding.js';
+import { buildNameIndex, matchOffer, notASet, type MatchIndex } from './matching.js';
 import { refreshSets } from './refresh.js';
 import { computeDeals } from '../deals/engine.js';
 import { seedReferenceData } from './seed.js';
@@ -73,6 +74,7 @@ export async function crawlShop(adapter: ShopAdapter, log: (m: string) => void, 
     )) existing.set(r.external_id, r);
 
     const idx = await loadMatchIndex();
+    const rules = await loadRules();
     const seenThisRun = new Set<string>();
 
     for await (const page of adapter.crawl({ http, log: (m) => log(`[${shopId}] ${m}`), maxPages })) {
@@ -87,13 +89,17 @@ export async function crawlShop(adapter: ShopAdapter, log: (m: string) => void, 
           if (prev?.match_method === 'manual') {
             setNum = prev.set_num;
             method = 'manual';
+          } else if (prev?.match_method === 'hidden') {
+            method = 'hidden'; // the admin hid this offer: it stays hidden
+          } else if (rules.some((r) => ruleHides(r, shopId, o.title))) {
+            method = 'hidden_rule';
           } else {
             const m = matchOffer(o, idx, { checkPrice: adapter.shop.kind !== 'official' });
             if (m) {
               setNum = m.setNum;
               method = m.method;
-            } else if (isMerch(o.title)) {
-              method = 'merch'; // bags, bottles, keychains: not a set, keep out of the review queue
+            } else if (notASet(o)) {
+              method = 'merch'; // bags, used items, single minifigures: not a set, keep out of the review queue
             }
           }
           if (setNum) {

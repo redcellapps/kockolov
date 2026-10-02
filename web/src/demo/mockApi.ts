@@ -42,6 +42,8 @@ const state = {
   watchlist: new Set<string>((snap.deals.members.items as Json[]).slice(0, 3).map((d) => d.set_num as string)),
   users: (snap.admin.users as Json[]).map((u): Json => ({ accepted_at: u.last_login_at ?? u.created_at, invited_at: null, ...u })),
   unmatched: [...(snap.admin.unmatched as Json[])],
+  hidden: [] as Json[],
+  rules: [] as Json[],
 };
 
 const ok = (body: unknown, status = 200) => ({ status, body });
@@ -65,6 +67,14 @@ function filtersFrom(p: URLSearchParams): SearchFilters {
     size: num('size'),
   };
 }
+
+/** lowercase, no diacritics or punctuation (like the server's normalizeText) */
+const normWords = (s: string) =>
+  s.toLowerCase().replace(/đ/g, 'dj').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const hasWords = (title: string, q: string) => {
+  const n = ` ${normWords(title)} `;
+  return normWords(q).split(' ').filter(Boolean).every((w) => n.includes(` ${w}`));
+};
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -190,8 +200,61 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
 
   if (path.startsWith('/api/admin/')) {
     if (state.user!.role !== 'admin') return err(403, 'Samo za administratore.');
-    if (path === '/api/admin/overview') return ok({ ...snap.admin.overview, users: state.users.length });
-    if (path === '/api/admin/unmatched') return ok(state.unmatched);
+    if (path === '/api/admin/overview') {
+      const ov = snap.admin.overview as Json;
+      const shops = (ov.shops as Json[]).map((sh) => ({
+        ...sh,
+        unmatched: state.unmatched.filter((o) => o.shop_id === sh.id).length,
+        hidden: state.hidden.filter((o) => o.shop_id === sh.id).length,
+      }));
+      return ok({ ...ov, shops, users: state.users.length });
+    }
+    // unmatched offers: search, hide one by one or by a phrase rule (kept while the page is open)
+    if (path === '/api/admin/unmatched') {
+      const shop = p.get('shop');
+      const items = state.unmatched.filter((o) => (!shop || o.shop_id === shop) && hasWords(String(o.title), p.get('q') ?? ''));
+      return ok({ total: items.length, items: items.slice(0, 300) });
+    }
+    if (path === '/api/admin/hidden') return ok({ rules: state.rules, total: state.hidden.length, items: state.hidden });
+    if (path === '/api/admin/offers/hide' && method === 'POST') {
+      const ids = new Set((body?.ids as number[]) ?? []);
+      const moved = state.unmatched.filter((o) => ids.has(o.id as number));
+      state.unmatched = state.unmatched.filter((o) => !ids.has(o.id as number));
+      state.hidden.push(...moved.map((o) => ({ ...o, match_method: 'hidden' })));
+      return ok({ ok: true, hidden: moved.length });
+    }
+    const restore = path.match(/^\/api\/admin\/offers\/(\d+)\/restore$/);
+    if (restore && method === 'POST') {
+      const o = state.hidden.find((x) => x.id === Number(restore[1]));
+      if (o?.match_method === 'hidden_rule') return err(409, 'Ovu ponudu sakriva pravilo; obriši pravilo da je vratiš.');
+      if (o) {
+        state.hidden = state.hidden.filter((x) => x !== o);
+        state.unmatched.push({ ...o, match_method: null });
+      }
+      return ok({ ok: true });
+    }
+    if (path === '/api/admin/hide-rules' && method === 'POST') {
+      const phrase = normWords(String(body?.phrase ?? ''));
+      if (phrase.length < 3) return err(400, 'Pravilo mora imati bar 3 slova.');
+      const rule = { id: state.rules.length + 1, phrase, shop_id: (body?.shopId as string) || null };
+      state.rules.push(rule);
+      const hits = state.unmatched.filter((o) => (!rule.shop_id || o.shop_id === rule.shop_id) && ` ${normWords(String(o.title))} `.includes(` ${phrase}`));
+      state.unmatched = state.unmatched.filter((o) => !hits.includes(o));
+      state.hidden.push(...hits.map((o) => ({ ...o, match_method: 'hidden_rule' })));
+      return ok({ ok: true, rule, hidden: hits.length });
+    }
+    const delRule = path.match(/^\/api\/admin\/hide-rules\/(\d+)$/);
+    if (delRule && method === 'DELETE') {
+      const rule = state.rules.find((r) => r.id === Number(delRule[1]));
+      if (!rule) return err(404, 'Pravilo nije pronađeno');
+      state.rules = state.rules.filter((r) => r !== rule);
+      const back = state.hidden.filter(
+        (o) => o.match_method === 'hidden_rule' && (!rule.shop_id || o.shop_id === rule.shop_id) && ` ${normWords(String(o.title))} `.includes(` ${rule.phrase}`),
+      );
+      state.hidden = state.hidden.filter((o) => !back.includes(o));
+      state.unmatched.push(...back.map((o) => ({ ...o, match_method: null })));
+      return ok({ ok: true, restored: back.length });
+    }
     if (path === '/api/admin/users' && method === 'GET') return ok(state.users);
     if (path === '/api/admin/users' && method === 'POST') {
       const email = String(body?.email ?? '').trim().toLowerCase();

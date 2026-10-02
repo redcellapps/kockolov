@@ -114,3 +114,9 @@ export const LockIcon = (p: P) => (
     <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
   </svg>
 );
+export const EyeOffIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-2.7 3.6M6.6 6.6C3.9 8.4 2.5 12 2.5 12s3.5 7 9.5 7a9.6 9.6 0 0 0 5.4-1.6" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+  </svg>
+);

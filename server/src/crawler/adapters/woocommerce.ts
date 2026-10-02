@@ -141,5 +141,6 @@ export const abckockaAdapter = (baseUrl = 'https://abckocka.com') =>
   wooStoreAdapter(
     { id: 'abckocka', name: 'ABC Kocka', url: 'https://abckocka.com', kind: 'shop', membersOnly: true },
     baseUrl,
-    [''], // LEGO-only shop: the whole catalogue
+    [''], // the whole catalogue: mostly LEGO, but also Barbie and Nerf (October 2026)
+    (p) => /\blego\b/i.test(p.name) || !!p.categories?.some((c) => /\blego\b/i.test(c.name ?? '')),
   );
