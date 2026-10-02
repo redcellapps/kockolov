@@ -120,3 +120,20 @@ export const EyeOffIcon = (p: P) => (
     <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
   </svg>
 );
+export const PencilIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M15.5 5.5l3 3M4 20l1-4L16.2 4.8a2.1 2.1 0 0 1 3 3L8 19l-4 1z" />
+  </svg>
+);
+export const AlertIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z" />
+    <path d="M12 9.5v4M12 17h.01" />
+  </svg>
+);
+export const UndoIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </svg>
+);

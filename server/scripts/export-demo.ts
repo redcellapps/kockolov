@@ -88,7 +88,7 @@ async function main() {
     details,
     admin: {
       overview: await get('/api/admin/overview'),
-      unmatched: (await get('/api/admin/unmatched')).map((o: { shop_id: string; url: string }) => ({ ...o, url: realUrl(o) })),
+      unmatched: (await get('/api/admin/unmatched')).items.map((o: { shop_id: string; url: string }) => ({ ...o, url: realUrl(o) })),
       users: await get('/api/admin/users'),
     },
     images,

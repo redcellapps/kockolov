@@ -14,7 +14,7 @@ import { usePageTitle } from '../lib/title';
 export default function SetDetail() {
   const { setNum = '' } = useParams();
   const navigate = useNavigate();
-  const { fx } = useAuth();
+  const { fx, user } = useAuth();
   const q = useQuery({
     queryKey: ['set', setNum],
     queryFn: () => api<SetDetailData>(`/api/sets/${encodeURIComponent(setNum)}`),
@@ -160,7 +160,14 @@ export default function SetDetail() {
 
       {/* offers */}
       <section id="ponude" className="mt-12 scroll-mt-24">
-        <h2 className="mb-4 text-2xl font-extrabold tracking-tight">{t('set.offers.title')}</h2>
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-2xl font-extrabold tracking-tight">{t('set.offers.title')}</h2>
+          {user?.role === 'admin' && (
+            <Link to={`/admin/ponude?trazi=${encodeURIComponent(set.set_num)}`} className="text-sm font-bold text-accent hover:underline">
+              {t('set.offers.admin')}
+            </Link>
+          )}
+        </div>
         {offers.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-line bg-surface">
             <table className="w-full text-left">

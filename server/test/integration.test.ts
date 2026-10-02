@@ -705,6 +705,79 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     }
   });
 
+  it('lists every offer with its set, and lets the admin fix a mistyped set number', async () => {
+    const admin = (method: 'GET' | 'POST', url: string, payload?: object) =>
+      app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    const offer = (await one<{ id: number; set_num: string; title: string }>(
+      `SELECT id, set_num, title FROM offers
+        WHERE shop_id = 'kockarium' AND set_num IS NOT NULL AND in_stock AND match_method <> 'manual' AND title LIKE set_num || '%'
+        ORDER BY id LIMIT 1`,
+    ))!;
+    const right = offer.set_num;
+    const other = (await one<{ set_num: string }>('SELECT set_num FROM sets WHERE set_num <> $1 ORDER BY set_num LIMIT 1', [right]))!.set_num;
+    // two digits swapped, a number no shop sells
+    let typo = right.slice(0, 3) + right[4] + right[3] + right.slice(5);
+    if (typo === right || (await one('SELECT 1 FROM sets WHERE set_num = $1', [typo]))) typo = '99' + right.slice(2);
+
+    expect((await app.inject({ method: 'GET', url: '/api/admin/offers' })).statusCode).toBe(401);
+    const all = (await admin('GET', '/api/admin/offers')).json();
+    expect(all.total).toBe(all.counts.all);
+    expect(all.counts.all).toBe(all.counts.linked + all.counts.open + all.counts.merch + all.counts.hidden);
+    // a search by set number finds the offers linked to it
+    const bySet = (await admin('GET', `/api/admin/offers?q=${right}`)).json();
+    expect(bySet.items.map((o: { id: number }) => o.id)).toContain(offer.id);
+    expect(bySet.items.find((o: { id: number }) => o.id === offer.id)).toMatchObject({ set_num: right, doubts: [] });
+    // sorted and paged
+    const paged = (await admin('GET', '/api/admin/offers?filter=linked&sort=price&dir=desc&size=10&page=2')).json();
+    expect(paged).toMatchObject({ page: 2, size: 10, sort: 'price' });
+    const prices = paged.items.map((o: { price_rsd: number }) => o.price_rsd);
+    expect(prices).toEqual([...prices].sort((a, b) => b - a));
+
+    // the number shows its set while typing; an unknown one needs a second, explicit confirmation
+    expect((await admin('GET', `/api/admin/sets/${right}`)).json()).toMatchObject({ set_num: right });
+    expect((await admin('GET', `/api/admin/sets/${typo}`)).json()).toMatchObject({ code: 'unknown_set' });
+    expect((await admin('POST', `/api/admin/offers/${offer.id}/match`, { setNum: 'abc' })).statusCode).toBe(400);
+    const refused = await admin('POST', `/api/admin/offers/${offer.id}/match`, { setNum: typo });
+    expect([refused.statusCode, refused.json().code]).toEqual([409, 'unknown_set']);
+    expect((await admin('POST', `/api/admin/offers/${offer.id}/match`, { setNum: typo, confirmNew: true })).json()).toMatchObject({
+      ok: true,
+      previous: right,
+      setNum: typo,
+    });
+
+    // the wrong link stands out: hand-made, and the title names another set
+    const manual = (await admin('GET', '/api/admin/offers?filter=manual')).json();
+    expect(manual.items[0]).toMatchObject({ id: offer.id, set_num: typo, match_method: 'manual', doubts: [{ kind: 'number', num: right }] });
+    expect(manual.items[0].manual_by).toBeTruthy();
+    expect(manual.items[0].manual_at).toBeTruthy();
+    expect((await admin('GET', '/api/admin/offers?filter=check')).json().items.map((o: { id: number }) => o.id)).toContain(offer.id);
+
+    // a hand-made link survives the crawl
+    await runCrawl({ shops: ['kockarium'], log });
+    expect(await one('SELECT set_num, match_method FROM offers WHERE id = $1', [offer.id])).toEqual({ set_num: typo, match_method: 'manual' });
+
+    // fixing it removes the set the typo made
+    expect((await admin('POST', `/api/admin/offers/${offer.id}/match`, { setNum: other })).json()).toMatchObject({ setNum: other, dropped: [typo] });
+    expect(await one('SELECT 1 FROM sets WHERE set_num = $1', [typo])).toBeNull();
+    expect((await admin('GET', `/api/sets/${typo}`)).statusCode).toBe(404);
+
+    // back to automatic: linked right away the way the crawler links it
+    const back = (await admin('POST', `/api/admin/offers/${offer.id}/auto`)).json();
+    expect(back).toMatchObject({ ok: true, previous: other, setNum: right });
+    expect(await one('SELECT set_num, match_method <> $2 AS auto, manual_at FROM offers WHERE id = $1', [offer.id, 'manual'])).toEqual({
+      set_num: right,
+      auto: true,
+      manual_at: null,
+    });
+    expect((await admin('GET', `/api/sets/${right}`)).json().offers.map((o: { id: number }) => o.id)).toContain(offer.id);
+
+    // a hidden offer comes back linked, without waiting for the next crawl
+    await admin('POST', '/api/admin/offers/hide', { ids: [offer.id] });
+    expect((await admin('GET', '/api/admin/offers?filter=hidden')).json().items.map((o: { id: number }) => o.id)).toContain(offer.id);
+    await admin('POST', `/api/admin/offers/${offer.id}/restore`);
+    expect((await one<{ set_num: string }>('SELECT set_num FROM offers WHERE id = $1', [offer.id]))!.set_num).toBe(right);
+  });
+
   it('records price changes and marks vanished listings as unavailable on the next run', async () => {
     const page1 = readFileSync(path.join(__dirname, 'fixtures/kockarium/page1.html'), 'utf8').replace('13.190,00', '12.490,00');
     await mock.close();

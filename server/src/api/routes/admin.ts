@@ -17,6 +17,7 @@ import {
 } from '../../mail/announce.js';
 import { mailConfigured } from '../../mail/mailer.js';
 import { applyRule, loadRules, normalizePhrase, releaseRule, type HideRule } from '../../crawler/hiding.js';
+import { LINK_FILTERS, OFFER_SORTS, UnknownSetError, dropOrphanSets, linkOffer, listOffers, lookupSet, resetLink } from '../../crawler/links.js';
 import { normalizeText } from '../../lib/normalize.js';
 import { hashPassword, normalizeEmail } from '../auth.js';
 
@@ -40,6 +41,14 @@ function refreshAfterHiding(log: { error: (e: unknown) => void }) {
     await computeDeals({ log: () => {} });
   })().catch((err) => log.error(err));
 }
+
+/** After a link changed by hand: set names and prices now, today's best buys in the background */
+async function refreshAfterLink(log: { error: (e: unknown) => void }) {
+  await refreshSets(() => {});
+  computeDeals({ log: () => {} }).catch((err) => log.error(err));
+}
+
+const SET_NUM = /^\d{3,7}(-\w+)?$/;
 
 async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
   if (!req.user) return reply.code(401).send({ error: 'Potrebna je prijava.' });
@@ -87,19 +96,25 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post('/api/admin/offers/hide', async (req) => {
     const { ids } = z.object({ ids: z.array(z.number().int()).min(1).max(2000) }).parse(req.body);
     const rows = await query<{ set_num: string | null }>(
-      "UPDATE offers o SET set_num = NULL, match_method = 'hidden' FROM offers old WHERE o.id = old.id AND o.id = ANY($1::bigint[]) RETURNING old.set_num",
+      `UPDATE offers o SET set_num = NULL, match_method = 'hidden', manual_at = NULL, manual_by = NULL
+         FROM offers old WHERE o.id = old.id AND o.id = ANY($1::bigint[]) RETURNING old.set_num`,
       [ids],
     );
+    await dropOrphanSets(rows.map((r) => r.set_num));
     if (rows.some((r) => r.set_num)) refreshAfterHiding(req.log);
     return { ok: true, hidden: rows.length };
   });
 
-  /** Shows an offer hidden one by one again; the next crawl of its shop links it to a set. */
+  /** Shows an offer hidden one by one again, linked to a set right away the way the crawler would. */
   app.post<{ Params: { id: string } }>('/api/admin/offers/:id/restore', async (req, reply) => {
-    const o = await one<{ match_method: string | null }>('SELECT match_method FROM offers WHERE id = $1', [Number(req.params.id)]);
+    const id = Number(req.params.id);
+    const o = await one<{ match_method: string | null }>('SELECT match_method FROM offers WHERE id = $1', [id]);
     if (!o) return reply.code(404).send({ error: 'Ponuda nije pronađena' });
     if (o.match_method === 'hidden_rule') return reply.code(409).send({ error: 'Ovu ponudu sakriva pravilo; obriši pravilo da je vratiš.' });
-    await query("UPDATE offers SET match_method = NULL WHERE id = $1 AND match_method = 'hidden'", [Number(req.params.id)]);
+    if (o.match_method === 'hidden') {
+      const res = await resetLink(id);
+      if (res?.setNum) await refreshAfterLink(req.log);
+    }
     return { ok: true };
   });
 
@@ -140,21 +155,51 @@ export async function adminRoutes(app: FastifyInstance) {
     return { ok: true, restored };
   });
 
+  // ---- every offer with its set: find and fix wrong links ----
+  app.get('/api/admin/offers', async (req) => {
+    const p = z
+      .object({
+        q: z.string().max(80).optional(),
+        shop: z.string().max(40).optional(),
+        filter: z.enum(LINK_FILTERS).optional().catch(undefined),
+        sort: z.enum(OFFER_SORTS).optional().catch(undefined),
+        dir: z.enum(['asc', 'desc']).optional().catch(undefined),
+        page: z.coerce.number().int().optional().catch(undefined),
+        size: z.coerce.number().int().optional().catch(undefined),
+      })
+      .parse(req.query);
+    return listOffers(p);
+  });
+
+  /** The set behind a number, shown while the admin types it */
+  app.get<{ Params: { num: string } }>('/api/admin/sets/:num', async (req, reply) => {
+    const num = req.params.num.trim();
+    const set = SET_NUM.test(num) ? await lookupSet(num) : null;
+    if (!set) return reply.code(404).send({ error: `Set ${num} nije u katalogu.`, code: 'unknown_set' });
+    return set;
+  });
+
+  /** Links an offer to a set by hand; a number that isn't in the catalogue needs confirmNew */
   app.post<{ Params: { id: string } }>('/api/admin/offers/:id/match', async (req, reply) => {
-    const { setNum } = z.object({ setNum: z.string().regex(/^\d{3,7}(-\w+)?$/).nullable() }).parse(req.body);
-    const offer = await one<{ id: number; title: string; image_url: string | null }>(
-      'SELECT id, title, image_url FROM offers WHERE id = $1',
-      [Number(req.params.id)],
-    );
-    if (!offer) return reply.code(404).send({ error: 'Ponuda nije pronađena' });
-    if (setNum) {
-      await query('INSERT INTO sets (set_num, name, image_url) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [
-        setNum, offer.title, offer.image_url,
-      ]);
+    const body = z.object({ setNum: z.string().trim(), confirmNew: z.boolean().optional() }).safeParse(req.body ?? {});
+    if (!body.success || !SET_NUM.test(body.data.setNum)) return reply.code(400).send({ error: 'Upiši broj seta, npr. 60384 ili 71051-7.' });
+    try {
+      const res = await linkOffer(Number(req.params.id), body.data.setNum, req.user!.id, { confirmNew: body.data.confirmNew });
+      if (!res) return reply.code(404).send({ error: 'Ponuda nije pronađena' });
+      await refreshAfterLink(req.log);
+      return { ok: true, ...res };
+    } catch (err) {
+      if (err instanceof UnknownSetError) return reply.code(409).send({ error: err.message, code: 'unknown_set' });
+      throw err;
     }
-    await query("UPDATE offers SET set_num = $2, match_method = 'manual' WHERE id = $1", [offer.id, setNum]);
-    await refreshSets(() => {});
-    return { ok: true };
+  });
+
+  /** Back to automatic: the offer is linked the way the crawler would link it */
+  app.post<{ Params: { id: string } }>('/api/admin/offers/:id/auto', async (req, reply) => {
+    const res = await resetLink(Number(req.params.id));
+    if (!res) return reply.code(404).send({ error: 'Ponuda nije pronađena' });
+    await refreshAfterLink(req.log);
+    return { ok: true, ...res };
   });
 
   app.get('/api/admin/users', async () =>

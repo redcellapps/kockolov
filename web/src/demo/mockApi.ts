@@ -41,10 +41,84 @@ const state = {
   // a few sets already watched, so the watchlist page shows what it does
   watchlist: new Set<string>((snap.deals.members.items as Json[]).slice(0, 3).map((d) => d.set_num as string)),
   users: (snap.admin.users as Json[]).map((u): Json => ({ accepted_at: u.last_login_at ?? u.created_at, invited_at: null, ...u })),
-  unmatched: [...(snap.admin.unmatched as Json[])],
-  hidden: [] as Json[],
+  // every offer as the admin sees it (linked ones from the set pages, plus the unmatched ones);
+  // orig_* is how the crawler linked it, for "back to automatic" and "restore"
+  rows: adminRows(),
   rules: [] as Json[],
 };
+
+function adminRows(): Json[] {
+  const sets = new Map((snap.sets as DemoSet[]).map((s) => [s.set_num, s]));
+  const rows: Json[] = [];
+  for (const [setNum, d] of Object.entries(snap.details as Record<string, Json>)) {
+    for (const o of d.members.offers as Json[]) {
+      rows.push({
+        id: o.id, shop_id: o.shop_id, seller: o.seller, title: o.title, url: o.url, image_url: o.image_url,
+        price_rsd: o.price_rsd, in_stock: o.in_stock, set_num: setNum, match_method: o.match_method,
+        orig_set: setNum, orig_method: o.match_method, manual_at: null, manual_by: null, set: sets.get(setNum),
+      });
+    }
+  }
+  for (const o of snap.admin.unmatched as Json[]) {
+    rows.push({ ...o, image_url: null, set_num: null, match_method: o.match_method ?? null, orig_set: null, orig_method: o.match_method ?? null, manual_at: null, manual_by: null });
+  }
+  return rows;
+}
+const setByNum = new Map((snap.sets as DemoSet[]).map((s) => [s.set_num, s]));
+const HIDDEN = ['hidden', 'hidden_rule'];
+const isOpenRow = (o: Json) => !o.set_num && o.match_method !== 'merch' && !HIDDEN.includes(o.match_method);
+const openRows = () => state.rows.filter(isOpenRow);
+const hiddenRows = () => state.rows.filter((o) => HIDDEN.includes(o.match_method));
+/** back to how the crawler linked it (unless a rule hides it) */
+function relink(o: Json) {
+  const ruled = state.rules.some((r) => (!r.shop_id || o.shop_id === r.shop_id) && ` ${normWords(String(o.title))} `.includes(` ${r.phrase}`));
+  Object.assign(o, ruled ? { set_num: null, match_method: 'hidden_rule' } : { set_num: o.orig_set, match_method: o.orig_method });
+  Object.assign(o, { manual_at: null, manual_by: null, set: o.set_num ? setByNum.get(o.set_num) : undefined });
+}
+function doubts(o: Json): Json[] {
+  if (!o.set_num) return [];
+  const title = ` ${normWords(String(o.title))} `;
+  if (title.includes(` ${normWords(o.set_num)} `)) return [];
+  const other = (String(o.title).match(/(?<![\d.,])\d{4,6}(?!\d)/g) ?? []).find((n) => n !== o.set_num && setByNum.has(n));
+  return other ? [{ kind: 'number', num: other }] : [];
+}
+const FILTERS: Record<string, (o: Json) => boolean> = {
+  all: () => true,
+  linked: (o) => !!o.set_num,
+  manual: (o) => o.match_method === 'manual',
+  check: (o) => doubts(o).length > 0,
+  open: isOpenRow,
+  merch: (o) => o.match_method === 'merch',
+  hidden: (o) => HIDDEN.includes(o.match_method),
+};
+const coll = new Intl.Collator('sr', { numeric: true, sensitivity: 'base' });
+const SORTS: Record<string, (a: Json, b: Json) => number> = {
+  title: (a, b) => coll.compare(a.title, b.title),
+  shop: (a, b) => coll.compare(a.shop_id, b.shop_id) || coll.compare(a.title, b.title),
+  price: (a, b) => a.price_rsd - b.price_rsd,
+  set: (a, b) => (!a.set_num ? 1 : 0) - (!b.set_num ? 1 : 0) || coll.compare(a.set_num ?? '', b.set_num ?? ''),
+  linked: (a, b) => (b.manual_at ? Date.parse(b.manual_at) : 0) - (a.manual_at ? Date.parse(a.manual_at) : 0) || coll.compare(a.title, b.title),
+};
+function adminOffers(p: URLSearchParams) {
+  const shop = p.get('shop');
+  const found = state.rows.filter(
+    (o) => (!shop || o.shop_id === shop) && hasWords(`${o.title} ${o.seller} ${o.set_num ?? ''} ${o.set?.name ?? ''}`, p.get('q') ?? ''),
+  );
+  const counts = Object.fromEntries(Object.entries(FILTERS).map(([k, f]) => [k, found.filter(f).length]));
+  const filter = FILTERS[p.get('filter') ?? ''] ? p.get('filter')! : 'all';
+  const sort = SORTS[p.get('sort') ?? ''] ? p.get('sort')! : filter === 'manual' ? 'linked' : 'title';
+  const items = found.filter(FILTERS[filter]).sort(SORTS[sort]);
+  if (p.get('dir') === 'desc') items.reverse();
+  const size = 50;
+  const pages = Math.max(1, Math.ceil(items.length / size));
+  const page = Math.min(Math.max(Number(p.get('page')) || 1, 1), pages);
+  return {
+    total: items.length, page, pages, size, sort, counts,
+    items: items.slice((page - 1) * size, page * size).map(({ set, orig_set: _s, orig_method: _m, ...o }) => ({
+      ...o, set_name: set?.name ?? null, set_image: set?.image_url ?? null, doubts: doubts(o),
+    })),
+  };
+}
 
 const ok = (body: unknown, status = 200) => ({ status, body });
 const err = (status: number, error: string) => ({ status, body: { error } });
@@ -204,43 +278,63 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
       const ov = snap.admin.overview as Json;
       const shops = (ov.shops as Json[]).map((sh) => ({
         ...sh,
-        unmatched: state.unmatched.filter((o) => o.shop_id === sh.id).length,
-        hidden: state.hidden.filter((o) => o.shop_id === sh.id).length,
+        unmatched: openRows().filter((o) => o.shop_id === sh.id).length,
+        hidden: hiddenRows().filter((o) => o.shop_id === sh.id).length,
       }));
       return ok({ ...ov, shops, users: state.users.length });
     }
     // unmatched offers: search, hide one by one or by a phrase rule (kept while the page is open)
     if (path === '/api/admin/unmatched') {
       const shop = p.get('shop');
-      const items = state.unmatched.filter((o) => (!shop || o.shop_id === shop) && hasWords(String(o.title), p.get('q') ?? ''));
+      const items = openRows().filter((o) => (!shop || o.shop_id === shop) && hasWords(String(o.title), p.get('q') ?? ''));
       return ok({ total: items.length, items: items.slice(0, 300) });
     }
-    if (path === '/api/admin/hidden') return ok({ rules: state.rules, total: state.hidden.length, items: state.hidden });
+    if (path === '/api/admin/hidden') {
+      const items = hiddenRows().map(({ set: _s, ...o }) => o);
+      return ok({ rules: state.rules, total: items.length, items });
+    }
     if (path === '/api/admin/offers/hide' && method === 'POST') {
       const ids = new Set((body?.ids as number[]) ?? []);
-      const moved = state.unmatched.filter((o) => ids.has(o.id as number));
-      state.unmatched = state.unmatched.filter((o) => !ids.has(o.id as number));
-      state.hidden.push(...moved.map((o) => ({ ...o, match_method: 'hidden' })));
+      const moved = state.rows.filter((o) => ids.has(o.id as number));
+      moved.forEach((o) => Object.assign(o, { set_num: null, set: undefined, match_method: 'hidden', manual_at: null, manual_by: null }));
       return ok({ ok: true, hidden: moved.length });
     }
     const restore = path.match(/^\/api\/admin\/offers\/(\d+)\/restore$/);
     if (restore && method === 'POST') {
-      const o = state.hidden.find((x) => x.id === Number(restore[1]));
+      const o = state.rows.find((x) => x.id === Number(restore[1]));
       if (o?.match_method === 'hidden_rule') return err(409, 'Ovu ponudu sakriva pravilo; obriši pravilo da je vratiš.');
-      if (o) {
-        state.hidden = state.hidden.filter((x) => x !== o);
-        state.unmatched.push({ ...o, match_method: null });
-      }
+      if (o?.match_method === 'hidden') relink(o);
       return ok({ ok: true });
+    }
+    // every offer with its set: search, fix a wrong number, back to automatic
+    if (path === '/api/admin/offers') return ok(adminOffers(p));
+    const lookup = path.match(/^\/api\/admin\/sets\/(.+)$/);
+    if (lookup) {
+      const s = setByNum.get(decodeURIComponent(lookup[1]));
+      if (!s) return { status: 404, body: { error: `Set ${decodeURIComponent(lookup[1])} nije u katalogu.`, code: 'unknown_set' } };
+      const offers = state.rows.filter((o) => o.set_num === s.set_num).length;
+      return ok({ set_num: s.set_num, name: s.name, image_url: s.image_url, theme_name: s.theme_name, rrp_rsd: s.rrp_rsd, offers });
+    }
+    const auto = path.match(/^\/api\/admin\/offers\/(\d+)\/auto$/);
+    if (auto && method === 'POST') {
+      const o = state.rows.find((x) => x.id === Number(auto[1]));
+      if (!o) return err(404, 'Ponuda nije pronađena');
+      const previous = o.set_num;
+      relink(o);
+      return ok({ ok: true, previous, setNum: o.set_num, method: o.match_method, dropped: [] });
     }
     if (path === '/api/admin/hide-rules' && method === 'POST') {
       const phrase = normWords(String(body?.phrase ?? ''));
       if (phrase.length < 3) return err(400, 'Pravilo mora imati bar 3 slova.');
       const rule = { id: state.rules.length + 1, phrase, shop_id: (body?.shopId as string) || null };
       state.rules.push(rule);
-      const hits = state.unmatched.filter((o) => (!rule.shop_id || o.shop_id === rule.shop_id) && ` ${normWords(String(o.title))} `.includes(` ${phrase}`));
-      state.unmatched = state.unmatched.filter((o) => !hits.includes(o));
-      state.hidden.push(...hits.map((o) => ({ ...o, match_method: 'hidden_rule' })));
+      const hits = state.rows.filter(
+        (o) =>
+          !['manual', ...HIDDEN].includes(o.match_method) &&
+          (!rule.shop_id || o.shop_id === rule.shop_id) &&
+          ` ${normWords(String(o.title))} `.includes(` ${phrase}`),
+      );
+      hits.forEach((o) => Object.assign(o, { set_num: null, set: undefined, match_method: 'hidden_rule' }));
       return ok({ ok: true, rule, hidden: hits.length });
     }
     const delRule = path.match(/^\/api\/admin\/hide-rules\/(\d+)$/);
@@ -248,11 +342,10 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
       const rule = state.rules.find((r) => r.id === Number(delRule[1]));
       if (!rule) return err(404, 'Pravilo nije pronađeno');
       state.rules = state.rules.filter((r) => r !== rule);
-      const back = state.hidden.filter(
+      const back = hiddenRows().filter(
         (o) => o.match_method === 'hidden_rule' && (!rule.shop_id || o.shop_id === rule.shop_id) && ` ${normWords(String(o.title))} `.includes(` ${rule.phrase}`),
       );
-      state.hidden = state.hidden.filter((o) => !back.includes(o));
-      state.unmatched.push(...back.map((o) => ({ ...o, match_method: null })));
+      back.forEach(relink);
       return ok({ ok: true, restored: back.length });
     }
     if (path === '/api/admin/users' && method === 'GET') return ok(state.users);
@@ -290,8 +383,22 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
     }
     const match = path.match(/^\/api\/admin\/offers\/(\d+)\/match$/);
     if (match && method === 'POST') {
-      state.unmatched = state.unmatched.filter((o) => o.id !== Number(match[1]));
-      return ok({ ok: true });
+      const o = state.rows.find((x) => x.id === Number(match[1]));
+      if (!o) return err(404, 'Ponuda nije pronađena');
+      const setNum = String(body?.setNum ?? '').trim();
+      if (!/^\d{3,7}(-\w+)?$/.test(setNum)) return err(400, 'Upiši broj seta, npr. 60384 ili 71051-7.');
+      if (!setByNum.has(setNum) && !body?.confirmNew) {
+        return { status: 409, body: { error: `Set ${setNum} nije u katalogu. Proveri broj; ako je tačan, potvrdi povezivanje.`, code: 'unknown_set' } };
+      }
+      const previous = o.set_num;
+      Object.assign(o, {
+        set_num: setNum,
+        set: setByNum.get(setNum) ?? { name: o.title, image_url: o.image_url },
+        match_method: 'manual',
+        manual_at: new Date().toISOString(),
+        manual_by: state.user!.name || state.user!.email,
+      });
+      return ok({ ok: true, previous, setNum, dropped: [] });
     }
     if (path === '/api/admin/crawl') {
       return err(409, 'U ovom pregledu se cene ne preuzimaju: prikazane su cene sa sajtova prodavnica od 28. 9. 2026.');

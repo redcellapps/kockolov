@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { AdminNav } from '../components/admin/AdminNav';
 import { Announcements } from '../components/admin/Announcements';
 import { OfferReview } from '../components/admin/OfferReview';
 import { Button, ShopDot, Spinner, cx } from '../components/ui';
@@ -105,7 +106,10 @@ export default function AdminPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6 sm:py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-extrabold tracking-tight">{t('admin.title')}</h1>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <h1 className="text-3xl font-extrabold tracking-tight">{t('admin.title')}</h1>
+          <AdminNav />
+        </div>
         <Button onClick={() => crawl.mutate()} disabled={crawl.isPending || ov.data?.crawlRunning}>
           {ov.data?.crawlRunning ? (
             <>

@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { t, tn } from '../../i18n';
 import { api } from '../../lib/api';
 import { rsd, shopName } from '../../lib/format';
-import { ChevronDown, EyeOffIcon, SearchIcon, XIcon } from '../icons';
+import { ChevronDown, ChevronRight, EyeOffIcon, SearchIcon, XIcon } from '../icons';
 import { Button, ShopDot, cx } from '../ui';
+import { SetNumForm } from './SetNumForm';
 
 interface Offer {
   id: number;
@@ -61,7 +63,9 @@ export function OfferReview({ shops }: { shops?: ShopCount[] }) {
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin'] });
   const fail = (e: unknown) => setNotice({ ok: false, text: (e as Error).message });
   const match = useMutation({
-    mutationFn: ({ id, setNum }: { id: number; setNum: string }) => api(`/api/admin/offers/${id}/match`, { method: 'POST', json: { setNum } }),
+    mutationFn: ({ id, setNum, confirmNew }: { id: number; setNum: string; confirmNew: boolean }) =>
+      api<{ setNum: string }>(`/api/admin/offers/${id}/match`, { method: 'POST', json: { setNum, confirmNew } }),
+    onSuccess: (r) => setNotice({ ok: true, text: t('admin.offers.linked', { num: r.setNum }) }),
     onError: fail,
     onSettled: refresh,
   });
@@ -101,9 +105,14 @@ export function OfferReview({ shops }: { shops?: ShopCount[] }) {
 
   return (
     <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6">
-      <h2 className="text-lg font-extrabold">
-        {t('admin.unmatched')} ({total})
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-extrabold">
+          {t('admin.unmatched')} ({total})
+        </h2>
+        <Link to="/admin/ponude" className="inline-flex items-center gap-1 text-sm font-bold text-accent hover:underline">
+          {t('admin.unmatched.all')} <ChevronRight size={15} />
+        </Link>
+      </div>
       <p className="mt-1 mb-4 text-sm text-ink-3">{t('admin.unmatched.hint')}</p>
 
       <div className="flex flex-wrap gap-2">
@@ -157,8 +166,8 @@ export function OfferReview({ shops }: { shops?: ShopCount[] }) {
           <OpenRow
             key={o.id}
             o={o}
-            busy={busy}
-            onMatch={(setNum) => match.mutate({ id: o.id, setNum })}
+            busy={busy || match.isPending}
+            onMatch={(setNum, confirmNew) => match.mutate({ id: o.id, setNum, confirmNew })}
             onHide={() => hide.mutate([o.id])}
           />
         ))}
@@ -230,12 +239,21 @@ export function OfferReview({ shops }: { shops?: ShopCount[] }) {
   );
 }
 
-function OpenRow({ o, busy, onMatch, onHide }: { o: Offer; busy: boolean; onMatch: (setNum: string) => void; onHide: () => void }) {
-  const [v, setV] = useState('');
+function OpenRow({
+  o,
+  busy,
+  onMatch,
+  onHide,
+}: {
+  o: Offer;
+  busy: boolean;
+  onMatch: (setNum: string, confirmNew: boolean) => void;
+  onHide: () => void;
+}) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line px-3 py-2">
-      <ShopDot shop={o.shop_id} />
-      <div className="min-w-0 flex-1">
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-xl border border-line px-3 pt-2.5 pb-1">
+      <ShopDot shop={o.shop_id} className="mt-1.5" />
+      <div className="min-w-0 flex-1 basis-64">
         <a href={o.url} target="_blank" rel="noreferrer" className="block truncate text-sm font-semibold hover:underline">
           {o.title}
         </a>
@@ -244,27 +262,16 @@ function OpenRow({ o, busy, onMatch, onHide }: { o: Offer; busy: boolean; onMatc
           {o.seller && ` · ${o.seller}`} · {rsd(o.price_rsd)}
         </div>
       </div>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (v.trim()) onMatch(v.trim());
-        }}
-      >
-        <input
-          value={v}
-          onChange={(e) => setV(e.target.value)}
-          placeholder={t('admin.match.placeholder')}
-          aria-label={t('admin.match.placeholder')}
-          className="tabular h-9 w-28 rounded-lg border border-line bg-surface px-2 text-sm outline-none focus:border-ink"
-        />
-        <Button size="sm" variant="outline" type="submit">
-          {t('admin.match')}
-        </Button>
-        <Button size="sm" variant="ghost" type="button" disabled={busy} onClick={onHide} title={t('admin.hide.one')}>
-          <EyeOffIcon size={15} /> {t('admin.hide')}
-        </Button>
-      </form>
+      <SetNumForm
+        busy={busy}
+        submitLabel={t('admin.match')}
+        onSave={onMatch}
+        extra={
+          <Button size="sm" variant="ghost" type="button" disabled={busy} onClick={onHide} title={t('admin.hide.one')}>
+            <EyeOffIcon size={15} /> {t('admin.hide')}
+          </Button>
+        }
+      />
     </div>
   );
 }

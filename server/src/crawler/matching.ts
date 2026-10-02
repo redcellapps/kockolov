@@ -99,6 +99,26 @@ export function plausiblePrice(price: number, rrp: number | null | undefined): b
   return ratio >= 0.4 && ratio <= 3;
 }
 
+export type LinkDoubt = { kind: 'number'; num: string } | { kind: 'name' } | { kind: 'price' };
+
+/**
+ * Why an existing link between an offer and a set looks wrong, for the admin's table of offers:
+ * the title names another known set (a typo like 75129 for 75192), the title shares no word with
+ * any of the set's names, or the price is far from the LEGO Store price. Empty = looks fine.
+ */
+export function linkDoubts(o: { title: string; price: number }, setNum: string, idx: Pick<MatchIndex, 'known' | 'sets'>): LinkDoubt[] {
+  const out: LinkDoubt[] = [];
+  const facts = idx.sets?.get(setNum);
+  if (!` ${normalizeText(o.title)} `.includes(` ${normalizeText(setNum)} `)) {
+    const other = setNumFromTitle(o.title, (n) => idx.known.has(n));
+    const words = nameWords(o.title);
+    if (other && other !== setNum && idx.known.has(other)) out.push({ kind: 'number', num: other });
+    else if (facts && words.size && !facts.names.some((n) => [...nameWords(n)].some((w) => words.has(w)))) out.push({ kind: 'name' });
+  }
+  if (!plausiblePrice(o.price, facts?.rrp)) out.push({ kind: 'price' });
+  return out;
+}
+
 export function buildNameIndex(rows: { set_num: string; names: (string | null)[] }[]): Map<string, string> {
   const map = new Map<string, string>();
   const dup = new Set<string>();
@@ -118,13 +138,15 @@ export function buildNameIndex(rows: { set_num: string; names: (string | null)[]
  * Links an offer to a set number. With checkPrice (every shop except the LEGO Store itself) a
  * match whose price is implausible next to the LEGO Store price is dropped.
  */
-export function matchOffer(offer: RawOffer, idx: MatchIndex, opts: { checkPrice?: boolean } = {}): MatchResult | null {
+export type MatchInput = Pick<RawOffer, 'title' | 'sku' | 'skuGuess' | 'priceRsd'> & Partial<RawOffer>;
+
+export function matchOffer(offer: MatchInput, idx: MatchIndex, opts: { checkPrice?: boolean } = {}): MatchResult | null {
   const m = matchBy(offer, idx);
   if (m && opts.checkPrice && !plausiblePrice(offer.priceRsd, idx.sets?.get(m.setNum)?.rrp)) return null;
   return m;
 }
 
-function matchBy(offer: RawOffer, idx: MatchIndex): MatchResult | null {
+function matchBy(offer: MatchInput, idx: MatchIndex): MatchResult | null {
   const fromSku = setNumFromSku(offer.sku);
   if (fromSku) return { setNum: fromSku, method: 'sku' };
   if (offer.sku) return null; // shop gave a non-set SKU (keychains, clothing...)

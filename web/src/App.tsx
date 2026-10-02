@@ -5,6 +5,7 @@ import { Spinner } from './components/ui';
 import { useAuth } from './lib/auth';
 import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
+import AdminOffersPage from './pages/AdminOffers';
 import Home from './pages/Home';
 import InvitePage from './pages/Invite';
 import LoginPage from './pages/Login';
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/pracenje" element={<Gate needUser><WatchlistPage /></Gate>} />
         <Route path="/nalog" element={<Gate needUser><AccountPage /></Gate>} />
         <Route path="/admin" element={<Gate needAdmin><AdminPage /></Gate>} />
+        <Route path="/admin/ponude" element={<Gate needAdmin><AdminOffersPage /></Gate>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Layout>

@@ -3,7 +3,7 @@ import { PoliteFetcher } from '../lib/http.js';
 import { cleanTitle } from '../lib/setnum.js';
 import { themeFromList } from '../lib/themes.js';
 import { adaptersFor } from './adapters/index.js';
-import { loadRules, ruleHides } from './hiding.js';
+import { loadRules, ruleHides, type HideRule } from './hiding.js';
 import { buildNameIndex, matchOffer, notASet, type MatchIndex } from './matching.js';
 import { refreshSets } from './refresh.js';
 import { computeDeals } from '../deals/engine.js';
@@ -33,7 +33,7 @@ interface ExistingOffer {
   active: boolean;
 }
 
-async function loadMatchIndex(): Promise<MatchIndex> {
+export async function loadMatchIndex(): Promise<MatchIndex> {
   const rows = await query<{ set_num: string; names: (string | null)[]; theme_slug: string | null; rrp_rsd: number | null }>(
     `SELECT s.set_num, s.theme_slug, s.rrp_rsd,
             array_remove(array_agg(DISTINCT o.title), NULL) || ARRAY[s.name, s.name_en] AS names
@@ -49,8 +49,28 @@ async function loadMatchIndex(): Promise<MatchIndex> {
   };
 }
 
-function initialSetName(shopId: string, o: RawOffer, setNum: string): string {
-  const t = shopId === 'lstore' ? o.title : cleanTitle(o.title.replace(new RegExp(`^${setNum}\\s*[-–:]?\\s*`), ''), setNum);
+/**
+ * The link the crawler makes on its own, without an admin decision: hidden by a rule, a set,
+ * "not a set" (merch), or nothing (waits in the admin's list). Also used when the admin puts a
+ * hand-made link back to automatic.
+ */
+export function autoLink(
+  o: Pick<RawOffer, 'title' | 'sku' | 'skuGuess' | 'priceRsd'>,
+  shopId: string,
+  official: boolean,
+  idx: MatchIndex,
+  rules: HideRule[],
+): { setNum: string | null; method: string | null } {
+  if (rules.some((r) => ruleHides(r, shopId, o.title))) return { setNum: null, method: 'hidden_rule' };
+  const m = matchOffer(o, idx, { checkPrice: !official });
+  if (m) return { setNum: m.setNum, method: m.method };
+  // bags, used items, single minifigures: not a set, keep out of the review queue
+  if (notASet(o)) return { setNum: null, method: 'merch' };
+  return { setNum: null, method: null };
+}
+
+export function initialSetName(shopId: string, title: string, setNum: string): string {
+  const t = shopId === 'lstore' ? title : cleanTitle(title.replace(new RegExp(`^${setNum}\\s*[-–:]?\\s*`), ''), setNum);
   return t || `LEGO ${setNum}`;
 }
 
@@ -91,32 +111,25 @@ export async function crawlShop(adapter: ShopAdapter, log: (m: string) => void, 
             method = 'manual';
           } else if (prev?.match_method === 'hidden') {
             method = 'hidden'; // the admin hid this offer: it stays hidden
-          } else if (rules.some((r) => ruleHides(r, shopId, o.title))) {
-            method = 'hidden_rule';
           } else {
-            const m = matchOffer(o, idx, { checkPrice: adapter.shop.kind !== 'official' });
-            if (m) {
-              setNum = m.setNum;
-              method = m.method;
-            } else if (notASet(o)) {
-              method = 'merch'; // bags, used items, single minifigures: not a set, keep out of the review queue
-            }
+            ({ setNum, method } = autoLink(o, shopId, adapter.shop.kind === 'official', idx, rules));
           }
           if (setNum) {
             await db.query(
               `INSERT INTO sets (set_num, name, theme_slug, image_url, age_min)
                VALUES ($1, $2, $3, $4, $5) ON CONFLICT (set_num) DO NOTHING`,
-              [setNum, initialSetName(shopId, o, setNum), themeFromList(o.themeRaw), o.imageUrl ?? null, o.ageMin ?? null],
+              [setNum, initialSetName(shopId, o.title, setNum), themeFromList(o.themeRaw), o.imageUrl ?? null, o.ageMin ?? null],
             );
             if (!idx.known.has(setNum)) idx.known.add(setNum);
             summary.matched++;
           }
           const res = await db.query<{ id: number }>(
             `INSERT INTO offers (shop_id, external_id, seller, set_num, match_method, title, url, image_url, price_rsd,
-                                 regular_price_rsd, in_stock, stock_qty, theme_raw, age_min, active, last_seen)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true,now())
+                                 regular_price_rsd, in_stock, stock_qty, theme_raw, age_min, sku, sku_guess, active, last_seen)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,now())
              ON CONFLICT (shop_id, external_id) DO UPDATE SET
                seller = EXCLUDED.seller, set_num = EXCLUDED.set_num, match_method = EXCLUDED.match_method,
+               sku = EXCLUDED.sku, sku_guess = EXCLUDED.sku_guess,
                title = EXCLUDED.title, url = EXCLUDED.url, image_url = COALESCE(EXCLUDED.image_url, offers.image_url),
                price_rsd = EXCLUDED.price_rsd, regular_price_rsd = EXCLUDED.regular_price_rsd,
                in_stock = EXCLUDED.in_stock, stock_qty = EXCLUDED.stock_qty, theme_raw = EXCLUDED.theme_raw,
@@ -126,6 +139,7 @@ export async function crawlShop(adapter: ShopAdapter, log: (m: string) => void, 
             [
               shopId, o.externalId, o.seller ?? '', setNum, method, o.title, o.url, o.imageUrl ?? null, o.priceRsd,
               o.regularPriceRsd ?? null, o.inStock, o.stockQty ?? null, o.themeRaw ?? [], o.ageMin ?? null,
+              o.sku ?? null, o.skuGuess ?? null,
             ],
           );
           const offerId = res.rows[0].id;

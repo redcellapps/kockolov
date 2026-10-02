@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeText, parseRsd } from '../src/lib/normalize.js';
 import { ageFromText, cleanTitle, setNumFromSku, setNumFromTitle } from '../src/lib/setnum.js';
 import { refineSuperHeroes, themeFromList, themeFromRaw } from '../src/lib/themes.js';
-import { isMerch, matchOffer, buildNameIndex } from '../src/crawler/matching.js';
+import { isMerch, linkDoubts, matchOffer, buildNameIndex } from '../src/crawler/matching.js';
 
 describe('normalizeText', () => {
   it('strips diacritics, trademarks and punctuation', () => {
@@ -111,6 +111,30 @@ describe('matching', () => {
     expect(
       matchOffer({ externalId: '1', title: 'LEGO Art Most Kloda Monea, Uzrast 18+', url: '', priceRsd: 1, inStock: true }, idx),
     ).toEqual({ setNum: '31999', method: 'name' });
+  });
+});
+
+describe('doubtful links (admin table of offers)', () => {
+  const idx = {
+    known: new Set(['75192', '75129', '10280']),
+    sets: new Map([
+      ['75192', { names: ['Millennium Falcon'], theme: 'star-wars', rrp: 109999 }],
+      ['75129', { names: ['Wookiee Gunship'], theme: 'star-wars', rrp: 2999 }],
+      ['10280', { names: ['Buket cveća'], theme: 'botanicals', rrp: 7799 }],
+    ]),
+  };
+  it('trusts a title that names the linked set', () => {
+    expect(linkDoubts({ title: 'LEGO Star Wars 75192 Millennium Falcon', price: 99999 }, '75192', idx)).toEqual([]);
+  });
+  it('flags a title that names another known set (swapped digits)', () => {
+    expect(linkDoubts({ title: 'LEGO Star Wars 75192 Millennium Falcon', price: 99999 }, '75129', idx)).toEqual([
+      { kind: 'number', num: '75192' },
+      { kind: 'price' },
+    ]);
+  });
+  it('flags a title with no word in common with the set, and a far-off price', () => {
+    expect(linkDoubts({ title: 'LEGO Botanicals Orhideja', price: 7499 }, '10280', idx)).toEqual([{ kind: 'name' }]);
+    expect(linkDoubts({ title: 'LEGO Buket cveća', price: 1999 }, '10280', idx)).toEqual([{ kind: 'price' }]);
   });
 });
 

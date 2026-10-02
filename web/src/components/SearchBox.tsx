@@ -1,21 +1,9 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { t } from '../i18n';
+import { useMedia } from '../lib/media';
 import { SearchIcon, XIcon } from './icons';
 import { cx } from './ui';
-
-/** True while the media query matches; updates when the window is resized. */
-function useMedia(query: string): boolean {
-  const [match, setMatch] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
-  useEffect(() => {
-    const m = window.matchMedia(query);
-    const on = () => setMatch(m.matches);
-    on();
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
-  }, [query]);
-  return match;
-}
 
 /**
  * Set search. `md` is the compact header field; `lg` is the home hero field with its own
