@@ -12,6 +12,8 @@ import { alertOnCrawlProblems } from './jobs/alerts.js';
 import { writeFileSync } from 'node:fs';
 import { currencyOpts, loadDigestData, renderDigest, sendDigests, unsubscribeUrl } from './mail/digest.js';
 import { todayLocal } from './lib/time.js';
+import { sendWatchAlerts } from './push/alerts.js';
+import { sendPushToUser } from './push/push.js';
 
 const HELP = `Kockolov CLI
 
@@ -22,6 +24,8 @@ const HELP = `Kockolov CLI
   deals                                    izračunaj današnje najbolje ponude
   digest [--dry-run] [--email x@y.rs]      pošalji jutarnji pregled
   digest --preview pregled.html [--email]  sačuvaj e-mail kao HTML (bez slanja)
+  push [--dry-run]                         pošalji obaveštenja o praćenim setovima (inače uz jutarnji pregled)
+  push:test --email x@y.rs                 probno obaveštenje na sve uređaje tog korisnika
   user:create --email x@y.rs [--name Ime] [--admin] [--password tajna]
   user:invite --email x@y.rs [--name Ime] [--admin]   (e-mail sa linkom za postavljanje lozinke)
   user:password --email x@y.rs [--password tajna]
@@ -81,6 +85,17 @@ async function main() {
         break;
       }
       await sendDigests({ dryRun: values['dry-run'], onlyEmail: values.email });
+      break;
+    }
+    case 'push':
+      await sendWatchAlerts({ dryRun: values['dry-run'] });
+      break;
+    case 'push:test': {
+      if (!values.email) throw new Error('--email je obavezan');
+      const u = await one<{ id: number }>('SELECT id FROM users WHERE email = $1', [normalizeEmail(values.email)]);
+      if (!u) throw new Error('Nema tog korisnika');
+      const r = await sendPushToUser(u.id, { title: 'Kockolov: probno obaveštenje', body: 'Ako ovo vidiš, obaveštenja rade.', url: '/pracenje', tag: 'test' });
+      console.log(`uređaja: ${r.devices}, isporučeno: ${r.sent}, nestalo: ${r.gone}, neuspelo: ${r.failed}`);
       break;
     }
     case 'user:create': {

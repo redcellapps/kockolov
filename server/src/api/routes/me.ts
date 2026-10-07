@@ -68,7 +68,14 @@ export async function meRoutes(app: FastifyInstance) {
   app.put<{ Params: { setNum: string } }>('/api/me/watchlist/:setNum', { preHandler: requireUser }, async (req, reply) => {
     const exists = await one('SELECT 1 FROM sets WHERE set_num = $1', [req.params.setNum]);
     if (!exists) return reply.code(404).send({ error: 'Set nije pronađen' });
-    await query('INSERT INTO watchlist (user_id, set_num) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user!.id, req.params.setNum]);
+    // today's best price is the starting point for "got cheaper" notifications
+    await query(
+      `INSERT INTO watchlist (user_id, set_num, seen_price, seen_in_stock)
+       SELECT $1, $2, b.price, b.price IS NOT NULL
+         FROM (SELECT min(price_rsd) AS price FROM offers WHERE set_num = $2 AND active AND in_stock) b
+       ON CONFLICT DO NOTHING`,
+      [req.user!.id, req.params.setNum],
+    );
     return { ok: true, watched: true };
   });
 

@@ -180,3 +180,52 @@ describe('news e-mail text', () => {
     expect(bodyToText(body)).toBe('Šta je novo\n\nCene <b>iz</b> 11 prodavnica & više.\nDrugi red.\n\n- jedan\n- dva https://kockolov.rs/ponude.');
   });
 });
+
+describe('watched-set notifications', () => {
+  const row = (over: Partial<import('../src/push/alerts.js').WatchState>) => ({
+    user_id: 1,
+    set_num: '10280',
+    name: 'Buket cveća',
+    image_url: 'https://example.com/10280.jpg',
+    price: 7000,
+    shop_id: 'kockarium',
+    seller: '',
+    seen_price: 7319,
+    seen_in_stock: true,
+    ...over,
+  });
+
+  it('tells about a real drop or a set back in stock, and nothing else', async () => {
+    const { watchEvent, dropThreshold } = await import('../src/push/alerts.js');
+    expect(dropThreshold(3000)).toBe(100);
+    expect(dropThreshold(20000)).toBe(400);
+    expect(watchEvent(row({}))).toMatchObject({ kind: 'drop', price: 7000, was: 7319 });
+    expect(watchEvent(row({ price: 7250 }))).toBeNull(); // 69 dinars: not worth a message
+    expect(watchEvent(row({ price: 7500 }))).toBeNull(); // more expensive
+    expect(watchEvent(row({ seen_in_stock: false }))).toMatchObject({ kind: 'back', price: 7000 });
+    expect(watchEvent(row({ price: null, shop_id: null }))).toBeNull(); // sold out
+    expect(watchEvent(row({ seen_in_stock: null, seen_price: null }))).toBeNull(); // first look
+  });
+
+  it('writes the messages in Serbian, and sums up more than three sets in one', async () => {
+    const { alertMessages, setovi, watchEvent } = await import('../src/push/alerts.js');
+    expect([1, 2, 4, 5, 11, 12, 21, 22, 25, 104].map(setovi)).toEqual([
+      '1 set', '2 seta', '4 seta', '5 setova', '11 setova', '12 setova', '21 set', '22 seta', '25 setova', '104 seta',
+    ]);
+    const money = (n: number) => `${new Intl.NumberFormat('sr-RS').format(n)} RSD`;
+    const drop = watchEvent(row({}))!;
+    const back = watchEvent(row({ set_num: '71051-7', name: 'Mini figura', seen_in_stock: false, shop_id: 'ananas', seller: 'Spark', image_url: null }))!;
+    expect(alertMessages([drop, back], money)).toEqual([
+      {
+        title: 'Pojeftinio: Buket cveća',
+        body: 'Sada 7.000 RSD · Kockarium. Ranije 7.319 RSD (−4%).',
+        url: '/set/10280',
+        tag: 'set-10280',
+        icon: 'https://example.com/10280.jpg',
+      },
+      { title: 'Ponovo na stanju: Mini figura', body: '7.000 RSD · Ananas · Spark', url: '/set/71051-7', tag: 'set-71051-7', icon: undefined },
+    ]);
+    const many = alertMessages([drop, back, drop, back, drop], money);
+    expect(many).toEqual([{ title: 'Praćeno: nove cene za 5 setova', body: 'Buket cveća, Mini figura, Buket cveća i još 2.', url: '/pracenje', tag: 'pracenje' }]);
+  });
+});

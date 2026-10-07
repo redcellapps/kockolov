@@ -6,6 +6,7 @@ import { seedReferenceData } from './crawler/seed.js';
 import { alertOnCrawlProblems } from './jobs/alerts.js';
 import { refreshEurRate } from './fx.js';
 import { sendDigests } from './mail/digest.js';
+import { sendWatchAlerts } from './push/alerts.js';
 
 const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
 
@@ -25,6 +26,12 @@ async function crawlJob() {
 }
 
 async function digestJob() {
+  // phones first (quick), then the e-mails
+  try {
+    await sendWatchAlerts({ log });
+  } catch (err) {
+    log(`posao: obaveštenja na telefon nisu poslata: ${(err as Error).stack ?? err}`);
+  }
   try {
     await sendDigests({ log });
   } catch (err) {

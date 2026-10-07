@@ -26,12 +26,14 @@
     "robots-parser": "^3.0.1",
     "satori": "^0.33.5",
     "sharp": "^0.35.5",
+    "web-push": "^3.6.7",
     "zod": "^4.1.11"
   },
   "devDependencies": {
     "@types/node": "^22.18.6",
     "@types/nodemailer": "^7.0.1",
     "@types/pg": "^8.15.5",
+    "@types/web-push": "^3.6.4",
     "tsx": "^4.20.6",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"

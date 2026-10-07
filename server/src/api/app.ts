@@ -11,6 +11,7 @@ import { type SessionUser, userFromRequest } from './auth.js';
 import { adminRoutes } from './routes/admin.js';
 import { blogRoutes } from './routes/blog.js';
 import { publicRoutes } from './routes/public.js';
+import { pushRoutes } from './routes/push.js';
 import { injectHead, pageMeta } from '../seo/pages.js';
 import { authRoutes } from './routes/auth.js';
 import { catalogRoutes } from './routes/catalog.js';
@@ -66,6 +67,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(adminRoutes);
   await app.register(publicRoutes);
   await app.register(blogRoutes);
+  await app.register(pushRoutes);
 
   const dist = webDistDir();
   if (existsSync(dist)) {

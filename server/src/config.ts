@@ -72,6 +72,13 @@ const schema = z.object({
   // pause between two news e-mails, so the mail server isn't flooded
   ANNOUNCE_DELAY_MS: z.coerce.number().default(1500),
 
+  // Push notifications (a watched set got cheaper or is back in stock). Empty = the server makes a key
+  // pair once and keeps it in the database; set both only to bring a key from elsewhere.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  // how the push services (Google, Apple, Mozilla) can reach us; empty = mailto:CONTACT_EMAIL
+  VAPID_SUBJECT: z.string().optional(),
+
   // Link-preview images (and the product photos in them) kept on disk — a Docker volume in
   // production — so a shared link shows its picture at once, also right after a deploy
   OG_CACHE_DIR: z.string().default(fileURLToPath(new URL('../../cache/og', import.meta.url))),

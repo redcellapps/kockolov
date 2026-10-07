@@ -904,4 +904,75 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     const still = await one("SELECT in_stock, active FROM offers WHERE shop_id = 'kockarium' AND external_id = '541874'");
     expect(still).toEqual({ in_stock: true, active: true });
   });
+
+  it('sends a push notification when a watched set gets cheaper or is back in stock', async () => {
+    const { setPushSender } = await import('../src/push/push.js');
+    const { sendWatchAlerts } = await import('../src/push/alerts.js');
+    const sent: { endpoint: string; msg: { title: string; body: string; url: string } }[] = [];
+    let best: { id: number; price_rsd: number; shop_id: string; seller: string } | undefined;
+    setPushSender(async (sub, payload) => {
+      if (sub.endpoint.endsWith('/gone')) throw Object.assign(new Error('Gone'), { statusCode: 410 });
+      sent.push({ endpoint: sub.endpoint, msg: JSON.parse(payload) });
+      return { statusCode: 201 };
+    });
+    try {
+      const call = (method: 'GET' | 'POST' | 'DELETE', url: string, payload?: object) =>
+        app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+
+      // one key pair, made once and kept
+      const key = (await call('GET', '/api/push/key')).json().key;
+      expect(key).toMatch(/^[A-Za-z0-9_-]{87}$/);
+      expect((await call('GET', '/api/push/key')).json().key).toBe(key);
+      expect(await one("SELECT count(*)::int AS n FROM app_secrets WHERE name = 'vapid'")).toEqual({ n: 1 });
+
+      const sub = (endpoint: string) => ({ subscription: { endpoint, keys: { p256dh: 'B'.repeat(87), auth: 'a'.repeat(22) } } });
+      expect((await call('POST', '/api/me/push', sub('http://push.example.com/x'))).statusCode).toBe(400);
+      expect((await call('POST', '/api/me/push', sub('https://push.example.com/phone'))).statusCode).toBe(200);
+      expect((await call('POST', '/api/me/push', sub('https://push.example.com/gone'))).statusCode).toBe(200);
+      expect((await call('GET', '/api/me/push')).json()).toEqual({ devices: 2 });
+
+      // a sample, to this phone only
+      const test = (await call('POST', '/api/me/push/test', { endpoint: 'https://push.example.com/phone' })).json();
+      expect(test).toMatchObject({ ok: true, devices: 1, sent: 1 });
+      expect(sent.pop()!.msg.title).toBe('Kockolov: obaveštenja rade');
+
+      // watching starts from today's price
+      best = (await one<{ id: number; price_rsd: number; shop_id: string; seller: string }>(
+        "SELECT id, price_rsd, shop_id, seller FROM offers WHERE set_num = '10280' AND active AND in_stock ORDER BY price_rsd LIMIT 1",
+      ))!;
+      await call('PUT' as 'POST', '/api/me/watchlist/10280');
+      expect(await one("SELECT seen_price, seen_in_stock FROM watchlist WHERE set_num = '10280'")).toEqual({ seen_price: best.price_rsd, seen_in_stock: true });
+      await call('PUT' as 'POST', '/api/me/watchlist/11378');
+      await query("UPDATE watchlist SET seen_in_stock = false WHERE set_num = '11378'"); // it was sold out yesterday
+      await query('UPDATE offers SET price_rsd = $2 WHERE id = $1', [best.id, best.price_rsd - 320]);
+
+      const r = await sendWatchAlerts({ log });
+      expect(r).toEqual({ users: 1, messages: 2, devices: 2, gone: 1, failed: 0 });
+      expect(sent.map((m) => m.endpoint)).toEqual(['https://push.example.com/phone', 'https://push.example.com/phone']);
+      const drop = sent.find((m) => m.msg.url === '/set/10280')!.msg;
+      const money = (n: number) => `${new Intl.NumberFormat('sr-RS').format(n)} RSD`;
+      // signed-in watchers get the best price of all shops, members-only ones included
+      const shop = (await import('../src/mail/format.js')).shopLabel(best.shop_id, best.seller);
+      expect(drop).toMatchObject({
+        title: 'Pojeftinio: Buket cveća',
+        body: `Sada ${money(best.price_rsd - 320)} · ${shop}. Ranije ${money(best.price_rsd)} (−${Math.round((32000 / best.price_rsd))}%).`,
+      });
+      expect(sent.find((m) => m.msg.url === '/set/11378')!.msg.title).toMatch(/^Ponovo na stanju: /);
+      // the phone that is gone is forgotten; today's prices are remembered
+      expect((await call('GET', '/api/me/push')).json()).toEqual({ devices: 1 });
+      expect(await one("SELECT seen_price, seen_in_stock FROM watchlist WHERE set_num = '10280'")).toEqual({ seen_price: best.price_rsd - 320, seen_in_stock: true });
+
+      // nothing new, nothing sent
+      sent.length = 0;
+      expect((await sendWatchAlerts({ log })).messages).toBe(0);
+      expect(sent).toEqual([]);
+
+      expect((await call('DELETE', '/api/me/push', { endpoint: 'https://push.example.com/phone' })).statusCode).toBe(200);
+      expect((await call('GET', '/api/me/push')).json()).toEqual({ devices: 0 });
+    } finally {
+      setPushSender(null);
+      if (best) await query('UPDATE offers SET price_rsd = $2 WHERE id = $1', [best.id, best.price_rsd]);
+      await query("DELETE FROM watchlist WHERE set_num IN ('10280', '11378')");
+    }
+  });
 });
