@@ -1,3 +1,5 @@
+import os from 'node:os';
+import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -9,6 +11,9 @@ export default defineConfig({
       CRAWLER_DELAY_MS: '0',
       PUBLIC_MODE: 'false',
       TZ_NAME: 'Europe/Belgrade',
+      // preview images go to a throwaway folder; no background drawing during tests
+      OG_CACHE_DIR: path.join(os.tmpdir(), `kockolov-og-test-${process.pid}`),
+      OG_WARM_MINUTES: '0',
     },
     testTimeout: 30000,
     fileParallelism: false,

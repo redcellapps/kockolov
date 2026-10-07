@@ -71,6 +71,12 @@ const schema = z.object({
   CONTACT_EMAIL: z.string().default('kontakt@kockolov.rs'),
   // pause between two news e-mails, so the mail server isn't flooded
   ANNOUNCE_DELAY_MS: z.coerce.number().default(1500),
+
+  // Link-preview images (and the product photos in them) kept on disk — a Docker volume in
+  // production — so a shared link shows its picture at once, also right after a deploy
+  OG_CACHE_DIR: z.string().default(fileURLToPath(new URL('../../cache/og', import.meta.url))),
+  // minutes between rounds that prepare every public set's preview image ahead of time; 0 = off
+  OG_WARM_MINUTES: z.coerce.number().default(20),
 });
 
 const parsed = schema.parse(process.env);

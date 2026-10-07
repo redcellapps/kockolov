@@ -705,6 +705,53 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     }
   });
 
+  it('keeps set preview images ready, so a shared link shows its picture at once', async () => {
+    const { readdirSync } = await import('node:fs');
+    const { warmSetCards } = await import('../src/seo/warm.js');
+    const cards = (prefix: string) => {
+      try {
+        return readdirSync(config.OG_CACHE_DIR).filter((f) => f.startsWith(prefix));
+      } catch {
+        return [];
+      }
+    };
+    expect(await warmSetCards({ pauseMs: 0 })).toEqual({ total: 0, drawn: 0, failed: 0 }); // site still private
+    config.PUBLIC_MODE = true;
+    try {
+      // every set on the public site gets its card ahead of time; the next round has nothing to draw
+      const first = await warmSetCards({ pauseMs: 0 });
+      expect(first.total).toBeGreaterThan(1);
+      expect(first.drawn).toBeGreaterThan(0); // (one or two were already drawn by earlier link previews)
+      expect(first.failed).toBe(0);
+      expect(cards('set-10280-')).toHaveLength(1);
+      expect((await warmSetCards({ pauseMs: 0 })).drawn).toBe(0);
+
+      const get = () => app.inject({ method: 'GET', url: '/og/set/10280.jpg' });
+      const ready = await get();
+      expect([ready.statusCode, ready.headers['content-type'], ready.headers['cache-control']]).toEqual([200, 'image/jpeg', 'public, max-age=86400']);
+      expect(ready.rawPayload.length).toBeLessThan(300_000);
+
+      // a new price: the last card is sent right away (briefly cached) while the new one is drawn
+      const offer = (await one<{ id: number; price_rsd: number }>(
+        "SELECT id, price_rsd FROM public_offers WHERE set_num = '10280' AND active AND in_stock ORDER BY price_rsd LIMIT 1",
+      ))!;
+      await query('UPDATE offers SET price_rsd = price_rsd - 500 WHERE id = $1', [offer.id]);
+      try {
+        const stale = await get();
+        expect([stale.statusCode, stale.headers['cache-control']]).toEqual([200, 'public, max-age=600']);
+        expect(stale.rawPayload.equals(ready.rawPayload)).toBe(true);
+        await vi.waitFor(async () => expect((await get()).headers['cache-control']).toBe('public, max-age=86400'), { timeout: 10000 });
+        const fresh = await get();
+        expect(fresh.rawPayload.equals(ready.rawPayload)).toBe(false);
+        expect(cards('set-10280-')).toHaveLength(1); // the old version is gone
+      } finally {
+        await query('UPDATE offers SET price_rsd = $2 WHERE id = $1', [offer.id, offer.price_rsd]);
+      }
+    } finally {
+      config.PUBLIC_MODE = false;
+    }
+  });
+
   it('publishes blog posts with their picture, link-preview card, structured data and sitemap entry', async () => {
     const { pageMeta, injectHead } = await import('../src/seo/pages.js');
     const sharp = (await import('sharp')).default;

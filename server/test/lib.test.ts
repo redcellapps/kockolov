@@ -4,6 +4,7 @@ import { ageFromText, cleanTitle, setNumFromSku, setNumFromTitle } from '../src/
 import { refineSuperHeroes, themeFromList, themeFromRaw } from '../src/lib/themes.js';
 import { isMerch, linkDoubts, matchOffer, buildNameIndex } from '../src/crawler/matching.js';
 import { htmlToText, parseFrontmatter, parsePost, readingMinutes } from '../src/blog/posts.js';
+import { keyPart } from '../src/seo/cards.js';
 
 describe('normalizeText', () => {
   it('strips diacritics, trademarks and punctuation', () => {
@@ -136,6 +137,13 @@ describe('doubtful links (admin table of offers)', () => {
   it('flags a title with no word in common with the set, and a far-off price', () => {
     expect(linkDoubts({ title: 'LEGO Botanicals Orhideja', price: 7499 }, '10280', idx)).toEqual([{ kind: 'name' }]);
     expect(linkDoubts({ title: 'LEGO Buket cveća', price: 1999 }, '10280', idx)).toEqual([{ kind: 'price' }]);
+  });
+});
+
+describe('preview image keys', () => {
+  it('keeps one set\'s cards apart from another\'s (71051 vs 71051-7)', () => {
+    expect(keyPart('71051-7')).toBe('71051_7');
+    expect(`set-${keyPart('71051-7')}-x`.startsWith(`set-${keyPart('71051')}-`)).toBe(false);
   });
 });
 

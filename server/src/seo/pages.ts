@@ -57,13 +57,22 @@ export interface SetSeo {
   any_price: number | null;
   offers_in_stock: number;
   shops_in_stock: number;
+  /** other shops' photos of the set, for when its own picture can't be loaded */
+  alt_images: string[];
 }
 
 export function loadSet(setNum: string): Promise<SetSeo | null> {
   return one<SetSeo>(
     `SELECT s.set_num, s.name, s.theme_slug, t.name AS theme_name, s.image_url, s.rrp_rsd,
             b.price_rsd AS best_price, b.shop_id AS best_shop, b.seller AS best_seller,
-            a.max_price, a.any_price, coalesce(a.offers_in_stock, 0) AS offers_in_stock, coalesce(a.shops_in_stock, 0) AS shops_in_stock
+            a.max_price, a.any_price, coalesce(a.offers_in_stock, 0) AS offers_in_stock, coalesce(a.shops_in_stock, 0) AS shops_in_stock,
+            array(
+              SELECT o.image_url FROM offers o
+               WHERE o.set_num = s.set_num AND o.active AND o.image_url IS NOT NULL AND o.image_url IS DISTINCT FROM s.image_url
+               GROUP BY o.image_url
+               ORDER BY min(CASE o.shop_id WHEN 'lstore' THEN 0 WHEN 'kockarium' THEN 1 WHEN 'ananas' THEN 2 ELSE 3 END), o.image_url
+               LIMIT 4
+            ) AS alt_images
        FROM sets s
        LEFT JOIN themes t ON t.slug = s.theme_slug
        LEFT JOIN LATERAL (

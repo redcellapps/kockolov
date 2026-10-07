@@ -3,7 +3,8 @@ import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { config } from '../../config.js';
 import { BLOG_DIR, getPost, listPosts, summary } from '../../blog/posts.js';
-import { cached, renderBlogCard } from '../../seo/og.js';
+import { renderBlogCard } from '../../seo/og.js';
+import { keyPart, sendCard } from '../../seo/cards.js';
 import { version } from '../../seo/pages.js';
 
 /** "2. oktobar 2026." */
@@ -45,7 +46,7 @@ export async function blogRoutes(app: FastifyInstance) {
       byline: `${post.author} · ${blogDate(post.date)}`,
       imageFile: post.image ? path.join(BLOG_DIR, post.image.file) : null,
     };
-    const jpg = await cached(`blog:${version(card)}`, () => renderBlogCard(card));
-    return reply.type('image/jpeg').header('Cache-Control', 'public, max-age=86400').send(jpg);
+    const prefix = `blog-${keyPart(post.slug)}-`;
+    return sendCard(reply, `${prefix}${version(card)}`, prefix, () => renderBlogCard(card));
   });
 }

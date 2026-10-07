@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import satori from 'satori';
@@ -98,21 +99,27 @@ async function fetchPicture(url: string): Promise<Buffer> {
   return buf;
 }
 
-/** The picture as a square PNG data URI on white, or null when it can't be loaded. */
+/**
+ * The picture as a square JPEG data URI on white, or null when it can't be loaded. Pictures that
+ * loaded once are kept on disk, so a card can be drawn again without asking the shop.
+ */
 export function picture(url: string | null | undefined, size: number): Promise<string | null> {
   if (!url) return Promise.resolve(null);
   const key = `${size}|${url}`;
   let p = pictures.get(key);
   if (!p) {
-    p = fetchPicture(url)
-      .then((buf) =>
-        sharp(buf, { density: 200 })
+    const file = path.join(config.OG_CACHE_DIR, 'pics', `${createHash('sha1').update(key).digest('hex')}.jpg`);
+    p = readFile(file)
+      .catch(async () => {
+        const jpg = await sharp(await fetchPicture(url), { density: 200 })
           .flatten({ background: '#ffffff' })
           .resize(size, size, { fit: 'contain', background: '#ffffff' })
-          .png()
-          .toBuffer(),
-      )
-      .then((png) => `data:image/png;base64,${png.toString('base64')}`)
+          .jpeg({ quality: 90, chromaSubsampling: '4:4:4' })
+          .toBuffer();
+        await saveFile(file, jpg).catch(() => {});
+        return jpg;
+      })
+      .then((jpg) => `data:image/jpeg;base64,${jpg.toString('base64')}`)
       .catch(() => {
         pictures.delete(key); // try again next time
         return null;
@@ -121,6 +128,23 @@ export function picture(url: string | null | undefined, size: number): Promise<s
     pictures.set(key, p);
   }
   return p;
+}
+
+/** The first of the pictures that loads (the set's own, then other shops' photos of it) */
+export async function firstPicture(urls: (string | null | undefined)[], size: number): Promise<string | null> {
+  for (const url of [...new Set(urls.filter(Boolean))]) {
+    const pic = await picture(url, size);
+    if (pic) return pic;
+  }
+  return null;
+}
+
+/** Writes a file whole (a reader never sees half of it) */
+async function saveFile(file: string, buf: Buffer): Promise<void> {
+  await mkdir(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, buf);
+  await rename(tmp, file);
 }
 
 /** Serbian plural: 1 prodavnica, 2–4 prodavnice, 5+ prodavnica (21 prodavnica, 22 prodavnice…) */
@@ -196,8 +220,9 @@ export interface SetCard {
   shops: number;
 }
 
-export async function renderSetCard(c: SetCard): Promise<Buffer> {
-  const pic = await picture(c.imageUrl, 900);
+/** `alternatives`: other shops' photos of the set, used when the set's own picture can't be loaded */
+export async function renderSetCard(c: SetCard, alternatives: string[] = []): Promise<Buffer> {
+  const pic = await firstPicture([c.imageUrl, ...alternatives], 900);
   const saving = c.bestPrice && c.refPrice && c.refPrice > c.bestPrice ? c.refPrice - c.bestPrice : 0;
   const pct = saving && c.refPrice ? Math.round((100 * saving) / c.refPrice) : 0;
   const nameSize = c.name.length > 44 ? 44 : c.name.length > 26 ? 52 : 60;
@@ -206,7 +231,8 @@ export async function renderSetCard(c: SetCard): Promise<Buffer> {
     ? h(
         'div',
         { flexDirection: 'column' },
-        h('div', { fontSize: 104, fontWeight: 800, letterSpacing: -4, lineHeight: 1 }, rsd(c.bestPrice)),
+        // "12.459 RSD" on one line too
+        h('div', { fontSize: rsd(c.bestPrice).length > 9 ? 86 : 104, fontWeight: 800, letterSpacing: -4, lineHeight: 1 }, rsd(c.bestPrice)),
         pct >= 3
           ? h(
               'div',
@@ -400,17 +426,77 @@ export async function renderBlogCard(c: BlogCard): Promise<Buffer> {
   );
 }
 
-// ---- rendered images, kept in memory (the key changes whenever the content does) ----
-const rendered = new Map<string, Promise<Buffer>>();
-export function cached(key: string, make: () => Promise<Buffer>): Promise<Buffer> {
-  let p = rendered.get(key);
+// ---- rendered images: in memory, and on disk so they survive a restart or a deploy ----
+// A key is "<prefix><version>", e.g. "set-71866-<hash of what the card shows>". When a new version
+// of a card is saved, the older versions with the same prefix are deleted.
+const drawing = new Map<string, Promise<Buffer>>();
+const done = new Map<string, Buffer>();
+const cardFile = (key: string) => path.join(config.OG_CACHE_DIR, `${key.replace(/[^a-zA-Z0-9_-]/g, '_')}.jpg`);
+const remember = (key: string, buf: Buffer) => {
+  done.delete(key);
+  done.set(key, buf);
+  if (done.size > 200) done.delete(done.keys().next().value!);
+};
+
+/** A card that is ready right now (memory or disk), without drawing it */
+export async function readyCard(key: string): Promise<Buffer | null> {
+  const mem = done.get(key);
+  if (mem) return mem;
+  try {
+    const buf = await readFile(cardFile(key));
+    remember(key, buf);
+    return buf;
+  } catch {
+    return null;
+  }
+}
+
+/** The newest saved card whose key starts with prefix (an older price, while the new one is drawn) */
+export async function staleCard(prefix: string): Promise<Buffer | null> {
+  const name = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
+  try {
+    const files = (await readdir(config.OG_CACHE_DIR)).filter((f) => f.startsWith(name) && f.endsWith('.jpg'));
+    if (!files.length) return null;
+    const dated = await Promise.all(files.map(async (f) => ({ f, t: (await stat(path.join(config.OG_CACHE_DIR, f))).mtimeMs })));
+    dated.sort((a, b) => b.t - a.t);
+    return await readFile(path.join(config.OG_CACHE_DIR, dated[0].f));
+  } catch {
+    return null;
+  }
+}
+
+async function dropOlder(prefix: string, keep: string): Promise<void> {
+  const name = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const keepFile = path.basename(cardFile(keep));
+  const files = await readdir(config.OG_CACHE_DIR).catch(() => [] as string[]);
+  await Promise.all(files.filter((f) => f.startsWith(name) && f.endsWith('.jpg') && f !== keepFile).map((f) => unlink(path.join(config.OG_CACHE_DIR, f)).catch(() => {})));
+}
+
+/** The card for key: from memory, from disk, or drawn now (and saved); one drawing per key at a time. */
+export function cached(key: string, make: () => Promise<Buffer>, prefix?: string): Promise<Buffer> {
+  const mem = done.get(key);
+  if (mem) return Promise.resolve(mem);
+  let p = drawing.get(key);
   if (!p) {
-    p = make().catch((err) => {
-      rendered.delete(key);
-      throw err;
-    });
-    if (rendered.size > 300) rendered.delete(rendered.keys().next().value!);
-    rendered.set(key, p);
+    p = readFile(cardFile(key))
+      .catch(async () => {
+        const buf = await shrink(await make());
+        await saveFile(cardFile(key), buf).catch(() => {});
+        if (prefix) await dropOlder(prefix, key);
+        return buf;
+      })
+      .then((buf) => {
+        remember(key, buf);
+        return buf;
+      })
+      .finally(() => drawing.delete(key));
+    drawing.set(key, p);
   }
   return p;
+}
+
+/** WhatsApp skips preview images over about 300 KB: re-encode the rare card that is bigger */
+async function shrink(jpg: Buffer): Promise<Buffer> {
+  if (jpg.length <= 280_000) return jpg;
+  return sharp(jpg).jpeg({ quality: 78, mozjpeg: true }).toBuffer();
 }

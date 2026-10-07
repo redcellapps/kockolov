@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { migrate, pool } from './db.js';
 import { seedReferenceData } from './crawler/seed.js';
 import { resumeAnnouncements } from './mail/announce.js';
+import { startCardWarmup } from './seo/warm.js';
 
 async function main() {
   await migrate();
@@ -12,6 +13,8 @@ async function main() {
   app.log.info(`Kockolov API na ${config.HOST}:${config.PORT} (javni režim: ${config.PUBLIC_MODE ? 'da' : 'ne'})`);
   // news e-mails that were still going out when the app stopped
   resumeAnnouncements((m) => app.log.info(m)).catch((err) => app.log.error(err));
+  // link-preview images of the public sets, drawn ahead of time
+  startCardWarmup((m) => app.log.info(m));
   const stop = async () => {
     await app.close();
     await pool.end();

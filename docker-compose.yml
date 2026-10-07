@@ -33,6 +33,9 @@ services:
     # Only reachable from the server itself; Caddy (deploy/caddy) or nginx in front serves HTTPS.
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3100}:8080"
+    # link-preview images, kept across deploys so shared links show their picture at once
+    volumes:
+      - ogcache:/app/cache
 
   # Scheduler: crawl at 05:30, morning e-mail at 07:00 (Europe/Belgrade)
   worker:
@@ -51,3 +54,4 @@ services:
 
 volumes:
   pgdata:
+  ogcache:

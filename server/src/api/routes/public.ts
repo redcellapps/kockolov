@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { config } from '../../config.js';
 import { one, query } from '../../db.js';
-import { shopLabel } from '../../mail/format.js';
-import { cached, renderCollectionCard, renderSetCard, type SetCard } from '../../seo/og.js';
+import { renderCollectionCard, renderSetCard } from '../../seo/og.js';
+import { keyPart, sendCard, setCardFor } from '../../seo/cards.js';
 import { loadCollection, loadSet, version } from '../../seo/pages.js';
 import { listPosts } from '../../blog/posts.js';
 
@@ -61,33 +61,22 @@ export async function publicRoutes(app: FastifyInstance) {
   });
 
   // ---- link-preview images (1200×630 JPEG); the ?v= in the page's og:image changes with the content ----
-  function sendJpeg(reply: import('fastify').FastifyReply, buf: Buffer) {
-    return reply.type('image/jpeg').header('Cache-Control', 'public, max-age=86400').send(buf);
-  }
   const jpgName = (file: string) => (file.endsWith('.jpg') ? decodeURIComponent(file.slice(0, -4)) : null);
 
   app.get<{ Params: { file: string } }>('/og/set/:file', async (req, reply) => {
     const setNum = jpgName(req.params.file);
     const s = config.PUBLIC_MODE && setNum ? await loadSet(setNum) : null;
     if (!s) return reply.code(404).send('');
-    const card: SetCard = {
-      setNum: s.set_num,
-      name: s.name,
-      theme: s.theme_name,
-      imageUrl: s.image_url,
-      bestPrice: s.best_price,
-      refPrice: s.rrp_rsd,
-      shopLabel: s.best_shop ? shopLabel(s.best_shop, s.best_seller) : null,
-      shops: s.shops_in_stock,
-    };
-    return sendJpeg(reply, await cached(`set:${version(card)}`, () => renderSetCard(card)));
+    const { card, key, prefix, alternatives } = setCardFor(s);
+    return sendCard(reply, key, prefix, () => renderSetCard(card, alternatives));
   });
 
   async function collection(reply: import('fastify').FastifyReply, kind: 'home' | 'deals' | 'theme', slug?: string) {
     const c = config.PUBLIC_MODE ? await loadCollection(kind, slug) : null;
     if (!c) return reply.code(404).send('');
     const card = { title: c.title, subtitle: c.subtitle, items: c.items.map((i) => ({ imageUrl: i.image_url, price: i.best_price })) };
-    return sendJpeg(reply, await cached(`col:${version(card)}`, () => renderCollectionCard(card)));
+    const prefix = `col-${kind}${slug ? `_${keyPart(slug)}` : ''}-`;
+    return sendCard(reply, `${prefix}${version(card)}`, prefix, () => renderCollectionCard(card));
   }
   app.get('/og/home.jpg', (_req, reply) => collection(reply, 'home'));
   app.get('/og/deals.jpg', (_req, reply) => collection(reply, 'deals'));
