@@ -786,7 +786,8 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect(html).toContain('"@type":"BlogPosting"');
       expect(html).toContain('"articleBody":"Kockolov nije počeo');
       expect((await pageMeta('/blog/nema-ga', new URLSearchParams())).status).toBe(404);
-      expect((await pageMeta('/blog', new URLSearchParams())).image?.url).toContain(`/og/blog/${slug}.jpg`);
+      // the blog page's link preview is the newest post's card
+      expect((await pageMeta('/blog', new URLSearchParams())).image?.url).toContain(`/og/blog/${list.items[0].slug}.jpg`);
 
       const card = await app.inject({ method: 'GET', url: `/og/blog/${slug}.jpg` });
       expect(card.headers['content-type']).toBe('image/jpeg');
