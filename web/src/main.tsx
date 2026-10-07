@@ -7,9 +7,13 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 import { ApiError } from './lib/api';
 import { AuthProvider } from './lib/auth';
+import { startPwa } from './lib/pwa';
 
 // The in-browser preview (npm run build:demo) has no server for deep links, so it routes by #hash
 const Router = import.meta.env.VITE_DEMO ? HashRouter : BrowserRouter;
+
+// installable site: service worker (real build only) and the install offer
+startPwa();
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -80,7 +80,9 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
       // files in assets/ have a content hash in their name and never change
       setHeaders(res, filePath) {
         const file = path.basename(filePath);
-        if (file === 'index.html') res.setHeader('Cache-Control', 'no-cache');
+        // the service worker and the app manifest too: phones must pick up a new version on the next visit
+        if (file === 'index.html' || file === 'sw.js' || file === 'manifest.webmanifest' || file === 'offline.html')
+          res.setHeader('Cache-Control', 'no-cache');
         else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         else res.setHeader('Cache-Control', 'public, max-age=86400');
       },
