@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, Fragment, useContext, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, useEffect, type ReactNode } from 'react';
 import { api, type MeResponse } from './api';
 import { setDisplayCurrency } from './format';
+import { forgetPushOnSignOut, syncPush } from './pwa';
 
 interface AuthState extends MeResponse {
   loading: boolean;
@@ -17,6 +18,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // prices render in the user's currency; set before the children render, and remount them on a change
   const currency = q.data?.user?.currency === 'EUR' ? 'EUR' : 'RSD';
   setDisplayCurrency(currency, q.data?.fx?.eur.rate ?? 0);
+  const userId = q.data?.user?.id;
+  // a phone with notifications on gets the alerts of whoever is signed in on it now
+  useEffect(() => {
+    if (userId) void syncPush();
+  }, [userId]);
   const value: AuthState = {
     user: q.data?.user ?? null,
     publicMode: q.data?.publicMode ?? false,
@@ -27,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await qc.invalidateQueries();
     },
     logout: async () => {
+      // this device stops getting the account's notifications
+      await forgetPushOnSignOut();
       await api('/api/auth/logout', { method: 'POST' });
       if (import.meta.env.VITE_DEMO) {
         // in-browser preview: no server behind it, so drop cached data and re-read the session

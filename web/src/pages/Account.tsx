@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
+import { PhoneCard } from '../components/PhoneSettings';
 import { Button, Toggle, cx } from '../components/ui';
 import { dateLong, rateText } from '../lib/format';
 import { t } from '../i18n';
@@ -104,6 +105,8 @@ export default function AccountPage() {
           <p className="mt-1 text-sm text-ink-3">{t('account.news.hint')}</p>
         </div>
       </Card>
+
+      <PhoneCard />
 
       <Card title={t('account.currency')}>
         <div role="radiogroup" aria-label={t('account.currency')} className="grid grid-cols-2 gap-2 sm:max-w-sm">

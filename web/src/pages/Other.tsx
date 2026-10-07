@@ -8,6 +8,7 @@ import { api, type Deal, type Theme } from '../lib/api';
 import { dateLong } from '../lib/format';
 import { ThemeTile } from './Home';
 import { usePageTitle } from '../lib/title';
+import { PushPrompt } from '../components/PhoneSettings';
 
 function PageHead({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -90,6 +91,7 @@ export function WatchlistPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <PageHead title={t('watch.title')} subtitle={t('watch.subtitle')} />
+      {!!q.data?.items.length && <PushPrompt />}
       {q.isLoading ? (
         <Loading />
       ) : q.data?.items.length ? (

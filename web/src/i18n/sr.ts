@@ -193,7 +193,14 @@ export const sr = {
   'deals.day': 'Lista za {date}',
 
   'watch.title': 'Setovi koje pratiš',
-  'watch.subtitle': 'Promene cena za ove setove dobijaš u jutarnjem e-mailu.',
+  'watch.subtitle': 'Promene cena za ove setove dobijaš u jutarnjem e-mailu, a ako uključiš obaveštenja, i na telefonu.',
+  'watch.push.title': 'Saznaj čim pojeftini',
+  'watch.push.text': 'Uključi obaveštenja i javićemo ti ujutru, čim proverimo cene, kad set koji pratiš pojeftini ili se vrati na stanje.',
+  'watch.push.ios':
+    'Na iPhone-u prvo dodaj Kockolov na početni ekran: u Safariju dodirni Deli, pa „Dodaj na početni ekran”. Otvori Kockolov sa nove ikonice i ovde uključi obaveštenja.',
+  'watch.push.enable': 'Uključi obaveštenja',
+  'watch.push.later': 'Ne sada',
+  'watch.push.done': 'Obaveštenja su uključena. Javićemo ti kad neki od ovih setova pojeftini.',
   'watch.empty.title': 'Još ništa ne pratiš',
   'watch.empty.text': 'Na stranici bilo kog seta klikni „Prati cenu” i javićemo ti kad pojeftini.',
 
@@ -284,6 +291,24 @@ export const sr = {
   'account.delete.text': 'Brišemo nalog, listu setova koje pratiš i istoriju poslatih poruka. Ovo ne može da se poništi.',
   'account.delete.password': 'Lozinka za potvrdu',
   'account.delete.submit': 'Trajno obriši nalog',
+
+  'phone.title': 'Kockolov na telefonu',
+  'phone.intro': 'Javićemo ti ujutru, čim proverimo cene, kad set koji pratiš pojeftini ili se vrati na stanje.',
+  'phone.install': 'Instaliraj Kockolov',
+  'phone.install.hint': 'Dobija svoju ikonicu na početnom ekranu i otvara se kao aplikacija.',
+  'phone.installed': 'Kockolov je instaliran na ovom uređaju.',
+  'phone.ios':
+    'Na iPhone-u i iPad-u obaveštenja rade kad Kockolov dodaš na početni ekran: u Safariju dodirni Deli, pa „Dodaj na početni ekran”. Zatim otvori Kockolov sa nove ikonice i ovde uključi obaveštenja.',
+  'phone.push': 'Obaveštenja na ovom uređaju',
+  'phone.push.denied': 'Obaveštenja za Kockolov su blokirana u podešavanjima pregledača. Dozvoli ih tamo, pa se vrati ovde.',
+  'phone.push.unsupported': 'Ovaj pregledač ne prikazuje obaveštenja. Na telefonu probaj Chrome (Android) ili Safari (iPhone).',
+  'phone.push.devices.one': 'Obaveštenja su uključena na {n} uređaju.',
+  'phone.push.devices.few': 'Obaveštenja su uključena na {n} uređaja.',
+  'phone.push.devices.other': 'Obaveštenja su uključena na {n} uređaja.',
+  'phone.push.test': 'Pošalji probno obaveštenje',
+  'phone.push.testSent': 'Poslato. Ako ga ne vidiš za minut, proveri podešavanja obaveštenja na uređaju.',
+  'phone.push.testFailed': 'Obaveštenje nije stiglo do ovog uređaja. Isključi pa ponovo uključi obaveštenja.',
+  'phone.push.error': 'Nije uspelo. Pokušaj ponovo.',
 
   'admin.title': 'Administracija',
   'admin.crawl': 'Preuzmi cene sada',
@@ -485,7 +510,7 @@ export const sr = {
   'footer.madeBy': 'Made by',
   'footer.poweredBy': 'Powered by',
   'privacy.title': 'Politika privatnosti',
-  'privacy.updated': 'Poslednja izmena: 2. oktobar 2026.',
+  'privacy.updated': 'Poslednja izmena: 7. oktobar 2026.',
   'privacy.intro':
     'Kockolov upoređuje cene LEGO® setova u srpskim prodavnicama. Za pretragu i pregled ponuda nalog nije potreban. Ako otvoriš nalog, čuvamo samo ono što je potrebno da bi nalog radio. Ovde piše šta tačno čuvamo, zašto, i kako da ostvariš svoja prava po Zakonu o zaštiti podataka o ličnosti („Službeni glasnik RS“, br. 87/2018).',
   'privacy.who.h': 'Ko je odgovoran za podatke',
@@ -498,11 +523,13 @@ export const sr = {
   'privacy.what.4': 'Tehničke podatke o nalogu: kada je napravljen i potvrđen, poslednju prijavu i evidenciju poslatih poruka.',
   'privacy.what.5':
     'IP adresu koristimo samo za zaštitu od zloupotrebe (ograničenje broja pokušaja prijave i registracije) i ne upisujemo je u bazu. Server, kao i svaki veb-server, vodi dnevnik pristupa sa IP adresama, koji se čuva kratko i automatski briše.',
+  'privacy.what.7':
+    'Ako uključiš obaveštenja na telefonu ili računaru, tvoj pregledač nam daje adresu za isporuku obaveštenja na taj uređaj. Uz nju čuvamo samo naziv pregledača, da bi znao gde su obaveštenja uključena. Kad ih isključiš ili se odjaviš sa tog uređaja, adresu brišemo.',
   'privacy.what.6': 'Ne koristimo alate za praćenje posetilaca ni reklame, i ne pravimo profile korisnika.',
   'privacy.why.h': 'Zašto ih koristimo',
   'privacy.why.1': 'Da bi nalog radio: prijava, setovi koje pratiš i podešavanja. Osnov je pružanje usluge koju tražiš otvaranjem naloga.',
   'privacy.why.2':
-    'Za jutarnji pregled najboljih ponuda i povremene novosti o sajtu, samo dok su uključeni. Svaki isključuješ jednim klikom iz mejla ili u podešavanjima naloga.',
+    'Za jutarnji pregled najboljih ponuda, obaveštenja na telefonu o setovima koje pratiš i povremene novosti o sajtu, samo dok su uključeni. Mejlove isključuješ jednim klikom iz mejla, a sve zajedno u podešavanjima naloga.',
   'privacy.why.3': 'Za poruke o nalogu: potvrda e-mail adrese i link za novu lozinku.',
   'privacy.why.4': 'Za zaštitu sajta od zloupotrebe, na osnovu legitimnog interesa.',
   'privacy.cookies.h': 'Kolačići',
@@ -512,6 +539,8 @@ export const sr = {
   'privacy.where.1': 'Podatke ne prodajemo i ne dajemo ih drugima za marketing.',
   'privacy.where.2':
     'Sajt i baza rade na serveru kompanije Hetzner Online GmbH u Nemačkoj, zemlji sa primerenim nivoom zaštite podataka. Hetzner održava server, ali ne koristi podatke za svoje potrebe. Mejlove šaljemo sa istog servera.',
+  'privacy.where.4':
+    'Obaveštenja na telefon putuju preko servisa za obaveštenja tvog pregledača ili telefona (Google, Apple, Mozilla ili Microsoft). Sadržaj obaveštenja je šifrovan, pa ga taj servis ne može pročitati.',
   'privacy.where.3': 'Kad sa Kockolova pređeš u prodavnicu, za podatke koje tamo ostaviš važe pravila te prodavnice.',
   'privacy.keep.h': 'Koliko dugo ih čuvamo',
   'privacy.keep.1': 'Dok imaš nalog. Kad obrišeš nalog, podatke brišemo odmah, a iz rezervnih kopija baze nestaju u roku od 14 dana.',

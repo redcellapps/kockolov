@@ -253,6 +253,8 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
     if (body?.current !== DEMO_PASSWORD) return err(400, 'Trenutna lozinka nije ispravna.');
     return ok({ ok: true });
   }
+  // the preview has no service worker, so no notifications either
+  if (path === '/api/me/push' && method === 'GET') return ok({ devices: 0 });
   if (path === '/api/me/watchlist' && method === 'GET') {
     const nums = [...state.watchlist];
     if (!nums.length) return ok({ items: [] });
