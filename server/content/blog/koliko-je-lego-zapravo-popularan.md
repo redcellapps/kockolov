@@ -9,9 +9,10 @@ imageAlt: Milan Đorđević pokazuje na LEGO logo iznad ulaza u LEGO prodavnicu 
 keywords: LEGO istorija, koliko je LEGO popularan, LEGO zanimljivosti, koliko vrede LEGO setovi, LEGO kao investicija, Legoland, najveći LEGO set, LEGO cene Srbija
 ---
 
-Nedavno sam bio u Dubaiju. U jednom tržnom centru naleteo sam na poznata žuto-narandžasta vrata i veliki crveni logo. Nisam mogao da odolim: slikao sam se ispred ulaza kao turista ispred katedrale.
+Nedavno sam bio u Dubaiju. U jednom tržnom centru naleteo sam na poznata žuto-narandžasta vrata i veliki crveni logo. 
 
-Hiljadama kilometara od kuće, a police iste kao kod nas: Ninjago, City, Star Wars, Super Heroes. Mogao sam da budem u bilo kojoj prodavnici u Srbiji. Tada sam se zapitao: koliko je LEGO zapravo popularan? Malo sam kopao, i brojke su me iznenadile.
+Hiljadama kilometara od kuće, ali kao i uvek police su svugde iste: Ninjago, City, Star Wars, Harry Potter. Mogao sam da budem u bilo kojoj prodavnici u Srbiji. 
+Tada sam se zapitao: koliko je LEGO zapravo popularan? Uz malo kopanja, ovo je rezultat.
 
 ## Sve je počelo u stolarskoj radionici
 
@@ -60,7 +61,8 @@ Iz te studije izdvajam nekoliko pravila:
 - Najviše rastu tematski setovi: poznate građevine, filmovi i praznična izdanja, kao što su Milenijumski soko, Tadž Mahal ili Zvezda smrti II.
 - Ograničena izdanja i promotivni setovi su posebna priča.
 
-Ali pažnja: razlike su ogromne, od pada od 50% do rasta od 600% godišnje. Vrednost drži samo kutija koja nikada nije otvorena, a na zaradu se čeka godinama. Ovo nije savet za ulaganje. Moje mišljenje je da je LEGO pre svega za igru, a ne za sef.
+Ali pažnja: razlike su ogromne, od pada od 50% do rasta od 600% godišnje. Vrednost drži samo kutija koja nikada nije otvorena, a na zaradu se čeka godinama. 
+Moje mišljenje je da je LEGO pre svega za igru, a ne za sef.
 
 Jedno je ipak sigurno: što jeftinije kupiš set, to bolje prolaziš, i kada ga slažeš i kada ga jednog dana prodaješ.
 
@@ -74,7 +76,7 @@ Tu je, verovatno, i odgovor na pitanje koliko je LEGO popularan. Deca ga vole je
 
 Toliko popularna igračka prodaje se skoro svuda: u LEGO Store-u, u velikim online prodavnicama i u malim radnjama. A cena istog seta zna da se razlikuje i za nekoliko hiljada dinara. Tu pomaže Kockolov:
 
-- Svako jutro poredi cene u [LEGO Store-u](https://lstore.rs), [Kockariumu](https://www.kockarium.rs) i [Ananasu](https://ananas.rs), a uz besplatan nalog i u još desetak prodavnica u Srbiji.
+- Svako jutro poredi cene u a uz besplatan nalog i u skoro sve prodavnice u Srbiji.
 - Za svaki set pokazuje istoriju cena, pa odmah vidiš da li je akcija stvarno akcija.
 - Setove koje želiš dodaš u Praćeno, a svako jutro u 7 sati stiže ti mejl sa najboljim ponudama.
 
