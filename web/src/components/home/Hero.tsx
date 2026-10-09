@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import { t, tn } from '../../i18n';
 import type { Deal, Stats } from '../../lib/api';
-import { BlocksIcon, SparkIcon, StoreIcon, TagIcon, UserIcon } from '../icons';
+import { BlocksIcon, LockIcon, SparkIcon, StoreIcon, TagIcon, UserIcon } from '../icons';
 import { SearchBox } from '../SearchBox';
 import { HeroDeal, HeroDealSkeleton } from './HeroDeal';
 
@@ -23,7 +23,18 @@ function BrickShape() {
   );
 }
 
-export function Hero({ deal, dealLoading, stats }: { deal?: Deal; dealLoading: boolean; stats?: Stats }) {
+export function Hero({
+  deal,
+  dealLoading,
+  stats,
+  unlock,
+}: {
+  deal?: Deal;
+  dealLoading: boolean;
+  stats?: Stats;
+  /** visitors: link to the sign-up invitation under the hero ("+N prodavnica uz besplatan nalog") */
+  unlock?: number;
+}) {
   const facts = stats
     ? [
         { Icon: BlocksIcon, n: stats.sets_in_stock, key: 'home.stats.sets' },
@@ -85,6 +96,21 @@ export function Hero({ deal, dealLoading, stats }: { deal?: Deal; dealLoading: b
                   </div>
                 </div>
               ))}
+              {!!unlock && (
+                <div className="col-span-2 sm:basis-full">
+                  <a
+                    href="#members-cta"
+                    onClick={(e) => {
+                      // scroll here instead of changing the address, so the router's scroll-to-top doesn't kick in
+                      e.preventDefault();
+                      document.getElementById('members-cta')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-hero-ink px-3.5 text-sm font-bold text-brand transition hover:opacity-90"
+                  >
+                    <LockIcon size={14} /> {tn('members.moreShops', unlock)}
+                  </a>
+                </div>
+              )}
             </dl>
           )}
         </div>

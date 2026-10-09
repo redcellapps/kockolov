@@ -187,7 +187,9 @@ export async function catalogRoutes(app: FastifyInstance) {
               (SELECT max(finished_at) FROM crawl_runs WHERE status = 'ok') AS last_update,
               (SELECT count(*)::int FROM deals WHERE ${latestDeals(audience)}) AS deals_today,
               (SELECT count(*)::int FROM shops sh WHERE sh.enabled AND sh.members_only
-                  AND EXISTS (SELECT 1 FROM offers x WHERE x.shop_id = sh.id AND x.active AND x.in_stock)) AS members_shops`,
+                  AND EXISTS (SELECT 1 FROM offers x WHERE x.shop_id = sh.id AND x.active AND x.in_stock)) AS members_shops,
+              (SELECT count(*)::int FROM offers x JOIN shops sh ON sh.id = x.shop_id
+                WHERE sh.enabled AND sh.members_only AND x.active AND x.in_stock AND x.set_num IS NOT NULL) AS members_offers`,
     );
   });
 }

@@ -160,6 +160,8 @@ export interface Stats {
   deals_today: number;
   /** shops whose prices only signed-in users see */
   members_shops?: number;
+  /** in-stock offers in those shops (the sign-up invitation on the home page names it) */
+  members_offers?: number;
 }
 
 export interface User {

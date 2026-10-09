@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { ChevronRight, ClockIcon, LockIcon, SparkIcon, StoreIcon, TagIcon } from '../components/icons';
 import { Hero } from '../components/home/Hero';
+import { MembersCta } from '../components/home/MembersCta';
 import { DealCard, ProductImage } from '../components/SetCard';
 import { CardSkeleton, EmptyState, SectionHeader } from '../components/ui';
 import { t, tn } from '../i18n';
@@ -20,7 +21,17 @@ export default function Home() {
 
   return (
     <>
-      <Hero deal={deals.data?.items[0]} dealLoading={deals.isLoading} stats={stats.data} />
+      <Hero
+        deal={deals.data?.items[0]}
+        dealLoading={deals.isLoading}
+        stats={stats.data}
+        unlock={!user && shops.data ? stats.data?.members_shops : undefined}
+      />
+
+      {/* Visitors: most shops show prices to signed-in users only */}
+      {!user && !!stats.data?.members_shops && shops.data && (
+        <MembersCta stats={stats.data} shops={shops.data} registrationOpen={registrationOpen} />
+      )}
 
       {/* Deals */}
       <section className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 sm:pt-16">
