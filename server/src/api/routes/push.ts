@@ -25,20 +25,29 @@ export async function pushRoutes(app: FastifyInstance) {
     return { devices: r?.n ?? 0 };
   });
 
-  // add this device (or move it to the account signed in now)
+  // add this device (or move it to the account signed in now): a browser's subscription, or the app's Firebase token
   app.post('/api/me/push', { preHandler: requireUser }, async (req, reply) => {
-    const body = z.object({ subscription, replaces: z.string().max(1000).optional() }).safeParse(req.body);
+    const body = z
+      .union([
+        z.object({ subscription, replaces: z.string().max(1000).optional() }),
+        z.object({ fcm: z.object({ token: z.string().min(20).max(4096), platform: z.enum(['android', 'ios']) }), replaces: z.string().max(4096).optional() }),
+      ])
+      .safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Neispravna prijava za obaveštenja.' });
-    const { endpoint, keys } = body.data.subscription;
+    const d = body.data;
+    const row =
+      'fcm' in d
+        ? { kind: 'fcm', endpoint: d.fcm.token, p256dh: null, auth: null, platform: d.fcm.platform }
+        : { kind: 'web', endpoint: d.subscription.endpoint, p256dh: d.subscription.keys.p256dh, auth: d.subscription.keys.auth, platform: null };
     const userId = req.user!.id;
-    if (body.data.replaces && body.data.replaces !== endpoint) {
-      await query('DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2', [userId, body.data.replaces]);
+    if (d.replaces && d.replaces !== row.endpoint) {
+      await query('DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2', [userId, d.replaces]);
     }
     await query(
-      `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent) VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
-             user_agent = EXCLUDED.user_agent, failures = 0`,
-      [userId, endpoint, keys.p256dh, keys.auth, (req.headers['user-agent'] ?? '').slice(0, 300) || null],
+      `INSERT INTO push_subscriptions (user_id, kind, endpoint, p256dh, auth, platform, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, kind = EXCLUDED.kind, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
+             platform = EXCLUDED.platform, user_agent = EXCLUDED.user_agent, failures = 0`,
+      [userId, row.kind, row.endpoint, row.p256dh, row.auth, row.platform, (req.headers['user-agent'] ?? '').slice(0, 300) || null],
     );
     await query(
       `DELETE FROM push_subscriptions WHERE user_id = $1 AND id NOT IN (
@@ -49,7 +58,7 @@ export async function pushRoutes(app: FastifyInstance) {
   });
 
   app.delete('/api/me/push', { preHandler: requireUser }, async (req, reply) => {
-    const body = z.object({ endpoint: z.string().max(1000) }).safeParse(req.body);
+    const body = z.object({ endpoint: z.string().max(4096) }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Neispravan zahtev.' });
     await query('DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2', [req.user!.id, body.data.endpoint]);
     return { ok: true };
@@ -57,7 +66,7 @@ export async function pushRoutes(app: FastifyInstance) {
 
   // a sample notification, to see that it works (this device only, or all of the account's)
   app.post('/api/me/push/test', { preHandler: requireUser }, async (req) => {
-    const body = z.object({ endpoint: z.string().max(1000).optional() }).parse(req.body ?? {});
+    const body = z.object({ endpoint: z.string().max(4096).optional() }).parse(req.body ?? {});
     const r = await sendPushToUser(
       req.user!.id,
       {

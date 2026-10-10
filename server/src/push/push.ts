@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import { config } from '../config.js';
 import { one, query } from '../db.js';
+import { sendFcm } from './fcm.js';
 
 /** What the service worker (web/public/sw.js) turns into a notification */
 export interface PushMessage {
@@ -17,9 +18,11 @@ export interface PushMessage {
 export interface PushSubscriptionRow {
   id: number;
   user_id: number;
+  /** 'web': a browser's push address (endpoint + keys); 'fcm': the app's Firebase token (endpoint) */
+  kind: 'web' | 'fcm';
   endpoint: string;
-  p256dh: string;
-  auth: string;
+  p256dh: string | null;
+  auth: string | null;
 }
 
 /** For tests: replace the real sender (which talks to Google/Apple/Mozilla) */
@@ -59,33 +62,37 @@ const subject = () => config.VAPID_SUBJECT || `mailto:${config.CONTACT_EMAIL}`;
  * removed; one that fails for other reasons is removed after 10 failures in a row.
  */
 export async function sendPush(sub: PushSubscriptionRow, msg: PushMessage): Promise<'sent' | 'gone' | 'failed'> {
+  if (sub.kind === 'fcm') return recordResult(sub, await sendFcm(sub.endpoint, msg).catch(() => 'failed' as const));
   const { publicKey, privateKey } = await vapidKeys();
   try {
-    await sender({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(msg), {
+    await sender({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh ?? '', auth: sub.auth ?? '' } }, JSON.stringify(msg), {
       vapidDetails: { subject: subject(), publicKey, privateKey },
       // a phone that's off for a day still gets it when it comes back, but not days later
       TTL: 24 * 3600,
       urgency: 'normal',
       timeout: 15_000,
     });
-    await query('UPDATE push_subscriptions SET last_ok_at = now(), failures = 0 WHERE id = $1', [sub.id]);
-    return 'sent';
+    return recordResult(sub, 'sent');
   } catch (err) {
     const status = (err as { statusCode?: number }).statusCode;
-    if (status === 404 || status === 410) {
-      await query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
-      return 'gone';
-    }
+    return recordResult(sub, status === 404 || status === 410 ? 'gone' : 'failed');
+  }
+}
+
+async function recordResult(sub: PushSubscriptionRow, r: 'sent' | 'gone' | 'failed') {
+  if (r === 'sent') await query('UPDATE push_subscriptions SET last_ok_at = now(), failures = 0 WHERE id = $1', [sub.id]);
+  else if (r === 'gone') await query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
+  else {
     await query('UPDATE push_subscriptions SET failures = failures + 1 WHERE id = $1', [sub.id]);
     await query('DELETE FROM push_subscriptions WHERE id = $1 AND failures >= 10', [sub.id]);
-    return 'failed';
   }
+  return r;
 }
 
 /** Sends to every device of a user (or only the given one); returns how many got it. */
 export async function sendPushToUser(userId: number, msg: PushMessage, endpoint?: string) {
   const subs = await query<PushSubscriptionRow>(
-    `SELECT id, user_id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1 ${endpoint ? 'AND endpoint = $2' : ''}`,
+    `SELECT id, user_id, kind, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1 ${endpoint ? 'AND endpoint = $2' : ''}`,
     endpoint ? [userId, endpoint] : [userId],
   );
   const out = { devices: subs.length, sent: 0, gone: 0, failed: 0 };

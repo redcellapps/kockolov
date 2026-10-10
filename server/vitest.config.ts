@@ -14,6 +14,8 @@ export default defineConfig({
       // preview images go to a throwaway folder; no background drawing during tests
       OG_CACHE_DIR: path.join(os.tmpdir(), `kockolov-og-test-${process.pid}`),
       OG_WARM_MINUTES: '0',
+      // box barcodes are read only in their own test
+      EAN_PER_RUN: '0',
     },
     testTimeout: 30000,
     fileParallelism: false,

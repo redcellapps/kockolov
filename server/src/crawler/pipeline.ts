@@ -7,6 +7,7 @@ import { loadRules, ruleHides, type HideRule } from './hiding.js';
 import { buildNameIndex, matchOffer, notASet, type MatchIndex } from './matching.js';
 import { refreshSets } from './refresh.js';
 import { computeDeals } from '../deals/engine.js';
+import { fillEans } from './ean.js';
 import { seedReferenceData } from './seed.js';
 import type { RawOffer, ShopAdapter } from './types.js';
 
@@ -232,6 +233,10 @@ export async function runCrawl(opts: { shops?: string[]; log?: (m: string) => vo
     const out: ShopRunSummary[] = [];
     // Official store first: it establishes names + reference prices used for matching the others
     for (const a of adapters) out.push(await crawlShop(a, log));
+    // box barcodes for scanning in the app, a few hundred LEGO Store products per run
+    if (out.some((r) => r.shop === 'lstore' && r.status === 'ok')) {
+      await fillEans({ log }).catch((err) => log(`[ean] ${(err as Error).message}`));
+    }
     await refreshSets(log);
     await computeDeals({ log });
     return out;

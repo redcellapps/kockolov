@@ -14,6 +14,7 @@ import { currencyOpts, loadDigestData, renderDigest, sendDigests, unsubscribeUrl
 import { todayLocal } from './lib/time.js';
 import { sendWatchAlerts } from './push/alerts.js';
 import { sendPushToUser } from './push/push.js';
+import { fillEans } from './crawler/ean.js';
 
 const HELP = `Kockolov CLI
 
@@ -26,6 +27,7 @@ const HELP = `Kockolov CLI
   digest --preview pregled.html [--email]  sačuvaj e-mail kao HTML (bez slanja)
   push [--dry-run]                         pošalji obaveštenja o praćenim setovima (inače uz jutarnji pregled)
   push:test --email x@y.rs                 probno obaveštenje na sve uređaje tog korisnika
+  ean [broj]                               preuzmi bar-kodove kutija iz LEGO Store-a (podrazumevano 400)
   user:create --email x@y.rs [--name Ime] [--admin] [--password tajna]
   user:invite --email x@y.rs [--name Ime] [--admin]   (e-mail sa linkom za postavljanje lozinke)
   user:password --email x@y.rs [--password tajna]
@@ -87,6 +89,9 @@ async function main() {
       await sendDigests({ dryRun: values['dry-run'], onlyEmail: values.email });
       break;
     }
+    case 'ean':
+      console.log(await fillEans({ log: console.log, max: positionals[0] ? Number(positionals[0]) : undefined }));
+      break;
     case 'push':
       await sendWatchAlerts({ dryRun: values['dry-run'] });
       break;
