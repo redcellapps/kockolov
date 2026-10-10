@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { Announcements } from '../components/admin/Announcements';
+import { Barcodes } from '../components/admin/Barcodes';
 import { OfferReview } from '../components/admin/OfferReview';
 import { Button, ShopDot, Spinner, cx } from '../components/ui';
 import { t } from '../i18n';
@@ -195,6 +196,8 @@ export default function AdminPage() {
       </Box>
 
       <OfferReview shops={ov.data?.shops} />
+
+      <Barcodes />
 
       <Box title={`${t('admin.users')} (${users.data?.length ?? 0})`}>
         <form

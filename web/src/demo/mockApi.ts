@@ -284,6 +284,8 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
 
   if (path.startsWith('/api/admin/')) {
     if (state.user!.role !== 'admin') return err(403, 'Samo za administratore.');
+    // the preview has no barcodes yet
+    if (path === '/api/admin/eans') return ok({ found: 0, missing: 0, waiting: 0, total: 0 });
     if (path === '/api/admin/overview') {
       const ov = snap.admin.overview as Json;
       const shops = (ov.shops as Json[]).map((sh) => ({

@@ -1074,5 +1074,18 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     expect((await code('673419340366')).json()).toEqual({ set_num: '10280', by: 'ean' });
     expect((await code('10280')).json()).toEqual({ set_num: '10280', by: 'number' });
     expect((await code('1234567890123')).statusCode).toBe(404);
+
+    // the admin sees how far it has got and downloads them as an Excel table
+    const stats = (await app.inject({ method: 'GET', url: '/api/admin/eans', headers: { cookie } })).json();
+    expect(stats.found).toBeGreaterThanOrEqual(1);
+    expect(stats.found + stats.missing + stats.waiting).toBe(stats.total);
+    const file = await app.inject({ method: 'GET', url: '/api/admin/eans.xlsx', headers: { cookie } });
+    expect(file.headers['content-type']).toContain('spreadsheetml.sheet');
+    expect(String(file.headers['content-disposition'])).toMatch(/attachment; filename="kockolov-bar-kodovi-\d{4}-\d{2}-\d{2}\.xlsx"/);
+    const { unzipSync, strFromU8 } = await import('fflate');
+    const sheet = strFromU8(unzipSync(new Uint8Array(file.rawPayload))['xl/worksheets/sheet1.xml']);
+    expect(sheet).toContain('<t>5702017584379</t>'); // a text cell: Excel keeps all 13 digits
+    expect(sheet).toContain('<t>76476</t>');
+    expect((await app.inject({ method: 'GET', url: '/api/admin/eans.xlsx' })).statusCode).toBe(401);
   });
 });

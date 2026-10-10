@@ -229,3 +229,26 @@ describe('watched-set notifications', () => {
     expect(many).toEqual([{ title: 'Praćeno: nove cene za 5 setova', body: 'Buket cveća, Mini figura, Buket cveća i još 2.', url: '/pracenje', tag: 'pracenje' }]);
   });
 });
+
+describe('Excel export', () => {
+  it('writes a sheet Excel opens: header, text kept as text, numbers as numbers', async () => {
+    const { xlsx, columnName } = await import('../src/lib/xlsx.js');
+    const { unzipSync, strFromU8 } = await import('fflate');
+    expect([0, 25, 26, 27, 701].map(columnName)).toEqual(['A', 'Z', 'AA', 'AB', 'ZZ']);
+    const file = xlsx('Bar-kodovi', [{ header: 'Set', width: 8 }, { header: 'Bar-kod', width: 16 }, { header: 'Cena', width: 10, kind: 'number' }], [
+      ['10280', '5702017584379', 8999],
+      ['71051-7', 'Š & <Ž>', null],
+    ]);
+    const parts = unzipSync(file);
+    expect(Object.keys(parts).sort()).toEqual(
+      ['[Content_Types].xml', '_rels/.rels', 'xl/_rels/workbook.xml.rels', 'xl/styles.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml'].sort(),
+    );
+    const sheet = strFromU8(parts['xl/worksheets/sheet1.xml']);
+    expect(sheet).toContain('<c r="A1" t="inlineStr" s="1"><is><t>Set</t></is></c>');
+    expect(sheet).toContain('<c r="B2" t="inlineStr"><is><t>5702017584379</t></is></c>');
+    expect(sheet).toContain('<c r="C2" s="2"><v>8999</v></c>');
+    expect(sheet).toContain('<t>Š &amp; &lt;Ž&gt;</t>');
+    expect(sheet).not.toContain('r="C3"'); // empty cells are left out
+    expect(sheet).toContain('<autoFilter ref="A1:C3"/>');
+  });
+});

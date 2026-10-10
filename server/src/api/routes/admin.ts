@@ -7,6 +7,8 @@ import { refreshSets } from '../../crawler/refresh.js';
 import { computeDeals } from '../../deals/engine.js';
 import { sendLink } from '../invites.js';
 import { config } from '../../config.js';
+import { todayLocal } from '../../lib/time.js';
+import { xlsx } from '../../lib/xlsx.js';
 import {
   countRecipients,
   createAnnouncement,
@@ -58,6 +60,45 @@ async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', async (req, reply) => {
     if (req.url.startsWith('/api/admin')) return requireAdmin(req, reply);
+  });
+
+  // box barcodes for the app's scanner: how far reading them from the LEGO Store has got
+  app.get('/api/admin/eans', async () =>
+    one(
+      `SELECT count(*) FILTER (WHERE ean IS NOT NULL)::int AS found,
+              count(*) FILTER (WHERE ean IS NULL AND ean_checked_at IS NOT NULL)::int AS missing,
+              count(*) FILTER (WHERE ean_checked_at IS NULL)::int AS waiting,
+              count(*)::int AS total
+         FROM offers WHERE shop_id = 'lstore' AND active AND set_num IS NOT NULL`,
+    ),
+  );
+
+  // ...and all of them as an Excel table
+  app.get('/api/admin/eans.xlsx', async (_req, reply) => {
+    const rows = await query<{ set_num: string; name: string; theme: string | null; ean: string; price_rsd: number; in_stock: boolean; url: string }>(
+      `SELECT o.set_num, s.name, t.name AS theme, o.ean, o.price_rsd, o.in_stock, o.url
+         FROM offers o JOIN sets s ON s.set_num = o.set_num LEFT JOIN themes t ON t.slug = s.theme_slug
+        WHERE o.shop_id = 'lstore' AND o.active AND o.ean IS NOT NULL
+        ORDER BY o.set_num`,
+    );
+    const file = xlsx(
+      'Bar-kodovi',
+      [
+        { header: 'Set', width: 10 },
+        { header: 'Naziv', width: 44 },
+        { header: 'Tema', width: 22 },
+        { header: 'Bar-kod (EAN)', width: 17 },
+        { header: 'Cena u LEGO Store-u (RSD)', width: 26, kind: 'number' },
+        { header: 'Na stanju', width: 11 },
+        { header: 'Link', width: 60 },
+      ],
+      rows.map((r) => [r.set_num, r.name, r.theme, r.ean, r.price_rsd, r.in_stock ? 'da' : 'ne', r.url]),
+    );
+    return reply
+      .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('Content-Disposition', `attachment; filename="kockolov-bar-kodovi-${todayLocal()}.xlsx"`)
+      .header('Cache-Control', 'no-store')
+      .send(Buffer.from(file));
   });
 
   app.get('/api/admin/overview', async () => {
