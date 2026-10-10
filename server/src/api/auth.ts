@@ -34,11 +34,30 @@ export interface SessionUser {
   currency: 'RSD' | 'EUR';
 }
 
+/** Header the Android/iOS app sends with every request; it signs in with a token instead of a cookie */
+export const APP_HEADER = 'x-kockolov-app';
+/** Response header carrying the new session's token to the app */
+export const TOKEN_HEADER = 'x-kockolov-token';
+
+/** The app's requests come from its own origin, where the site's cookie isn't kept (iPhone) */
+export const isAppRequest = (req: FastifyRequest) => req.headers[APP_HEADER] !== undefined;
+
+function bearer(req: FastifyRequest): string | undefined {
+  const h = req.headers.authorization;
+  return h?.startsWith('Bearer ') ? h.slice(7).trim() || undefined : undefined;
+}
+
 export async function createSession(reply: FastifyReply, userId: number): Promise<void> {
   const token = randomBytes(32).toString('base64url');
-  const expires = new Date(Date.now() + config.SESSION_DAYS * 86400_000);
+  const app = isAppRequest(reply.request);
+  // the app stays signed in for a year; the site for SESSION_DAYS
+  const expires = new Date(Date.now() + (app ? config.APP_SESSION_DAYS : config.SESSION_DAYS) * 86400_000);
   await query('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [hashToken(token), userId, expires]);
   await query('UPDATE users SET last_login_at = now() WHERE id = $1', [userId]);
+  if (app) {
+    reply.header(TOKEN_HEADER, token);
+    return;
+  }
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
     httpOnly: true,
@@ -49,13 +68,13 @@ export async function createSession(reply: FastifyReply, userId: number): Promis
 }
 
 export async function destroySession(req: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const token = req.cookies[SESSION_COOKIE];
+  const token = bearer(req) ?? req.cookies[SESSION_COOKIE];
   if (token) await query('DELETE FROM sessions WHERE token_hash = $1', [hashToken(token)]);
   reply.clearCookie(SESSION_COOKIE, { path: '/' });
 }
 
 export async function userFromRequest(req: FastifyRequest): Promise<SessionUser | null> {
-  const token = req.cookies[SESSION_COOKIE];
+  const token = bearer(req) ?? req.cookies[SESSION_COOKIE];
   if (!token) return null;
   return one<SessionUser>(
     `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.news_enabled, u.currency

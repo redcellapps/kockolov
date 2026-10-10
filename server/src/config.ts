@@ -29,6 +29,10 @@ const schema = z.object({
   REGISTRATION_OPEN: z.string().optional(),
   COOKIE_SECURE: bool(false),
   SESSION_DAYS: z.coerce.number().default(60),
+  // the Android/iOS app signs in with a token kept on the phone
+  APP_SESSION_DAYS: z.coerce.number().default(365),
+  // where the app's pages come from (iOS, Android): these may call the API from another origin
+  APP_ORIGINS: z.string().default('capacitor://localhost,https://localhost'),
 
   // Crawler
   CRAWLER_USER_AGENT: z
@@ -78,6 +82,12 @@ const schema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   // how the push services (Google, Apple, Mozilla) can reach us; empty = mailto:CONTACT_EMAIL
   VAPID_SUBJECT: z.string().optional(),
+  // Notifications in the Android/iOS app go through Firebase Cloud Messaging: the Firebase service
+  // account key (Project settings → Service accounts → Generate new private key) as a file path,
+  // or its JSON / base64 JSON. Empty = the apps get no notifications (the site's still work).
+  FCM_SERVICE_ACCOUNT: z.string().optional(),
+  // LEGO Store product pages read per crawl to learn the box barcodes (for scanning in the app); 0 = off
+  EAN_PER_RUN: z.coerce.number().default(400),
 
   // Link-preview images (and the product photos in them) kept on disk — a Docker volume in
   // production — so a shared link shows its picture at once, also right after a deploy

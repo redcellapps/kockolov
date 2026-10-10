@@ -975,4 +975,104 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       await query("DELETE FROM watchlist WHERE set_num IN ('10280', '11378')");
     }
   });
+
+  it('lets the Android/iOS app sign in with a token, from its own origin only', async () => {
+    const appHeaders = { 'x-kockolov-app': '1', origin: 'capacitor://localhost' };
+    // the browser asks first whether the app's origin may call the API
+    const pre = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/auth/login',
+      headers: { origin: 'capacitor://localhost', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type,x-kockolov-app' },
+    });
+    expect(pre.statusCode).toBe(204);
+    expect(pre.headers['access-control-allow-origin']).toBe('capacitor://localhost');
+    expect(String(pre.headers['access-control-allow-headers'])).toMatch(/x-kockolov-app/i);
+    // other sites get no CORS headers
+    const other = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { origin: 'https://example.com' } });
+    expect(other.headers['access-control-allow-origin']).toBeUndefined();
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: appHeaders,
+      payload: { email: 'milan@example.com', password: 'tajna-lozinka' },
+    });
+    expect(login.statusCode).toBe(200);
+    expect(login.headers['set-cookie']).toBeUndefined();
+    expect(String(login.headers['access-control-expose-headers'])).toMatch(/x-kockolov-token/i);
+    const token = String(login.headers['x-kockolov-token']);
+    expect(token).toMatch(/^[\w-]{40,}$/);
+    const auth = { ...appHeaders, authorization: `Bearer ${token}` };
+    expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: auth })).json().user.email).toBe('milan@example.com');
+    // the private site's API works with the token too
+    expect((await app.inject({ method: 'GET', url: '/api/me/watchlist', headers: auth })).statusCode).toBe(200);
+    expect(await one('SELECT expires_at > now() + interval \'300 days\' AS long FROM sessions ORDER BY created_at DESC LIMIT 1')).toEqual({ long: true });
+
+    // notifications in the app go through Firebase
+    const { setFcmSender, fcmMessage } = await import('../src/push/fcm.js');
+    const sent: { token: string; title: string }[] = [];
+    setFcmSender(async (t, msg) => {
+      if (t.startsWith('gone')) return { status: 404, error: 'UNREGISTERED' };
+      sent.push({ token: t, title: msg.title });
+      return { status: 200 };
+    });
+    try {
+      const phone = 'f'.repeat(40);
+      const add = (t: string, platform = 'android') =>
+        app.inject({ method: 'POST', url: '/api/me/push', headers: auth, payload: { fcm: { token: t, platform } } });
+      expect((await add(phone)).statusCode).toBe(200);
+      expect((await add('gone'.padEnd(40, 'x'), 'ios')).statusCode).toBe(200);
+      expect((await add('short')).statusCode).toBe(400);
+      const test = (await app.inject({ method: 'POST', url: '/api/me/push/test', headers: auth, payload: {} })).json();
+      expect(test).toMatchObject({ devices: 2, sent: 1, gone: 1 });
+      expect(sent).toEqual([{ token: phone, title: 'Kockolov: obaveštenja rade' }]);
+      expect(await one("SELECT kind, platform FROM push_subscriptions WHERE endpoint = $1", [phone])).toEqual({ kind: 'fcm', platform: 'android' });
+      expect((await app.inject({ method: 'GET', url: '/api/me/push', headers: auth })).json()).toEqual({ devices: 1 });
+      // the message: same tag replaces the older one, the tap opens the set
+      expect(fcmMessage(phone, { title: 'T', body: 'B', url: '/set/10280', tag: 'set-10280' }).message).toMatchObject({
+        token: phone,
+        notification: { title: 'T', body: 'B' },
+        data: { url: '/set/10280', tag: 'set-10280' },
+        android: { collapse_key: 'set-10280' },
+      });
+      await app.inject({ method: 'DELETE', url: '/api/me/push', headers: auth, payload: { endpoint: phone } });
+    } finally {
+      setFcmSender(null);
+    }
+
+    // signing out in the app ends that token's session
+    await app.inject({ method: 'POST', url: '/api/auth/logout', headers: auth });
+    expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: auth })).json().user).toBeNull();
+  });
+
+  it('learns box barcodes from the LEGO Store, so the app can open a set by scanning it', async () => {
+    const { fillEans, eanFromProductJson } = await import('../src/crawler/ean.js');
+    expect(eanFromProductJson('{"product":{"variants":[{"barcode":""},{"barcode":"5702017 584379"}]}}')).toBe('5702017584379');
+    expect(eanFromProductJson('<html>')).toBeNull();
+    const shop = await startMockShops({
+      '/products/lego-harry-potter-76476.json': () => JSON.stringify({ product: { variants: [{ sku: '76476', barcode: '5702017584379' }] } }),
+      '/products/lego-icons-10280.json': () => null,
+    });
+    const offer = (await one<{ id: number }>("SELECT id FROM offers WHERE shop_id = 'lstore' AND set_num = '76476'"))!;
+    const other = (await one<{ id: number }>("SELECT id FROM offers WHERE shop_id = 'lstore' AND set_num = '10280'"))!;
+    try {
+      // only these two are still unknown; the rest count as checked
+      await query("UPDATE offers SET ean_checked_at = now() WHERE shop_id = 'lstore'");
+      await query("UPDATE offers SET ean = NULL, ean_checked_at = NULL, url = $2 || '/products/lego-harry-potter-76476' WHERE id = $1", [offer.id, shop.base]);
+      await query("UPDATE offers SET ean = NULL, ean_checked_at = NULL, url = $2 || '/products/lego-icons-10280' WHERE id = $1", [other.id, shop.base]);
+      expect(await fillEans({ max: 10 })).toEqual({ checked: 2, found: 1 });
+      expect(await one('SELECT ean FROM offers WHERE id = $1', [offer.id])).toEqual({ ean: '5702017584379' });
+      // asked once: not again until 30 days have passed
+      expect(await fillEans({ max: 10 })).toEqual({ checked: 0, found: 0 });
+    } finally {
+      await shop.close();
+    }
+    const code = (c: string) => app.inject({ method: 'GET', url: `/api/sets/by-code/${c}`, headers: { cookie } });
+    expect((await code('5702017584379')).json()).toEqual({ set_num: '76476', by: 'ean' });
+    // a US box (UPC-A, 12 digits) is the same number as an EAN-13 with a leading 0
+    await query("UPDATE offers SET ean = '0673419340366' WHERE id = $1", [other.id]);
+    expect((await code('673419340366')).json()).toEqual({ set_num: '10280', by: 'ean' });
+    expect((await code('10280')).json()).toEqual({ set_num: '10280', by: 'number' });
+    expect((await code('1234567890123')).statusCode).toBe(404);
+  });
 });

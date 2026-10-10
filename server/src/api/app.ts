@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { ZodError } from 'zod';
 import { config } from '../config.js';
 import { pool } from '../db.js';
-import { type SessionUser, userFromRequest } from './auth.js';
+import { APP_HEADER, type SessionUser, TOKEN_HEADER, userFromRequest } from './auth.js';
 import { adminRoutes } from './routes/admin.js';
 import { blogRoutes } from './routes/blog.js';
 import { publicRoutes } from './routes/public.js';
@@ -40,8 +40,25 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(cookie);
   app.decorateRequest('user', null);
 
+  // The Android/iOS app runs the same web app from its own origin and calls the API with a token
+  // (no cookies), so only those origins get CORS headers; browsers on other sites still can't.
+  const appOrigins = new Set(config.APP_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean));
   app.addHook('onRequest', async (req, reply) => {
-    if (!req.url.startsWith('/api/')) return;
+    const origin = req.headers.origin;
+    if (!origin || !appOrigins.has(origin) || !(req.url.startsWith('/api/') || req.url.startsWith('/media/'))) return;
+    reply.header('Access-Control-Allow-Origin', origin).header('Vary', 'Origin').header('Access-Control-Expose-Headers', TOKEN_HEADER);
+    if (req.method === 'OPTIONS') {
+      return reply
+        .code(204)
+        .header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE')
+        .header('Access-Control-Allow-Headers', `Authorization, Content-Type, ${APP_HEADER}`)
+        .header('Access-Control-Max-Age', '86400')
+        .send();
+    }
+  });
+
+  app.addHook('onRequest', async (req, reply) => {
+    if (!req.url.startsWith('/api/') || req.method === 'OPTIONS') return;
     req.user = await userFromRequest(req);
     const open = OPEN_PATHS.some((p) => req.url.startsWith(p));
     if (!config.PUBLIC_MODE && !open && !req.user) {

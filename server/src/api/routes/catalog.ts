@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { setForCode } from '../../crawler/ean.js';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
 import { audienceOf, latestDeals, offersFor } from '../audience.js';
@@ -174,6 +175,13 @@ export async function catalogRoutes(app: FastifyInstance) {
         WHERE sh.enabled ${req.user ? '' : 'AND NOT sh.members_only'}
         GROUP BY sh.id ORDER BY sh.kind = 'official' DESC, sh.members_only, sh.name`,
     );
+  });
+
+  // the app's scanner: a box barcode or a set number → the set's page
+  app.get<{ Params: { code: string } }>('/api/sets/by-code/:code', async (req, reply) => {
+    const r = await setForCode(req.params.code.slice(0, 32));
+    if (!r) return reply.code(404).send({ error: 'Ne prepoznajemo ovaj kod.' });
+    return r;
   });
 
   app.get('/api/stats', async (req) => {
