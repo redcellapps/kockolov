@@ -34,6 +34,9 @@ export function slugify(input: string): string {
 export function parseRsd(raw: string | number | null | undefined): number | null {
   if (raw === null || raw === undefined) return null;
   if (typeof raw === 'number') return Number.isFinite(raw) ? Math.round(raw) : null;
+  // two prices in one text ("450 RSD 500 RSD": a sale price with the old one beside it) would read
+  // as 450500; the adapter has to pick the right one, so this is no price at all
+  if ((raw.match(/rsd|\bdin\b|дин/gi)?.length ?? 0) > 1) return null;
   let s = raw.replace(/ /g, ' ').replace(/rsd|din\.?|дин\.?/gi, '').trim();
   if (!s) return null;
   // Serbian format: thousands '.', decimals ','

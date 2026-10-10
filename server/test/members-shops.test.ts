@@ -161,6 +161,31 @@ describe('Kocka.rs', () => {
     expect(o).toMatchObject({ inStock: false, sku: null, priceRsd: 1900 });
     expect(matchOffer(o, idx)).toEqual({ setNum: '40567', method: 'title' });
   });
+  it('reads the sale price, not the old price beside it', () => {
+    // the shop-wide −10% of October 2026, markup as on kocka.rs (10 Oct): 450 RSD used to read as 450,500 RSD
+    const card = (id: string, code: string, price: string) => `
+      <div class="products-item">
+        <a href="https://kocka.rs/${code}-x/proizvod/${id}" class="products-item__image"><picture><img src="https://kocka.rs/files/${id}.jpg"></picture></a>
+        <a href="https://kocka.rs/${code}-x/proizvod/${id}" class="products-item__title">${code}: LEGO set</a>
+        <div class="products-item__code">Šifra proizvoda: ${code}</div>
+        ${price}
+        <button class="products-item__to-cart">Dodaj u korpu</button>
+      </div>`;
+    const sale = parseKockaPage(
+      `<div class="products__list">${[
+        card('4826', '71048', '<div class="products-item__price  products-item__price--old"> 450 RSD <span>500 RSD</span> </div>'),
+        card('1776', '10696', '<div class="products-item__price  products-item__price--old">\n 3.780 RSD\n <span>4.200 RSD</span>\n </div>'),
+        card('3001', '60400', '<div class="products-item__price "> 1.900 RSD </div>'),
+      ].join('')}</div>`,
+      'https://kocka.rs',
+    );
+    expect(sale.map((o) => [o.externalId, o.priceRsd, o.regularPriceRsd])).toEqual([
+      ['4826', 450, 500],
+      ['1776', 3780, 4200],
+      ['3001', 1900, null],
+    ]);
+    expect(sale[0]).toMatchObject({ sku: '71048', url: 'https://kocka.rs/71048-x/proizvod/4826', imageUrl: 'https://kocka.rs/files/4826.jpg', inStock: true });
+  });
 });
 
 describe('Pertini Toys', () => {

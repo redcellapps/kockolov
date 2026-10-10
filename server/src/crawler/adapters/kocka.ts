@@ -17,8 +17,17 @@ export function parseKockaPage(html: string, baseUrl: string): RawOffer[] {
     const id = href.split('?')[0].match(/\/proizvod\/(\d+)/)?.[1];
     const title = $a.text().replace(/\s+/g, ' ').trim();
     if (!id || !title || out.has(id)) return;
-    const price = parseRsd($el.find('.products-item__price').first().text());
+    // on sale: <div class="products-item__price products-item__price--old"> 450 RSD <span>500 RSD</span></div>
+    // — the price's own text is what you pay, the span is the price before the sale
+    const $price = $el.find('.products-item__price').first();
+    const price = parseRsd(
+      $price
+        .contents()
+        .filter((_, n) => n.type === 'text')
+        .text(),
+    );
     if (!price) return;
+    const before = parseRsd($price.children('span').first().text());
     const code = $el.find('.products-item__code').text().replace(/^.*?:\s*/, '').trim();
     const $img = $el.find('a.products-item__image img').first();
     const soldOut = !$el.find('.products-item__to-cart').length || /rasprodat|nema na stanju/i.test($el.text());
@@ -28,7 +37,7 @@ export function parseKockaPage(html: string, baseUrl: string): RawOffer[] {
       url: absUrl(baseUrl, href)!,
       imageUrl: absUrl(baseUrl, $img.attr('data-src') || $img.attr('src')?.replace(/.*blank\.png$/, '')),
       priceRsd: price,
-      regularPriceRsd: null,
+      regularPriceRsd: before && before > price ? before : null,
       inStock: !soldOut,
       sku: /^\d{4,6}(-\w{1,3})?$/.test(code) ? code : null,
     });

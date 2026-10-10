@@ -7,6 +7,7 @@ import { rsd, shopName } from '../../lib/format';
 import { ChevronDown, ChevronRight, EyeOffIcon, SearchIcon, XIcon } from '../icons';
 import { Button, ShopDot, cx } from '../ui';
 import { SetNumForm } from './SetNumForm';
+import { ShopPageLink } from './ShopPageLink';
 
 interface Offer {
   id: number;
@@ -257,9 +258,12 @@ function OpenRow({
         <a href={o.url} target="_blank" rel="noreferrer" className="block truncate text-sm font-semibold hover:underline">
           {o.title}
         </a>
-        <div className="text-xs text-ink-3">
-          {shopName(o.shop_id)}
-          {o.seller && ` · ${o.seller}`} · {rsd(o.price_rsd)}
+        <div className="flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
+          <span>
+            {shopName(o.shop_id)}
+            {o.seller && ` · ${o.seller}`} · {rsd(o.price_rsd)}
+          </span>
+          <ShopPageLink url={o.url} />
         </div>
       </div>
       <SetNumForm

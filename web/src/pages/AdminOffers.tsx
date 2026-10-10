@@ -3,6 +3,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { AdminNav } from '../components/admin/AdminNav';
 import { SetNumForm, SetThumb } from '../components/admin/SetNumForm';
+import { ShopPageLink } from '../components/admin/ShopPageLink';
 import { AlertIcon, ChevronDown, EyeOffIcon, PencilIcon, SearchIcon, UndoIcon } from '../components/icons';
 import { Button, Chip, ShopDot, Spinner, cx } from '../components/ui';
 import { t, type TKey } from '../i18n';
@@ -196,7 +197,10 @@ export default function AdminOffersPage() {
       <a href={o.url} target="_blank" rel="noreferrer" className="line-clamp-2 font-semibold hover:underline" title={o.title}>
         {o.title}
       </a>
-      {!o.in_stock && <div className="text-xs text-ink-3">{t('admin.offers.outOfStock')}</div>}
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
+        <ShopPageLink url={o.url} />
+        {!o.in_stock && <span>{t('admin.offers.outOfStock')}</span>}
+      </div>
     </>
   );
   const setCell = (o: Row) =>

@@ -29,6 +29,12 @@ describe('parseRsd', () => {
     [7319, 7319],
   ])('%s -> %s', (raw, n) => expect(parseRsd(raw as string)).toBe(n));
   it('returns null for garbage', () => expect(parseRsd('—')).toBeNull());
+  it('refuses two prices in one text (sale price + old price)', () => {
+    // Kocka.rs on sale: "450 RSD <span>500 RSD</span>" used to read as 450,500 RSD
+    expect(parseRsd(' 450 RSD 500 RSD ')).toBeNull();
+    expect(parseRsd(' 3.780 RSD 4.200 RSD ')).toBeNull();
+    expect(parseRsd('2.999 din. 3.499 din.')).toBeNull();
+  });
 });
 
 describe('set numbers', () => {

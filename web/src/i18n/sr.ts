@@ -482,6 +482,8 @@ export const sr = {
   'admin.offers.doubt.name': 'Naziv ne liči na ovaj set',
   'admin.offers.doubt.price': 'Cena mnogo odstupa od LEGO Store cene',
   'admin.offers.outOfStock': 'nema na stanju',
+  'admin.offers.open': 'Otvori na {host}',
+  'admin.offers.open.title': 'Proveri cenu i šifru na sajtu prodavnice',
   'admin.offers.edit': 'Izmeni',
   'admin.offers.editTitle': 'Broj seta',
   'admin.offers.editHint': 'Ispod broja se odmah vidi koji je to set. Ručno povezana ponuda ostaje povezana i posle svakog preuzimanja cena.',
