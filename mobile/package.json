@@ -1,0 +1,27 @@
+{
+  "name": "kockolov-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Kockolov za Android i iOS: isti sajt (web/) u Capacitor ljusci, sa obaveštenjima i skenerom bar-koda",
+  "scripts": {
+    "build:web": "npm run build:app --prefix ../web",
+    "sync": "npm run build:web && cap sync",
+    "assets": "node scripts/make-assets.mjs",
+    "android": "npm run sync && cap open android",
+    "ios": "npm run sync && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor-firebase/messaging": "8.5.2",
+    "@capacitor-mlkit/barcode-scanning": "8.2.1",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/preferences": "8.0.1",
+    "@capacitor/splash-screen": "8.0.2",
+    "firebase": "12.19.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

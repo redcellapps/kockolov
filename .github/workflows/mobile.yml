@@ -1,0 +1,104 @@
+name: Mobile apps
+
+# Builds the Android app (an APK to install for testing) and checks that the iOS app compiles.
+# Firebase settings for notifications come from repository secrets when they are set:
+#   GOOGLE_SERVICES_JSON          contents of google-services.json (Android)
+#   GOOGLE_SERVICE_INFO_PLIST     contents of GoogleService-Info.plist (iOS)
+on:
+  push:
+    branches: [main, mobile]
+    paths: ['mobile/**', 'web/**', 'package-lock.json', '.github/workflows/mobile.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npm ci
+        working-directory: mobile
+      - name: App pages
+        run: npm run build:app -w web
+      - name: Firebase settings
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/app/google-services.json
+            echo "google-services.json added"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON secret not set: this build has no notifications"
+          fi
+      - run: npx cap sync android
+        working-directory: mobile
+      - name: Build (debug APK)
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        working-directory: mobile/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kockolov-android-debug
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+      # the APK straight on the phone: Releases → "android-test" → kockolov-test.apk (each build replaces it)
+      - name: Test APK as a download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk kockolov-test.apk
+          gh release view android-test >/dev/null 2>&1 || gh release create android-test --prerelease --target "$GITHUB_SHA" \
+            --title "Kockolov za Android (probna verzija)" \
+            --notes "Probna verzija za instalaciju na telefon (nije iz Google Play-a). Svaki novi build zamenjuje kockolov-test.apk."
+          gh release upload android-test kockolov-test.apk --clobber
+
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: mobile
+      - name: App pages
+        run: npm run build:app -w web
+      - name: Firebase settings
+        env:
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: |
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
+            printf '%s' "$GOOGLE_SERVICE_INFO_PLIST" > mobile/ios/App/App/GoogleService-Info.plist
+          fi
+      - name: Sync (pod install)
+        run: npx cap sync ios
+        working-directory: mobile
+      - name: Compile for iPhone (unsigned)
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tail -n 40
+          exit ${PIPESTATUS[0]}
