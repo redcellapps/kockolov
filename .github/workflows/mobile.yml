@@ -17,6 +17,8 @@ concurrency:
 jobs:
   android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,6 +58,16 @@ jobs:
           name: kockolov-android-debug
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+      # the APK straight on the phone: Releases → "android-test" → kockolov-test.apk (each build replaces it)
+      - name: Test APK as a download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk kockolov-test.apk
+          gh release view android-test >/dev/null 2>&1 || gh release create android-test --prerelease --target "$GITHUB_SHA" \
+            --title "Kockolov za Android (probna verzija)" \
+            --notes "Probna verzija za instalaciju na telefon (nije iz Google Play-a). Svaki novi build zamenjuje kockolov-test.apk."
+          gh release upload android-test kockolov-test.apk --clobber
 
   ios:
     runs-on: macos-15
