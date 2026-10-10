@@ -100,6 +100,8 @@ async function main() {
       const u = await one<{ id: number }>('SELECT id FROM users WHERE email = $1', [normalizeEmail(values.email)]);
       if (!u) throw new Error('Nema tog korisnika');
       const r = await sendPushToUser(u.id, { title: 'Kockolov: probno obaveštenje', body: 'Ako ovo vidiš, obaveštenja rade.', url: '/pracenje', tag: 'test' });
+      const word = { sent: 'isporučeno', gone: 'nema ga više (uklonjen)', failed: 'NIJE uspelo' } as const;
+      for (const d of r.results) console.log(`  ${d.kind === 'fcm' ? `aplikacija (${d.platform ?? '?'})` : 'pregledač (veb)'}: ${word[d.result]}`);
       console.log(`uređaja: ${r.devices}, isporučeno: ${r.sent}, nestalo: ${r.gone}, neuspelo: ${r.failed}`);
       break;
     }

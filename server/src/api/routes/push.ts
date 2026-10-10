@@ -77,6 +77,6 @@ export async function pushRoutes(app: FastifyInstance) {
       },
       body.endpoint,
     );
-    return { ok: r.sent > 0, ...r };
+    return { ok: r.sent > 0, devices: r.devices, sent: r.sent, gone: r.gone, failed: r.failed };
   });
 }

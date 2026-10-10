@@ -20,6 +20,8 @@ export interface PushSubscriptionRow {
   user_id: number;
   /** 'web': a browser's push address (endpoint + keys); 'fcm': the app's Firebase token (endpoint) */
   kind: 'web' | 'fcm';
+  /** for 'fcm': 'android' or 'ios' */
+  platform?: string | null;
   endpoint: string;
   p256dh: string | null;
   auth: string | null;
@@ -62,7 +64,14 @@ const subject = () => config.VAPID_SUBJECT || `mailto:${config.CONTACT_EMAIL}`;
  * removed; one that fails for other reasons is removed after 10 failures in a row.
  */
 export async function sendPush(sub: PushSubscriptionRow, msg: PushMessage): Promise<'sent' | 'gone' | 'failed'> {
-  if (sub.kind === 'fcm') return recordResult(sub, await sendFcm(sub.endpoint, msg).catch(() => 'failed' as const));
+  if (sub.kind === 'fcm')
+    return recordResult(
+      sub,
+      await sendFcm(sub.endpoint, msg).catch((err: unknown) => {
+        console.warn(`Firebase: ${(err as Error)?.message ?? err}`);
+        return 'failed' as const;
+      }),
+    );
   const { publicKey, privateKey } = await vapidKeys();
   try {
     await sender({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh ?? '', auth: sub.auth ?? '' } }, JSON.stringify(msg), {
@@ -92,10 +101,14 @@ async function recordResult(sub: PushSubscriptionRow, r: 'sent' | 'gone' | 'fail
 /** Sends to every device of a user (or only the given one); returns how many got it. */
 export async function sendPushToUser(userId: number, msg: PushMessage, endpoint?: string) {
   const subs = await query<PushSubscriptionRow>(
-    `SELECT id, user_id, kind, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1 ${endpoint ? 'AND endpoint = $2' : ''}`,
+    `SELECT id, user_id, kind, platform, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1 ${endpoint ? 'AND endpoint = $2' : ''}`,
     endpoint ? [userId, endpoint] : [userId],
   );
-  const out = { devices: subs.length, sent: 0, gone: 0, failed: 0 };
-  for (const s of subs) out[await sendPush(s, msg)]++;
+  const out = { devices: subs.length, sent: 0, gone: 0, failed: 0, results: [] as { kind: 'web' | 'fcm'; platform: string | null; result: 'sent' | 'gone' | 'failed' }[] };
+  for (const s of subs) {
+    const result = await sendPush(s, msg);
+    out[result]++;
+    out.results.push({ kind: s.kind, platform: s.platform ?? null, result });
+  }
   return out;
 }

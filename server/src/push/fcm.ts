@@ -107,12 +107,18 @@ export function setFcmSender(s: FcmSender | null) {
   sender = s ?? realSender;
 }
 
-/** The app was uninstalled or the token replaced: the phone won't get anything at this address again */
-const GONE = new Set(['UNREGISTERED', 'INVALID_ARGUMENT', 'SENDER_ID_MISMATCH', 'NOT_FOUND']);
+/**
+ * The app was uninstalled or the token replaced: the phone won't get anything at this address again.
+ * INVALID_ARGUMENT and SENDER_ID_MISMATCH also come from a wrong message or a server key from another
+ * Firebase project; those count as failures (logged), so a setup mistake doesn't remove every phone at
+ * once. A really dead token is still removed after 10 failures in a row.
+ */
+const GONE = new Set(['UNREGISTERED', 'NOT_FOUND']);
 
 export async function sendFcm(token: string, msg: PushMessage): Promise<'sent' | 'gone' | 'failed'> {
   const r = await sender(token, msg);
   if (r.status >= 200 && r.status < 300) return 'sent';
   if (r.status === 404 || (r.error && GONE.has(r.error))) return 'gone';
+  console.warn(`Firebase: slanje nije uspelo (${r.status}${r.error ? `, ${r.error}` : ''})`);
   return 'failed';
 }
