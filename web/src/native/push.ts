@@ -85,6 +85,12 @@ export async function forgetNativePush(): Promise<void> {
  */
 export async function startNativePush(open: (path: string) => void): Promise<void> {
   try {
+    // Android: the notifications' own entry in the phone's settings, named in Serbian
+    if (appPlatform === 'android') {
+      await FirebaseMessaging.createChannel({ id: 'cene', name: 'Cene setova koje pratiš', description: 'Kad set pojeftini ili se vrati na stanje', importance: 4 }).catch(
+        () => undefined,
+      );
+    }
     await FirebaseMessaging.addListener('notificationActionPerformed', (e) => {
       const url = (e.notification.data as { url?: string } | undefined)?.url;
       if (url && url.startsWith('/')) open(url);

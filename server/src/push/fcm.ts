@@ -75,7 +75,7 @@ export function fcmMessage(token: string, msg: PushMessage) {
       android: {
         collapse_key: tag,
         ttl: '86400s',
-        notification: { tag, color: '#FFCF00', icon: 'ic_stat_kockolov' },
+        notification: { tag, color: '#FFCF00', icon: 'ic_stat_kockolov', channel_id: 'cene' },
       },
       apns: {
         headers: { 'apns-collapse-id': tag.slice(0, 64) },
