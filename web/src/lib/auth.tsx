@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, Fragment, useContext, useEffect, type ReactNode } from 'react';
 import { api, type MeResponse } from './api';
 import { setDisplayCurrency } from './format';
+import { setAppToken } from './platform';
 import { forgetPushOnSignOut, syncPush } from './pwa';
 
 interface AuthState extends MeResponse {
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // this device stops getting the account's notifications
       await forgetPushOnSignOut();
       await api('/api/auth/logout', { method: 'POST' });
+      await setAppToken(null);
       if (import.meta.env.VITE_DEMO) {
         // in-browser preview: no server behind it, so drop cached data and re-read the session
         qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });

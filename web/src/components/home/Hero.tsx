@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { t, tn } from '../../i18n';
 import type { Deal, Stats } from '../../lib/api';
 import { BlocksIcon, LockIcon, SparkIcon, StoreIcon, TagIcon, UserIcon } from '../icons';
+import { ScanButton } from '../ScanButton';
 import { SearchBox } from '../SearchBox';
 import { HeroDeal, HeroDealSkeleton } from './HeroDeal';
 
@@ -65,6 +66,8 @@ export function Hero({
           {/* 2. Search, the main action, with popular searches under it */}
           <div className="order-2 lg:mt-8">
             <SearchBox size="lg" className="max-w-2xl lg:max-w-none" />
+            {/* the app: scan a box in the shop and see where it's cheapest */}
+            <ScanButton variant="wide" className="mt-3 w-full sm:w-auto" />
             <nav aria-label={t('home.popularLabel')} className="mt-4">
               <ul className="scrollbar-none -mx-4 flex items-center gap-2 overflow-x-auto px-4 [mask-image:linear-gradient(90deg,#000_88%,transparent)] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:[mask-image:none]">
                 <li className="shrink-0 text-sm font-semibold text-hero-ink/75" aria-hidden>

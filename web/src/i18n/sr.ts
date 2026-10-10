@@ -325,6 +325,18 @@ export const sr = {
   'phone.push.testSent': 'Poslato. Ako ga ne vidiš za minut, proveri podešavanja obaveštenja na uređaju.',
   'phone.push.testFailed': 'Obaveštenje nije stiglo do ovog uređaja. Isključi pa ponovo uključi obaveštenja.',
   'phone.push.error': 'Nije uspelo. Pokušaj ponovo.',
+  'phone.push.unsupportedApp': 'Obaveštenja u ovoj verziji aplikacije još nisu dostupna.',
+
+  'scan.button': 'Skeniraj kutiju',
+  'scan.aria': 'Skeniraj bar-kod sa LEGO kutije',
+  'scan.notFound': 'Ovaj bar-kod još ne prepoznajemo.',
+  'scan.failed': 'Pretraga nije uspela. Proveri internet vezu.',
+  'scan.typeNumber': 'Broj seta sa kutije, npr. 75192',
+  'scan.open': 'Otvori',
+  'scan.close': 'Zatvori',
+  'scan.denied': 'Dozvoli Kockolovu pristup kameri u podešavanjima telefona, pa probaj ponovo.',
+  'scan.preparing': 'Telefon preuzima skener. Probaj ponovo za nekoliko sekundi.',
+  'scan.unsupported': 'Ovaj telefon ne može da skenira bar-kod.',
 
   'admin.title': 'Administracija',
   'admin.crawl': 'Preuzmi cene sada',
