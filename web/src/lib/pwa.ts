@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { api } from './api';
+import { appPlatform, isApp } from './platform';
 
 /*
  * Installable site + push notifications, browser side.
@@ -25,6 +26,8 @@ let state: PwaState = read();
 const listeners = new Set<() => void>();
 
 function read(): PwaState {
+  // the Android/iOS app: already "installed", notifications through Firebase
+  if (isApp) return { canInstall: false, standalone: true, ios: appPlatform === 'ios', pushSupported: true };
   if (!enabled) return { canInstall: false, standalone: false, ios: false, pushSupported: false };
   const nav = navigator as Navigator & { standalone?: boolean };
   const ios = /iPhone|iPad|iPod/.test(nav.userAgent) || (nav.userAgent.includes('Macintosh') && nav.maxTouchPoints > 1);
@@ -43,7 +46,7 @@ function emit() {
 
 /** Called once at start-up: registers the service worker and listens for the install offer. */
 export function startPwa() {
-  if (!enabled) return;
+  if (!enabled || isApp) return;
   window.addEventListener('beforeinstallprompt', (e) => {
     // no automatic mini-bar: the site shows its own button where it makes sense
     e.preventDefault();
@@ -92,8 +95,11 @@ async function registration(): Promise<ServiceWorkerRegistration | null> {
   return (await navigator.serviceWorker.getRegistration('/')) ?? null;
 }
 
+const native = () => import('../native/push');
+
 /** Whether this device gets notifications (and whether it still can). */
 export async function pushStatus(): Promise<PushStatus> {
+  if (isApp) return (await native()).nativePushStatus();
   const reg = await registration();
   if (!reg) return 'unsupported';
   if (Notification.permission === 'denied') return 'denied';
@@ -115,6 +121,7 @@ function sameKey(a: ArrayBuffer | null | undefined, b: Uint8Array): boolean {
 
 /** Asks for permission (must follow a tap), subscribes this device and tells the server. */
 export async function enablePush(): Promise<PushStatus> {
+  if (isApp) return (await native()).enableNativePush();
   const reg = await registration();
   if (!reg) return 'unsupported';
   const permission = await Notification.requestPermission();
@@ -134,6 +141,7 @@ export async function enablePush(): Promise<PushStatus> {
 
 /** Stops notifications on this device (other devices keep theirs). */
 export async function disablePush(): Promise<PushStatus> {
+  if (isApp) return (await native()).disableNativePush();
   const reg = await registration();
   const sub = reg ? await reg.pushManager.getSubscription() : null;
   if (sub) {
@@ -148,6 +156,7 @@ export async function disablePush(): Promise<PushStatus> {
  * that is signed in now (the phone may have been used with another account before).
  */
 export async function syncPush(): Promise<void> {
+  if (isApp) return (await native()).syncNativePush();
   if ((await pushStatus()) !== 'on') return;
   const sub = await (await registration())!.pushManager.getSubscription();
   if (sub) await api('/api/me/push', { method: 'POST', json: { subscription: sub.toJSON() } }).catch(() => undefined);
@@ -155,7 +164,15 @@ export async function syncPush(): Promise<void> {
 
 /** Before signing out: this device stops getting the account's notifications. */
 export async function forgetPushOnSignOut(): Promise<void> {
+  if (isApp) return (await native()).forgetNativePush();
   const reg = await registration().catch(() => null);
   const sub = reg ? await reg.pushManager.getSubscription().catch(() => null) : null;
   if (sub) await api('/api/me/push', { method: 'DELETE', json: { endpoint: sub.endpoint } }).catch(() => undefined);
+}
+
+/** This device's address for a sample notification (browser endpoint, or the app's Firebase token). */
+export async function pushAddress(): Promise<string | undefined> {
+  if (isApp) return (await (await native()).nativePushToken()) ?? undefined;
+  const reg = await registration();
+  return (await reg?.pushManager.getSubscription())?.endpoint;
 }

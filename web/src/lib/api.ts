@@ -1,3 +1,5 @@
+import { API_BASE, appPlatform, appToken, isApp, setAppToken } from './platform';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -11,12 +13,24 @@ export class ApiError extends Error {
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, headers, ...rest } = init;
-  const res = await fetch(path, {
-    credentials: 'same-origin',
+  // in the Android/iOS app: kockolov.rs's API, signed in with the token kept on the phone
+  const token = appToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: isApp ? 'omit' : 'same-origin',
     ...rest,
-    headers: { ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
+    headers: {
+      ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(isApp ? { 'X-Kockolov-App': appPlatform ?? 'app', ...(token ? { Authorization: `Bearer ${token}` } : {}) } : {}),
+      ...headers,
+    },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
+  if (isApp) {
+    // a sign-in (login, confirmed e-mail, new password) hands the app its token; an expired one is dropped
+    const fresh = res.headers.get('x-kockolov-token');
+    if (fresh) await setAppToken(fresh);
+    else if (res.status === 401 && token) await setAppToken(null);
+  }
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) throw new ApiError(res.status, data?.error ?? `Greška ${res.status}`, data?.code);

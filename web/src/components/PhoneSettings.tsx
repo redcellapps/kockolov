@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { t, tn } from '../i18n';
 import { api } from '../lib/api';
-import { disablePush, enablePush, installApp, pushStatus, usePwa, type PushStatus } from '../lib/pwa';
+import { isApp } from '../lib/platform';
+import { disablePush, enablePush, installApp, pushAddress, pushStatus, usePwa, type PushStatus } from '../lib/pwa';
 import { BellIcon, XIcon } from './icons';
 import { Button, Toggle } from './ui';
 
@@ -39,11 +40,7 @@ export function PhoneCard() {
   const push = usePush();
   const [test, setTest] = useState<'sent' | 'failed' | null>(null);
   const sample = useMutation({
-    mutationFn: async () => {
-      const reg = await navigator.serviceWorker.getRegistration('/');
-      const sub = await reg?.pushManager.getSubscription();
-      return api<{ ok: boolean }>('/api/me/push/test', { method: 'POST', json: { endpoint: sub?.endpoint } });
-    },
+    mutationFn: async () => api<{ ok: boolean }>('/api/me/push/test', { method: 'POST', json: { endpoint: await pushAddress() } }),
     onSuccess: (r) => setTest(r.ok ? 'sent' : 'failed'),
     onError: () => setTest('failed'),
   });
@@ -66,7 +63,7 @@ export function PhoneCard() {
       {iosNeedsInstall ? (
         <IosSteps text={t('phone.ios')} />
       ) : push.status === 'unsupported' ? (
-        <p className="text-sm text-ink-3">{t('phone.push.unsupported')}</p>
+        <p className="text-sm text-ink-3">{t(isApp ? 'phone.push.unsupportedApp' : 'phone.push.unsupported')}</p>
       ) : push.status === 'denied' ? (
         <p className="text-sm font-semibold text-deal">{t('phone.push.denied')}</p>
       ) : push.status ? (
@@ -97,7 +94,7 @@ export function PhoneCard() {
       ) : null}
 
       {push.devices > 0 && <p className="mt-3 text-sm text-ink-3">{tn('phone.push.devices', push.devices)}</p>}
-      {pwa.standalone && <p className="mt-1 text-sm text-ink-3">{t('phone.installed')}</p>}
+      {pwa.standalone && !isApp && <p className="mt-1 text-sm text-ink-3">{t('phone.installed')}</p>}
     </section>
   );
 }

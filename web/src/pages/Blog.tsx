@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, Skeleton, buttonClasses, cx } from '../componen
 import { t, tn } from '../i18n';
 import { api, ApiError, type BlogPost, type BlogSummary } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { serverUrl } from '../lib/platform';
 import { usePageTitle } from '../lib/title';
 
 /** "2. oktobar 2026." (dates are YYYY-MM-DD, read at noon so no time zone moves them) */
@@ -30,7 +31,7 @@ function Cover({ post, className, eager }: { post: BlogSummary; className?: stri
   if (!post.image) return null;
   return (
     <img
-      src={post.image.url}
+      src={serverUrl(post.image.url)}
       alt={post.image.alt}
       width={post.image.width}
       height={post.image.height}
@@ -91,7 +92,7 @@ export function BlogListPage() {
             <Link key={p.slug} to={`/blog/${p.slug}`} className="group flex flex-col rounded-3xl border border-line bg-surface p-4 shadow transition hover:shadow-lg">
               {p.image && (
                 <img
-                  src={p.image.url}
+                  src={serverUrl(p.image.url)}
                   alt={p.image.alt}
                   loading="lazy"
                   className="aspect-[4/3] w-full rounded-2xl object-cover object-top"

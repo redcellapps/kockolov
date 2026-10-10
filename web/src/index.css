@@ -344,3 +344,12 @@ body {
     font-size: 1.375rem;
   }
 }
+
+/* The Android/iOS app draws under the status bar and the home indicator: keep content clear of them.
+   env() covers iPhone; Capacitor sets the --safe-area-* variables on Android. In a browser both are 0. */
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+}
