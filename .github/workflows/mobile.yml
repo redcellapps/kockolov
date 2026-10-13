@@ -1,14 +1,25 @@
 name: Mobile apps
 
 # Builds the Android app (an APK to install for testing) and checks that the iOS app compiles.
-# Firebase settings for notifications come from repository secrets when they are set:
-#   GOOGLE_SERVICES_JSON          contents of google-services.json (Android)
-#   GOOGLE_SERVICE_INFO_PLIST     contents of GoogleService-Info.plist (iOS)
+# Run by hand with "Verzija za Google Play" ticked, it also builds the signed .aab to upload to Play Console
+# (Releases → "android-play").
+# Repository secrets:
+#   GOOGLE_SERVICES_JSON          contents of google-services.json (Android notifications)
+#   GOOGLE_SERVICE_INFO_PLIST     contents of GoogleService-Info.plist (iOS notifications)
+#   ANDROID_KEYSTORE_BASE64       the upload key (.jks) as base64, for Google Play builds
+#   ANDROID_KEYSTORE_PASSWORD     its password (also used for the key unless ANDROID_KEY_PASSWORD is set)
+#   ANDROID_KEY_ALIAS             the key's alias (e.g. upload)
+#   ANDROID_KEY_PASSWORD          optional, when the key has its own password
 on:
   push:
     branches: [main, mobile]
     paths: ['mobile/**', 'web/**', 'package-lock.json', '.github/workflows/mobile.yml']
   workflow_dispatch:
+    inputs:
+      play:
+        description: Verzija za Google Play (potpisan .aab)
+        type: boolean
+        default: false
 
 concurrency:
   group: mobile-${{ github.ref }}
@@ -50,6 +61,11 @@ jobs:
           fi
       - run: npx cap sync android
         working-directory: mobile
+      # versionName from mobile/package.json; versionCode always higher than the last one (Play refuses repeats)
+      - name: Version
+        run: |
+          echo "KOCKOLOV_VERSION_NAME=$(node -p "require('./mobile/package.json').version")" >> "$GITHUB_ENV"
+          echo "KOCKOLOV_VERSION_CODE=$(( GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT ))" >> "$GITHUB_ENV"
       - name: Build (debug APK)
         run: ./gradlew assembleDebug --no-daemon --stacktrace
         working-directory: mobile/android
@@ -68,6 +84,56 @@ jobs:
             --title "Kockolov za Android (probna verzija)" \
             --notes "Probna verzija za instalaciju na telefon (nije iz Google Play-a). Svaki novi build zamenjuje kockolov-test.apk."
           gh release upload android-test kockolov-test.apk --clobber
+
+      # Google Play: Actions → Mobile apps → Run workflow → tick "Verzija za Google Play".
+      # Every other run signs with a throwaway key, so a broken release build shows up before it's needed.
+      - name: Upload key
+        env:
+          PLAY: ${{ github.event_name == 'workflow_dispatch' && inputs.play }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          key="$RUNNER_TEMP/upload.jks"
+          if [ "$PLAY" = "true" ]; then
+            if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+              echo "::error::Nedostaju secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD i ANDROID_KEY_ALIAS"
+              exit 1
+            fi
+            printf '%s' "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$key"
+          else
+            KEYSTORE_PASSWORD=throwaway KEY_ALIAS=check KEY_PASSWORD=throwaway
+            keytool -genkeypair -noprompt -keystore "$key" -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" \
+              -alias "$KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 1 -dname "CN=Kockolov CI check"
+          fi
+          {
+            echo "KOCKOLOV_KEYSTORE=$key"
+            echo "KOCKOLOV_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "KOCKOLOV_KEY_ALIAS=$KEY_ALIAS"
+            echo "KOCKOLOV_KEY_PASSWORD=${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+          } >> "$GITHUB_ENV"
+      - name: Build (signed AAB)
+        run: |
+          ./gradlew bundleRelease --no-daemon --stacktrace
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab | grep -q 'jar verified'
+          rm -f "$KOCKOLOV_KEYSTORE"
+        working-directory: mobile/android
+      - name: AAB as a download
+        if: github.event_name == 'workflow_dispatch' && inputs.play
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          name="kockolov-$KOCKOLOV_VERSION_NAME-$KOCKOLOV_VERSION_CODE.aab"
+          cp mobile/android/app/build/outputs/bundle/release/app-release.aab "$name"
+          gh release view android-play >/dev/null 2>&1 || gh release create android-play --prerelease --target "$GITHUB_SHA" \
+            --title "Kockolov za Google Play" \
+            --notes "Potpisan .aab za Play Console (Testiranje → Zatvoreno testiranje → Napravi novo izdanje). Svaki build zamenjuje prethodni fajl."
+          for old in $(gh release view android-play --json assets --jq '.assets[].name | select(endswith(".aab"))'); do
+            gh release delete-asset android-play "$old" --yes
+          done
+          gh release upload android-play "$name"
+          echo "### $name (versionName $KOCKOLOV_VERSION_NAME, versionCode $KOCKOLOV_VERSION_CODE)" >> "$GITHUB_STEP_SUMMARY"
 
   ios:
     runs-on: macos-15

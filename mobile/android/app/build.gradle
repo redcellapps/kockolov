@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
 
+// Release builds for Google Play are made by GitHub Actions (.github/workflows/mobile.yml) with the
+// upload key from repository secrets; locally, without these variables, release builds stay unsigned.
+def env = System.getenv()
+def uploadKeystore = env['KOCKOLOV_KEYSTORE']
+
 android {
     namespace = "rs.kockolov.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +12,9 @@ android {
         applicationId "rs.kockolov.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Google Play needs a higher versionCode for every upload: CI passes one from the run number
+        versionCode Integer.parseInt(env['KOCKOLOV_VERSION_CODE'] ?: '1')
+        versionName env['KOCKOLOV_VERSION_NAME'] ?: '1.0.0'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +22,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (uploadKeystore) {
+            upload {
+                storeFile file(uploadKeystore)
+                storePassword env['KOCKOLOV_KEYSTORE_PASSWORD']
+                keyAlias env['KOCKOLOV_KEY_ALIAS']
+                keyPassword env['KOCKOLOV_KEY_PASSWORD'] ?: env['KOCKOLOV_KEYSTORE_PASSWORD']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (uploadKeystore) signingConfig signingConfigs.upload
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
