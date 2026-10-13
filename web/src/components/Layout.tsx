@@ -24,8 +24,10 @@ function UserMenu() {
   }, []);
   if (!user) {
     return (
-      <div className="flex items-center gap-1.5">
-        <Link to="/prijava" className="rounded-xl px-3 py-2 text-sm font-bold hover:bg-surface-2">
+      // narrow phones (360 px) get tighter spacing; the smallest (320 px) keep only "Registracija",
+      // whose page links to sign-in
+      <div className="flex items-center gap-1.5 max-[399px]:gap-1">
+        <Link to="/prijava" className="rounded-xl px-3 py-2 text-sm font-bold whitespace-nowrap hover:bg-surface-2 max-[399px]:px-2 max-[349px]:hidden">
           {t('nav.login')}
         </Link>
         {registrationOpen && (
@@ -86,9 +88,9 @@ function Header() {
     cx('rounded-xl px-3 py-2 text-sm font-bold transition', isActive ? 'bg-surface-2 text-ink' : 'text-ink-2 hover:text-ink');
   return (
     <header className="safe-top sticky top-0 z-40 border-b border-line/80 bg-bg/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-5 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 max-[399px]:gap-1.5 sm:gap-5 sm:px-6">
         <Link to="/" className="shrink-0" aria-label="Kockolov">
-          <Logo />
+          <Logo compact />
         </Link>
         <nav className="hidden items-center gap-1 md:flex">
           <NavLink to="/ponude" className={link}>

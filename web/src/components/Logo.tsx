@@ -14,11 +14,12 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
-export function Logo({ className }: { className?: string }) {
+/** compact: a little smaller on narrow phones (under 400 px), so the header's buttons fit */
+export function Logo({ className, compact }: { className?: string; compact?: boolean }) {
   return (
-    <span className={cx('inline-flex items-center gap-2', className)}>
-      <LogoMark />
-      <span className="text-[22px] font-extrabold tracking-tight">
+    <span className={cx('inline-flex items-center gap-2', compact && 'max-[399px]:gap-1.5', className)}>
+      <LogoMark className={compact ? 'max-[399px]:h-8 max-[399px]:w-8' : undefined} />
+      <span className={cx('text-[22px] font-extrabold tracking-tight', compact && 'max-[399px]:text-[20px]')}>
         Kocko<span className="relative">lov</span>
       </span>
     </span>
