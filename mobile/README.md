@@ -11,8 +11,12 @@ Podaci stižu sa `https://kockolov.rs` (API sa tokenom umesto kolačića), a apl
 
 GitHub Actions (`.github/workflows/mobile.yml`) na svaki push u `mobile/` ili `web/`:
 
-- **Android**: debug APK kao artifact `kockolov-android-debug` (instalira se direktno na telefon);
+- **Android**: debug APK (Releases → `android-test` → `kockolov-test.apk`, instalira se direktno na telefon) i provera
+  potpisanog release build-a privremenim ključem;
 - **iOS**: provera da se projekat kompajlira (bez potpisa).
+
+Verzija za Google Play: Actions → Mobile apps → **Run workflow** → „Verzija za Google Play” → potpisan `.aab`
+(Releases → `android-play`). Ključ, secrets i ceo postupak objave: [`store/google-play.md`](store/google-play.md).
 
 Lokalno (Android Studio / Xcode):
 
