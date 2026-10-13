@@ -66,7 +66,7 @@ export default function SetDetail() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-10">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-10">
         {/* image */}
         <div className="relative overflow-hidden rounded-3xl border border-line">
           <ProductImage src={set.image_url} alt={set.name} className="aspect-square [&_img]:p-8 sm:[&_img]:p-12" />
@@ -169,7 +169,9 @@ export default function SetDetail() {
           )}
         </div>
         {offers.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+          // overflow-x-auto: if a very narrow screen or large system text still doesn't fit, the row scrolls
+          // instead of hiding the "Kupi" buttons
+          <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
             <table className="w-full text-left">
               <thead className="hidden border-b border-line bg-surface-2 text-xs font-bold uppercase tracking-wide text-ink-3 sm:table-header-group">
                 <tr>
@@ -184,14 +186,17 @@ export default function SetDetail() {
                   const isBest = best?.id === o.id;
                   return (
                     <tr key={o.id} className={cx('border-b border-line last:border-0', isBest && 'bg-save-soft/60', !o.in_stock && 'opacity-60')}>
-                      <td className="px-4 py-4 sm:px-5">
+                      {/* phones: w-full + max-w-0, so the shop column takes what the price and the button leave and the
+                          seller name truncates instead of widening the table */}
+                      <td className="py-4 pr-2 pl-4 max-sm:w-full max-sm:max-w-0 sm:px-5">
                         <div className="flex items-center gap-2.5">
                           <ShopDot shop={o.shop_id} />
                           <div className="min-w-0">
-                            <div className="font-bold">
-                              {o.shop_name}
+                            {/* the badge moves under the name when they don't fit side by side, never split */}
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-bold [overflow-wrap:anywhere]">{o.shop_name}</span>
                               {isBest && (
-                                <span className="ml-2 rounded-md bg-save px-1.5 py-0.5 align-middle text-[11px] font-extrabold uppercase text-white">
+                                <span className="rounded-md bg-save px-1.5 py-0.5 text-[11px] font-extrabold whitespace-nowrap uppercase text-white">
                                   {t('set.offers.cheapest')}
                                 </span>
                               )}
@@ -215,25 +220,26 @@ export default function SetDetail() {
                           {t('set.offers.updated')} {ago(o.last_seen)}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-right sm:px-5">
-                        <div className={cx('tabular text-lg font-extrabold', isBest ? 'text-save' : 'text-ink')}>{money(o.price_rsd)}</div>
+                      <td className="px-2 py-4 text-right sm:px-5">
+                        <div className={cx('tabular text-lg font-extrabold sm:whitespace-nowrap', isBest ? 'text-save' : 'text-ink')}>{money(o.price_rsd)}</div>
                         {o.regular_price_rsd && o.regular_price_rsd > o.price_rsd && (
                           <div className="tabular text-xs text-ink-3">
                             <span className="line-through">{money(o.regular_price_rsd)}</span> {t('set.offers.sale')}
                           </div>
                         )}
                       </td>
-                      <td className="w-0 py-4 pr-4 sm:pr-5">
+                      <td className="w-0 py-4 pr-3 pl-1 sm:pr-5 sm:pl-0">
                         <a
                           href={o.url}
                           target="_blank"
                           rel="noopener noreferrer nofollow"
                           className={cx(
-                            'inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-sm font-bold transition',
+                            'inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-bold whitespace-nowrap transition sm:px-3.5',
                             isBest ? 'bg-brand text-brand-ink hover:bg-brand-2' : 'border border-line hover:border-ink-3',
                           )}
                         >
-                          {t('set.offers.buy')} <ExternalIcon size={15} />
+                          {/* under 350 px only the icon, so the price and the shop still fit */}
+                          <span className="max-[349px]:sr-only">{t('set.offers.buy')}</span> <ExternalIcon size={15} />
                         </a>
                       </td>
                     </tr>
@@ -321,9 +327,9 @@ function MembersTeaser({ n, shops, onlyMembers, compact }: { n: number; shops: n
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface px-3 py-3 sm:px-4">
+    <div className="min-w-0 rounded-2xl border border-line bg-surface px-3 py-3 [overflow-wrap:anywhere] sm:px-4">
       <dt className="text-[11px] font-semibold leading-tight text-ink-3 sm:text-xs">{label}</dt>
-      <dd className="tabular mt-1 whitespace-nowrap text-[15px] font-extrabold sm:text-lg">{value}</dd>
+      <dd className="tabular mt-1 text-[15px] font-extrabold whitespace-nowrap max-[359px]:text-sm max-[359px]:whitespace-normal sm:text-lg">{value}</dd>
       {hint && <dd className="mt-0.5 text-xs text-ink-3">{hint}</dd>}
     </div>
   );

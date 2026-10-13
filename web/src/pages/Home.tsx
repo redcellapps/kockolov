@@ -4,7 +4,7 @@ import { ChevronRight, ClockIcon, LockIcon, SparkIcon, StoreIcon, TagIcon } from
 import { Hero } from '../components/home/Hero';
 import { MembersCta } from '../components/home/MembersCta';
 import { DealCard, ProductImage } from '../components/SetCard';
-import { CardSkeleton, EmptyState, SectionHeader } from '../components/ui';
+import { CardSkeleton, cx, EmptyState, SectionHeader } from '../components/ui';
 import { t, tn } from '../i18n';
 import { api, type Deal, type Shop, type Stats, type Theme } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -132,11 +132,15 @@ export default function Home() {
   );
 }
 
-export function ThemeTile({ th }: { th: Theme }) {
+/** inGrid: a cell of the themes page grid; otherwise a fixed-width card in the home page's sideways row */
+export function ThemeTile({ th, inGrid }: { th: Theme; inGrid?: boolean }) {
   return (
     <Link
       to={`/pretraga?theme=${th.slug}`}
-      className="group w-40 shrink-0 snap-start overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-0.5 hover:shadow-lift sm:w-auto"
+      className={cx(
+        'group overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-0.5 hover:shadow-lift',
+        inGrid ? 'min-w-0' : 'w-40 shrink-0 snap-start sm:w-auto',
+      )}
     >
       <ProductImage src={th.image_url} alt={th.name} className="aspect-[4/3]" />
       <div className="border-t border-line px-3.5 py-3">
