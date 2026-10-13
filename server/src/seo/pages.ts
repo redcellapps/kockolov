@@ -249,6 +249,9 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
   if (p === '/privatnost') {
     return { ...DEFAULT, path: p, canonical: p, title: `Politika privatnosti | ${SITE}`, description: 'Koje podatke Kockolov čuva, zašto i kako da ostvariš svoja prava.' };
   }
+  if (p === '/brisanje-naloga') {
+    return { ...DEFAULT, path: p, canonical: p, title: `Brisanje naloga | ${SITE}`, description: 'Kako da obrišeš nalog na Kockolovu (sajt i aplikacija) i šta se tada briše.' };
+  }
 
   // anything else: the app shows "not found", search engines get a real 404
   return { ...DEFAULT, status: 404, path: p, title: `Stranica nije pronađena | ${SITE}`, robots: 'noindex' };

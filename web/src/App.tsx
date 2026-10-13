@@ -12,6 +12,7 @@ import InvitePage from './pages/Invite';
 import LoginPage from './pages/Login';
 import { DealsPage, NotFoundPage, ThemesPage, WatchlistPage } from './pages/Other';
 import PrivacyPage from './pages/Privacy';
+import DeleteAccountPage from './pages/DeleteAccount';
 import SearchPage from './pages/Search';
 import SetDetail from './pages/SetDetail';
 import UnsubscribePage from './pages/Unsubscribe';
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/potvrda/:token" element={<InvitePage />} />
         <Route path="/odjava/:token" element={<UnsubscribePage />} />
         <Route path="/privatnost" element={<PrivacyPage />} />
+        <Route path="/brisanje-naloga" element={<DeleteAccountPage />} />
         <Route path="/blog" element={<Gate><BlogListPage /></Gate>} />
         <Route path="/blog/:slug" element={<Gate><BlogPostPage /></Gate>} />
         <Route path="/" element={<Gate><Home /></Gate>} />

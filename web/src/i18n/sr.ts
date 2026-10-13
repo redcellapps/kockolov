@@ -540,6 +540,7 @@ export const sr = {
   'title.register': 'Registracija',
   'title.forgot': 'Zaboravljena lozinka',
   'title.privacy': 'Politika privatnosti',
+  'title.deleteAccount': 'Brisanje naloga',
   'title.notFound': 'Stranica nije pronađena',
   'footer.privacy': 'Politika privatnosti',
   'footer.blog': 'Blog',
@@ -548,9 +549,9 @@ export const sr = {
   'footer.madeBy': 'Made by',
   'footer.poweredBy': 'Powered by',
   'privacy.title': 'Politika privatnosti',
-  'privacy.updated': 'Poslednja izmena: 7. oktobar 2026.',
+  'privacy.updated': 'Poslednja izmena: 13. oktobar 2026.',
   'privacy.intro':
-    'Kockolov upoređuje cene LEGO® setova u srpskim prodavnicama. Za pretragu i pregled ponuda nalog nije potreban. Ako otvoriš nalog, čuvamo samo ono što je potrebno da bi nalog radio. Ovde piše šta tačno čuvamo, zašto, i kako da ostvariš svoja prava po Zakonu o zaštiti podataka o ličnosti („Službeni glasnik RS“, br. 87/2018).',
+    'Kockolov upoređuje cene LEGO® setova u srpskim prodavnicama, na sajtu kockolov.rs i u aplikaciji Kockolov za Android i iPhone; ova pravila važe za oba. Za pretragu i pregled ponuda nalog nije potreban. Ako otvoriš nalog, čuvamo samo ono što je potrebno da bi nalog radio. Ovde piše šta tačno čuvamo, zašto, i kako da ostvariš svoja prava po Zakonu o zaštiti podataka o ličnosti („Službeni glasnik RS“, br. 87/2018).',
   'privacy.who.h': 'Ko je odgovoran za podatke',
   'privacy.who.1': 'Rukovalac podacima je Milan Đorđević iz Niša, koji vodi Kockolov kao lični projekat.',
   'privacy.who.2': 'Za sva pitanja o podacima i zahteve piši na {email}.',
@@ -562,7 +563,9 @@ export const sr = {
   'privacy.what.5':
     'IP adresu koristimo samo za zaštitu od zloupotrebe (ograničenje broja pokušaja prijave i registracije) i ne upisujemo je u bazu. Server, kao i svaki veb-server, vodi dnevnik pristupa sa IP adresama, koji se čuva kratko i automatski briše.',
   'privacy.what.7':
-    'Ako uključiš obaveštenja na telefonu ili računaru, tvoj pregledač nam daje adresu za isporuku obaveštenja na taj uređaj. Uz nju čuvamo samo naziv pregledača, da bi znao gde su obaveštenja uključena. Kad ih isključiš ili se odjaviš sa tog uređaja, adresu brišemo.',
+    'Ako uključiš obaveštenja, čuvamo adresu za isporuku obaveštenja na taj uređaj: na sajtu je daje tvoj pregledač, a u aplikaciji Firebase Cloud Messaging (Google) dodeljuje token aplikaciji na tom telefonu. Uz nju čuvamo samo naziv pregledača ili platformu (Android ili iOS), da bi znao gde su obaveštenja uključena. Kad ih isključiš ili se odjaviš sa tog uređaja, adresu brišemo.',
+  'privacy.what.8':
+    'Skener u aplikaciji koristi kameru samo dok je otvoren, a sliku obrađuje telefon. Serveru šaljemo samo pročitani bar-kod, da bismo našli set; slike nam ne stižu, a bar-kod ne vezujemo za tvoj nalog.',
   'privacy.what.6': 'Ne koristimo alate za praćenje posetilaca ni reklame, i ne pravimo profile korisnika.',
   'privacy.why.h': 'Zašto ih koristimo',
   'privacy.why.1': 'Da bi nalog radio: prijava, setovi koje pratiš i podešavanja. Osnov je pružanje usluge koju tražiš otvaranjem naloga.',
@@ -573,12 +576,13 @@ export const sr = {
   'privacy.cookies.h': 'Kolačići',
   'privacy.cookies.1':
     'Koristimo jedan neophodan kolačić (kl_session), koji te drži prijavljenim. Nema reklamnih ni analitičkih kolačića, pa ne tražimo ni pristanak za njih.',
+  'privacy.cookies.2': 'U aplikaciji umesto kolačića koristimo token za prijavu, sačuvan na telefonu. Važi godinu dana ili dok se ne odjaviš.',
   'privacy.where.h': 'Gde su podaci i ko im ima pristup',
   'privacy.where.1': 'Podatke ne prodajemo i ne dajemo ih drugima za marketing.',
   'privacy.where.2':
     'Sajt i baza rade na serveru kompanije Hetzner Online GmbH u Nemačkoj, zemlji sa primerenim nivoom zaštite podataka. Hetzner održava server, ali ne koristi podatke za svoje potrebe. Mejlove šaljemo sa istog servera.',
   'privacy.where.4':
-    'Obaveštenja na telefon putuju preko servisa za obaveštenja tvog pregledača ili telefona (Google, Apple, Mozilla ili Microsoft). Sadržaj obaveštenja je šifrovan, pa ga taj servis ne može pročitati.',
+    'Obaveštenja na sajtu putuju preko servisa za obaveštenja tvog pregledača (Google, Apple, Mozilla ili Microsoft) i šifrovana su, pa ih taj servis ne može pročitati. Obaveštenja u aplikaciji šaljemo preko Google Firebase Cloud Messaging-a (na iPhone-u dalje preko Apple-a); oni prenose tekst obaveštenja (naziv seta i cenu), ali ne i tvoj e-mail ni druge podatke o nalogu.',
   'privacy.where.3': 'Kad sa Kockolova pređeš u prodavnicu, za podatke koje tamo ostaviš važe pravila te prodavnice.',
   'privacy.keep.h': 'Koliko dugo ih čuvamo',
   'privacy.keep.1': 'Dok imaš nalog. Kad obrišeš nalog, podatke brišemo odmah, a iz rezervnih kopija baze nestaju u roku od 14 dana.',
@@ -587,13 +591,33 @@ export const sr = {
   'privacy.rights.h': 'Tvoja prava',
   'privacy.rights.1':
     'Možeš da tražiš uvid u svoje podatke, njihovu ispravku, brisanje, ograničenje obrade i prenos, i da uložiš prigovor na obradu.',
-  'privacy.rights.2': 'Ime menjaš i nalog brišeš sam, u podešavanjima naloga. Za ostalo piši na {email}; odgovaramo najkasnije u roku od 30 dana.',
+  'privacy.rights.2':
+    'Ime menjaš i nalog brišeš sam, u podešavanjima naloga na sajtu ili u aplikaciji (uputstvo: kockolov.rs/brisanje-naloga). Za ostalo piši na {email}; odgovaramo najkasnije u roku od 30 dana.',
   'privacy.rights.3':
     'Ako smatraš da su ti prava povređena, možeš da podneseš pritužbu Povereniku za informacije od javnog značaja i zaštitu podataka o ličnosti (poverenik.rs).',
   'privacy.kids.h': 'Deca',
   'privacy.kids.1': 'Ako imaš manje od 15 godina, nalog otvori uz saglasnost roditelja ili staratelja.',
   'privacy.changes.h': 'Izmene',
   'privacy.changes.1': 'Ako promenimo ova pravila, novu verziju objavljujemo na ovoj stranici, a o važnim promenama obaveštavamo korisnike e-mailom.',
+
+  'deleteInfo.title': 'Brisanje naloga',
+  'deleteInfo.intro':
+    'Nalog na Kockolovu (sajt kockolov.rs i aplikacija Kockolov za Android i iPhone) možeš da obrišeš sam, u bilo kom trenutku. Isti nalog važi i na sajtu i u aplikaciji, pa ga brišeš samo jednom.',
+  'deleteInfo.self.h': 'Obriši nalog sam',
+  'deleteInfo.self.1': 'Prijavi se na kockolov.rs ili u aplikaciji.',
+  'deleteInfo.self.2': 'Otvori „Nalog“: dodirni krug sa početnim slovom gore desno, pa „Nalog“.',
+  'deleteInfo.self.3': 'Na dnu stranice, u delu „Brisanje naloga“, upiši lozinku i dodirni „Trajno obriši nalog“.',
+  'deleteInfo.self.go': 'Otvori podešavanja naloga',
+  'deleteInfo.help.h': 'Ne možeš da se prijaviš?',
+  'deleteInfo.help.1': 'Ako ne znaš lozinku, na stranici za prijavu dodirni „Zaboravio si lozinku?“ i napravi novu, pa obriši nalog kao gore.',
+  'deleteInfo.help.2': 'Ili nam piši na {email} sa adrese na koju je nalog otvoren, i obrisaćemo ga u roku od 7 dana.',
+  'deleteInfo.what.h': 'Šta se briše',
+  'deleteInfo.what.1':
+    'Odmah: e-mail adresa i ime, otisak lozinke, setovi koje pratiš, podešavanja, uređaji na kojima su uključena obaveštenja, prijave na drugim uređajima i evidencija poslatih poruka.',
+  'deleteInfo.what.2': 'Iz rezervnih kopija baze podaci nestaju u roku od 14 dana. Ništa vezano za tebe ne zadržavamo.',
+  'deleteInfo.what.3': 'Cene i ponude su javni podaci prodavnica i ostaju na sajtu.',
+  'deleteInfo.what.4': 'Brisanje ne može da se poništi. Ako se predomisliš, novi nalog možeš da otvoriš na istu adresu.',
+  'deleteInfo.privacy': 'Više o podacima koje čuvamo piše u politici privatnosti.',
 
   'notFound.title': 'Stranica ne postoji',
   'notFound.back': 'Na početnu',

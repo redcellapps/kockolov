@@ -411,6 +411,8 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       // unknown sets and pages are real 404s; private and search pages stay out of the index
       expect((await head('/set/00000')).m).toMatchObject({ status: 404, robots: 'noindex' });
       expect((await head('/nema-ovoga')).m.status).toBe(404);
+      // the account deletion page the app stores link to, open to everyone
+      expect((await head('/brisanje-naloga')).m).toMatchObject({ status: 200, title: 'Brisanje naloga | Kockolov' });
       expect((await head('/nalog')).m.robots).toBe('noindex, follow');
       expect((await head('/pretraga?q=falcon')).m.robots).toBe('noindex, follow');
       const theme = await head('/pretraga?theme=harry-potter');
