@@ -45,11 +45,20 @@ GitHub → repo → **Settings → Secrets and variables → Actions → New rep
 
 | Ime | Vrednost |
 |---|---|
-| `ANDROID_KEYSTORE_BASE64` | sadržaj `kockolov-upload.b64` (`cat kockolov-upload.b64`, ceo red) |
+| `ANDROID_KEYSTORE_BASE64` | ključ kao tekst (base64), vidi ispod |
 | `ANDROID_KEYSTORE_PASSWORD` | lozinka iz koraka 1 |
 | `ANDROID_KEY_ALIAS` | `upload` |
 
 (`GOOGLE_SERVICES_JSON` je već tu.) Ključ i lozinke se nigde drugde ne upisuju i ne šalju.
+
+**Tekst za `ANDROID_KEYSTORE_BASE64`**, najlakše na Windows-u (kad je `.jks` u `C:\kockolov`), u PowerShell-u:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\kockolov\kockolov-upload.jks")) | Set-Clipboard
+```
+
+Ništa se ne ispiše, tekst je u clipboard-u: u polje **Secret** samo Ctrl+V. Ili na serveru
+`base64 -w0 /root/kockolov-android/kockolov-upload.jks` i kopiraj ceo ispisani red (prelomi reda ne smetaju).
 
 ## 3. Verzija za Google Play
 
