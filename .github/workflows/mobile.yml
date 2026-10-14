@@ -102,6 +102,19 @@ jobs:
               exit 1
             fi
             printf '%s' "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$key"
+            # a value pasted with a line break or spaces around it
+            KEYSTORE_PASSWORD=$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n')
+            KEY_PASSWORD=$(printf '%s' "$KEY_PASSWORD" | tr -d '\r\n')
+            KEY_ALIAS=$(printf '%s' "$KEY_ALIAS" | tr -d ' \r\n')
+            # say what is wrong here, in the run's summary, instead of a long Gradle error later
+            if ! list=$(keytool -list -keystore "$key" -storepass "$KEYSTORE_PASSWORD" 2>&1); then
+              echo "::error::Ključ ne može da se otvori ($(printf '%s' "$list" | grep -m1 -i -E 'error|exception' | cut -c1-160)). Proveri ANDROID_KEYSTORE_PASSWORD i da je ANDROID_KEYSTORE_BASE64 ceo .jks fajl."
+              exit 1
+            fi
+            if ! keytool -list -keystore "$key" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+              echo "::error::U ključu nema aliasa '$KEY_ALIAS'; ima: $(printf '%s' "$list" | grep -i 'PrivateKeyEntry' | cut -d, -f1 | tr '\n' ' '). Ispravi ANDROID_KEY_ALIAS."
+              exit 1
+            fi
           else
             KEYSTORE_PASSWORD=throwaway KEY_ALIAS=check KEY_PASSWORD=throwaway
             keytool -genkeypair -noprompt -keystore "$key" -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" \
@@ -115,7 +128,10 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Build (signed AAB)
         run: |
-          ./gradlew bundleRelease --no-daemon --stacktrace
+          if ! ./gradlew bundleRelease --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"; then
+            echo "::error::$(grep -m1 -E 'Failed to read key|Keystore was tampered|password was incorrect|What went wrong' -A2 "$RUNNER_TEMP/gradle.log" | tr '\n' ' ' | cut -c1-300)"
+            exit 1
+          fi
           jarsigner -verify app/build/outputs/bundle/release/app-release.aab | grep -q 'jar verified'
           rm -f "$KOCKOLOV_KEYSTORE"
         working-directory: mobile/android
