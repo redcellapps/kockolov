@@ -108,7 +108,12 @@ jobs:
             KEY_ALIAS=$(printf '%s' "$KEY_ALIAS" | tr -d ' \r\n')
             # say what is wrong here, in the run's summary, instead of a long Gradle error later
             if ! list=$(keytool -list -keystore "$key" -storepass "$KEYSTORE_PASSWORD" 2>&1); then
-              echo "::error::Ključ ne može da se otvori ($(printf '%s' "$list" | grep -m1 -i -E 'error|exception' | cut -c1-160)). Proveri ANDROID_KEYSTORE_PASSWORD i da je ANDROID_KEYSTORE_BASE64 ceo .jks fajl."
+              size=$(wc -c < "$key")
+              if printf '%s' "$list" | grep -q -i 'EOFException'; then
+                echo "::error::Ključ iz ANDROID_KEYSTORE_BASE64 je nepotpun (stiglo je $size bajtova): tekst nije kopiran ceo. Upiši ga ponovo, celog. Pravi kockolov-upload.jks ima oko 2.700 bajtova."
+              else
+                echo "::error::Ključ ne može da se otvori ($(printf '%s' "$list" | grep -m1 -i -E 'error|exception' | cut -c1-160); $size bajtova). Proveri ANDROID_KEYSTORE_PASSWORD i da je ANDROID_KEYSTORE_BASE64 ceo .jks fajl."
+              fi
               exit 1
             fi
             if ! keytool -list -keystore "$key" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
