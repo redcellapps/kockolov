@@ -129,7 +129,7 @@ Pretraga i ponude rade bez naloga. Uz besplatan nalog vidiš cene iz svih prodav
 LEGO® je zaštićeni znak LEGO grupe, koja ne sponzoriše, ne odobrava niti je povezana sa ovom aplikacijom.
 ```
 
-**Graphics** (`google-play/`): `icon-512.png`, `feature-graphic-1024x500.png`, telefon: `screenshot-1…5` (1080×1920).
+**Graphics** (`google-play/`): `icon-512.png`, `feature-graphic-1024x500.png`, telefon: `screenshot-1…6` (1080×1920, iz snimaka sa Milanovog telefona).
 
 **Release notes** (Šta je novo, 1.0.0):
 
