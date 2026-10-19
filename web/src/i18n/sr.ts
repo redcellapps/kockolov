@@ -164,6 +164,10 @@ export const sr = {
   'set.related': 'Još iz teme {theme}',
   'set.notFound': 'Set nije pronađen',
   'set.watch': 'Prati cenu',
+  'set.share': 'Podeli',
+  'share.title': 'Podeli set',
+  'share.text': 'Najniža cena: {price}',
+  'share.copied': 'Link je kopiran',
   'set.watching': 'Pratiš',
   'set.watch.hint': 'Pratiš ovaj set — promene cene stižu u jutarnjem e-mailu.',
   'members.teaser.offers.one': 'Još {n} ponuda',
@@ -544,12 +548,13 @@ export const sr = {
   'title.notFound': 'Stranica nije pronađena',
   'footer.privacy': 'Politika privatnosti',
   'footer.blog': 'Blog',
+  'footer.instagram': 'Instagram',
   'footer.copyright': '© {years} Kockolov',
   'footer.contact': 'Kontakt',
   'footer.madeBy': 'Made by',
   'footer.poweredBy': 'Powered by',
   'privacy.title': 'Politika privatnosti',
-  'privacy.updated': 'Poslednja izmena: 13. oktobar 2026.',
+  'privacy.updated': 'Poslednja izmena: 20. oktobar 2026.',
   'privacy.intro':
     'Kockolov upoređuje cene LEGO® setova u srpskim prodavnicama, na sajtu kockolov.rs i u aplikaciji Kockolov za Android i iPhone; ova pravila važe za oba. Za pretragu i pregled ponuda nalog nije potreban. Ako otvoriš nalog, čuvamo samo ono što je potrebno da bi nalog radio. Ovde piše šta tačno čuvamo, zašto, i kako da ostvariš svoja prava po Zakonu o zaštiti podataka o ličnosti („Službeni glasnik RS“, br. 87/2018).',
   'privacy.who.h': 'Ko je odgovoran za podatke',
@@ -566,7 +571,9 @@ export const sr = {
     'Ako uključiš obaveštenja, čuvamo adresu za isporuku obaveštenja na taj uređaj: na sajtu je daje tvoj pregledač, a u aplikaciji Firebase Cloud Messaging (Google) dodeljuje token aplikaciji na tom telefonu. Uz nju čuvamo samo naziv pregledača ili platformu (Android ili iOS), da bi znao gde su obaveštenja uključena. Kad ih isključiš ili se odjaviš sa tog uređaja, adresu brišemo.',
   'privacy.what.8':
     'Skener u aplikaciji koristi kameru samo dok je otvoren, a sliku obrađuje telefon. Serveru šaljemo samo pročitani bar-kod, da bismo našli set; slike nam ne stižu, a bar-kod ne vezujemo za tvoj nalog.',
-  'privacy.what.6': 'Ne koristimo alate za praćenje posetilaca ni reklame, i ne pravimo profile korisnika.',
+  'privacy.what.9':
+    'Brojimo posete jednostavnom statistikom bez kolačića (Umami, na našem serveru), na sajtu i u aplikaciji: koje se stranice otvaraju, odakle je posetilac došao (na primer sa linka sa Instagrama), vrstu uređaja i pregledača i približnu lokaciju (država i grad). IP adresu ne čuvamo, posetioce ne prepoznajemo od posete do posete, ne povezujemo ih sa nalogom i ne pamtimo šta su pretraživali. Podatke ne šaljemo trećim stranama. Posete administratora i pregledača koji šalju „Do Not Track“ ne računamo.',
+  'privacy.what.6': 'Ne koristimo reklame i ne pravimo profile korisnika.',
   'privacy.why.h': 'Zašto ih koristimo',
   'privacy.why.1': 'Da bi nalog radio: prijava, setovi koje pratiš i podešavanja. Osnov je pružanje usluge koju tražiš otvaranjem naloga.',
   'privacy.why.2':

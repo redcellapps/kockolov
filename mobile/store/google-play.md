@@ -180,11 +180,15 @@ Tipovi podataka (sve: **Collected**, **not shared**, **optional** – korisnik b
 |---|---|
 | Personal info → **Email address** | App functionality, Account management, Developer communications |
 | Personal info → **Name** | App functionality, Account management |
-| App activity → **Other user-generated content** (setovi koje korisnik prati) | App functionality |
+| App activity → **Other actions** (setovi koje korisnik prati) | App functionality |
+| App activity → **App interactions** (koje stranice se otvaraju, statistika posetilaca, Umami) | Analytics |
+| Location → **Approximate location** (država i grad iz statistike posetilaca; IP se ne čuva) | Analytics |
 | Device or other IDs → **Device or other IDs** (Firebase token za obaveštenja) | App functionality |
 
-Ne prikupljamo: lokaciju, kontakte, fotografije (skener obrađuje sliku na telefonu, serveru ide samo pročitani
-broj), istoriju pretrage, analitiku, reklamni ID. Firebase Cloud Messaging je obrađivač koji radi za nas, pa se
+Ne prikupljamo: tačnu lokaciju, kontakte, fotografije (skener obrađuje sliku na telefonu, serveru ide samo pročitani
+broj), istoriju pretrage (reči iz pretrage se ne šalju ni u statistiku), reklamni ID. Statistika posetilaca (Umami, na
+našem serveru, bez kolačića i bez trećih strana) je od verzije sa analitikom: kad je uključiš na serveru, u Data
+safety dodaj poslednja dva reda iz tabele. Firebase Cloud Messaging je obrađivač koji radi za nas, pa se
 po Google-ovim pravilima to ne računa kao „sharing”.
 
 ## 5. Zatvoreni test
