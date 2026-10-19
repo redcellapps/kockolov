@@ -1,0 +1,47 @@
+/// <reference types="vite/client" />
+import { defineConfig } from 'vite'
+import legacy from '@vitejs/plugin-legacy'
+import blitsVitePlugins from '@lightningjs/blits/vite'
+
+// One build for both TVs (Samsung 2018+ = Chromium 56, LG 2018+ = Chromium 53): ES5 + polyfills.
+// `legacy` only runs on `vite build`; `vite dev` serves modern code for a desktop browser.
+export default defineConfig(({ command }) => ({
+  // the packaged app loads from file:// (Tizen, webOS), so every asset path must be relative
+  base: './',
+  plugins: [
+    ...blitsVitePlugins,
+    ...(command === 'build'
+      ? [
+          legacy({
+            targets: ['chrome >= 53'],
+            modernPolyfills: true,
+            // one ES5 bundle only: Chromium 53/56 have no <script type="module"> anyway
+            renderModernChunks: false,
+          }),
+          {
+            // the packaged app loads from file:// (null origin): a crossorigin attribute would make the
+            // TV's web engine refuse the script
+            name: 'kockolov-no-crossorigin',
+            transformIndexHtml: { order: 'post', handler: (html) => html.replace(/ crossorigin(="[^"]*")?/g, '') },
+          },
+        ]
+      : []),
+  ],
+  resolve: {
+    mainFields: ['browser', 'module', 'jsnext:main', 'jsnext'],
+  },
+  server: {
+    fs: { allow: ['..'] },
+  },
+  build: {
+    outDir: 'dist',
+    target: 'es2015',
+    minify: 'terser',
+    sourcemap: false,
+  },
+  worker: { format: 'es' },
+  test: {
+    include: ['test/**/*.test.ts'],
+    environment: 'node',
+  },
+}))
