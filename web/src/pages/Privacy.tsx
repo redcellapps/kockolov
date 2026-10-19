@@ -5,7 +5,7 @@ import { usePageTitle } from '../lib/title';
 
 const SECTIONS: { h: TKey; p: TKey[] }[] = [
   { h: 'privacy.who.h', p: ['privacy.who.1', 'privacy.who.2'] },
-  { h: 'privacy.what.h', p: ['privacy.what.1', 'privacy.what.2', 'privacy.what.3', 'privacy.what.4', 'privacy.what.5', 'privacy.what.7', 'privacy.what.8', 'privacy.what.6'] },
+  { h: 'privacy.what.h', p: ['privacy.what.1', 'privacy.what.2', 'privacy.what.3', 'privacy.what.4', 'privacy.what.5', 'privacy.what.7', 'privacy.what.8', 'privacy.what.9', 'privacy.what.6'] },
   { h: 'privacy.why.h', p: ['privacy.why.1', 'privacy.why.2', 'privacy.why.3', 'privacy.why.4'] },
   { h: 'privacy.cookies.h', p: ['privacy.cookies.1', 'privacy.cookies.2'] },
   { h: 'privacy.where.h', p: ['privacy.where.1', 'privacy.where.2', 'privacy.where.4', 'privacy.where.3'] },

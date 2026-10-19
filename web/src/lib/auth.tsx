@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, Fragment, useContext, useEffect, type ReactNode } from 'react';
 import { api, type MeResponse } from './api';
+import { startAnalytics } from './analytics';
 import { setDisplayCurrency } from './format';
 import { setAppToken } from './platform';
 import { forgetPushOnSignOut, syncPush } from './pwa';
@@ -20,6 +21,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const currency = q.data?.user?.currency === 'EUR' ? 'EUR' : 'RSD';
   setDisplayCurrency(currency, q.data?.fx?.eur.rate ?? 0);
   const userId = q.data?.user?.id;
+  // statistics start once the server says where to send them (never for admins)
+  const analytics = q.data?.analytics;
+  const isAdmin = q.data?.user?.role === 'admin';
+  useEffect(() => {
+    if (q.isSuccess) startAnalytics(analytics, isAdmin);
+  }, [q.isSuccess, analytics, isAdmin]);
   // a phone with notifications on gets the alerts of whoever is signed in on it now
   useEffect(() => {
     if (userId) void syncPush();

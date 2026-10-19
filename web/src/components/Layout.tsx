@@ -5,8 +5,8 @@ import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { ago, displayCurrency, rateText } from '../lib/format';
-import { CONTACT_EMAIL, CREDITS } from '../lib/site';
-import { ClockIcon, HeartIcon } from './icons';
+import { CONTACT_EMAIL, CREDITS, INSTAGRAM_URL } from '../lib/site';
+import { ClockIcon, HeartIcon, InstagramIcon } from './icons';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Logo } from './Logo';
 import { ScanButton } from './ScanButton';
@@ -181,6 +181,9 @@ function Footer() {
             </Link>
             <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink-2 hover:text-ink hover:underline">
               {t('footer.contact')}: {CONTACT_EMAIL}
+            </a>
+            <a href={INSTAGRAM_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-ink-2 hover:text-ink hover:underline">
+              <InstagramIcon size={16} /> {t('footer.instagram')}
             </a>
           </nav>
           <p className="mt-4 text-xs leading-relaxed text-ink-3">{t('footer.disclaimer')}</p>

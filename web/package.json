@@ -17,6 +17,7 @@
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.3",
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
     "@tanstack/react-query": "^5.90.2",
     "firebase": "^12.19.0",
