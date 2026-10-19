@@ -5,6 +5,7 @@ import { latestDeals } from '../api/audience.js';
 import { buildSearch } from '../api/search.js';
 import { getPost, listPosts, type BlogPost } from '../blog/posts.js';
 import { escapeHtml, rsd, shopLabel } from '../mail/format.js';
+import { dealsBody, homeBody, setBody, themeBody, themesBody } from './body.js';
 import { OG_HEIGHT, OG_WIDTH, plural } from './og.js';
 
 /**
@@ -28,6 +29,8 @@ export interface PageMeta {
   product?: { price: number; availability: 'instock' | 'oos' };
   article?: { published: string; author: string };
   jsonLd?: object[];
+  /** the page's main content as plain HTML, for crawlers (see seo/body.ts) */
+  body?: string;
 }
 
 const site = () => config.APP_URL.replace(/\/$/, '');
@@ -191,6 +194,7 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
       description: `Uporedi cene ${sets(st.sets)} u ${inShops(st.shops)}: ${list(st.shop_names)}. Svakog jutra izdvajamo najisplativije kupovine i šaljemo ih e-mailom.`.replace(/\u00a0/g, ' '),
       image: { url: `/og/home.jpg?v=${version(st.sets, items[0]?.best_price, items[0]?.image_url)}`, alt: 'Kockolov: najbolje cene LEGO setova' },
       jsonLd: [{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE, url: `${site()}/`, inLanguage: 'sr-Latn' }],
+      body: await homeBody(),
     };
   }
 
@@ -211,6 +215,7 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
         ? `Najisplativije LEGO kupovine danas u srpskim prodavnicama: ${st.deals} ponuda, do −${st.max_pct}% u odnosu na LEGO Store. Lista se osvežava svakog jutra.`
         : 'Najisplativije LEGO kupovine u srpskim prodavnicama. Lista se osvežava svakog jutra.',
       image: { url: `/og/deals.jpg?v=${version(st.deals, st.max_pct, items[0]?.best_price)}`, alt: 'LEGO ponude dana na Kockolovu' },
+      body: await dealsBody(),
     };
   }
 
@@ -225,6 +230,7 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
       canonical: p,
       title: top.length ? `LEGO teme: ${top.map((t) => t.name).join(', ')} i ostale | ${SITE}` : `LEGO teme | ${SITE}`,
       description: 'Sve LEGO teme na jednom mestu, sa brojem setova u ponudi i najnižim cenama u srpskim prodavnicama.',
+      body: await themesBody(),
     };
   }
 
@@ -340,6 +346,7 @@ async function themePage(slug: string): Promise<PageMeta> {
     title: `LEGO ${name} setovi: cene u Srbiji | ${SITE}`,
     description: `${c.subtitle} Svi LEGO ${name} setovi iz prodavnica ${list(st.shop_names)} na jednom mestu.`.replace(/\u00a0/g, ' '),
     image: { url: `/og/theme/${encodeURIComponent(slug)}.jpg?v=${version(c.subtitle, c.items[0]?.image_url)}`, alt: `LEGO ${name} na Kockolovu` },
+    body: await themeBody(slug, name, c.subtitle),
   };
 }
 
@@ -410,6 +417,7 @@ async function setPage(setNum: string): Promise<PageMeta> {
       alt: s.best_price ? `${label}, ${rsd(s.best_price)}` : label,
     },
     jsonLd,
+    body: await setBody(s),
   };
 }
 
@@ -464,8 +472,10 @@ export function injectHead(template: string, m: PageMeta): string {
     ...(m.jsonLd ?? []).map((o) => `<script type="application/ld+json">${json(o)}</script>`),
   ].filter(Boolean);
 
-  return template
+  const withHead = template
     .replace(/<title>[\s\S]*?<\/title>/, `<title>${attr(m.title)}</title>`)
     .replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${attr(m.description)}" />`)
     .replace(/\s*<\/head>/, `\n    ${tags.join('\n    ')}\n  </head>`);
+  // the app replaces whatever is inside #root when it starts
+  return m.body ? withHead.replace('<div id="root"></div>', () => `<div id="root">${m.body}</div>`) : withHead;
 }

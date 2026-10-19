@@ -48,6 +48,13 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
   const { hashPassword } = await import('../src/api/auth.js');
   let mock: Awaited<ReturnType<typeof startMockShops>>;
   let app: Awaited<ReturnType<typeof buildApp>>;
+  /** the sitemap index and the three sitemaps it lists, as one text */
+  const sitemapText = async () => {
+    const index = await app.inject({ method: 'GET', url: '/sitemap.xml' });
+    const parts = [...index.body.matchAll(/<loc>[^<]*?(\/sitemap-[a-z-]+\.xml)<\/loc>/g)].map((m) => m[1]);
+    const bodies = await Promise.all(parts.map(async (u) => (await app.inject({ method: 'GET', url: u })).body));
+    return { index, parts, text: bodies.join('\n') };
+  };
   let cookie = '';
   const log = () => {};
 
@@ -368,10 +375,11 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       const robots = (await app.inject({ method: 'GET', url: '/robots.txt' })).body;
       expect(robots).toContain('Disallow: /api/');
       expect(robots).toContain('Sitemap: ');
-      const map = await app.inject({ method: 'GET', url: '/sitemap.xml' });
-      expect(map.headers['content-type']).toContain('application/xml');
-      expect(map.body).toContain('/set/10280</loc>');
-      expect(map.body).toContain('/privatnost</loc>');
+      const map = await sitemapText();
+      expect(map.index.headers['content-type']).toContain('application/xml');
+      expect(map.parts).toEqual(['/sitemap-pages.xml', '/sitemap-sets.xml', '/sitemap-sets-oos.xml']);
+      expect(map.text).toContain('/set/10280</loc>');
+      expect(map.text).toContain('/privatnost</loc>');
     } finally {
       config.PUBLIC_MODE = false;
     }
@@ -381,7 +389,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     const { pageMeta, injectHead } = await import('../src/seo/pages.js');
     const { plural } = await import('../src/seo/og.js');
     const sharp = (await import('sharp')).default;
-    const template = '<html><head><meta name="description" content="x" /><title>x</title></head><body></body></html>';
+    const template = '<html><head><meta name="description" content="x" /><title>x</title></head><body><div id="root"></div></body></html>';
     const head = async (path: string) => {
       const u = new URL(path, 'http://local');
       const m = await pageMeta(u.pathname, u.searchParams);
@@ -392,6 +400,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     const closed = await head('/set/10280');
     expect(closed.m.robots).toBe('noindex, nofollow');
     expect(closed.html).not.toContain('og:image');
+    expect(closed.html).not.toContain('data-ssr');
     expect((await app.inject({ method: 'GET', url: '/og/set/10280.jpg' })).statusCode).toBe(404);
 
     config.PUBLIC_MODE = true;
@@ -407,6 +416,11 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       const product = ld.find((o) => o['@type'] === 'Product');
       expect(product.offers).toMatchObject({ '@type': 'AggregateOffer', priceCurrency: 'RSD', lowPrice: 7319, availability: 'https://schema.org/InStock' });
       expect(ld.find((o) => o['@type'] === 'BreadcrumbList').itemListElement.length).toBeGreaterThanOrEqual(2);
+      // the page's own copy is in the HTML for crawlers: heading, best price, offers, links to other sets
+      expect(set.html).toMatch(/<div id="root"><div data-ssr [^>]*>.*<h1>LEGO 10280 .+<\/h1>/);
+      expect(set.html).toContain('Najniža cena: 7.319');
+      expect(set.html).toContain('<h2>Sve ponude</h2>');
+      expect(set.html).toMatch(/<a href="\/set\/\d+[^"]*">LEGO \d+/);
 
       // unknown sets and pages are real 404s; private and search pages stay out of the index
       expect((await head('/set/00000')).m).toMatchObject({ status: 404, robots: 'noindex' });
@@ -419,6 +433,11 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect(theme.m.title).toBe('LEGO Harry Potter setovi: cene u Srbiji | Kockolov');
       expect(theme.m.canonical).toBe('/pretraga?theme=harry-potter');
       expect((await head('/')).m.jsonLd?.[0]).toMatchObject({ '@type': 'WebSite' });
+      expect(theme.html).toContain('<h1>LEGO Harry Potter</h1>');
+      expect(theme.html).toMatch(/<a href="\/set\/\d+[^"]*">LEGO \d+/);
+      const home = (await head('/')).html;
+      expect(home).toContain('<h2>LEGO teme</h2>');
+      expect(home).toContain('href="/pretraga?theme=harry-potter"');
 
       // text from the shops can't break out of the HTML
       const { name: original } = (await one("SELECT name FROM sets WHERE set_num = '10280'"))!;
@@ -524,8 +543,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect(await get('/api/stats', false)).toMatchObject({ shops: 3, members_shops: 1, members_offers: 2 }); // only shops that have offers count
       const pubDeal = (await get('/api/deals', false)).items.find((i: { set_num: string }) => i.set_num === '10280');
       expect(pubDeal.best_shop).toBe('ananas');
-      const map = await app.inject({ method: 'GET', url: '/sitemap.xml' });
-      expect(map.body).not.toContain('42166');
+      expect((await sitemapText()).text).not.toContain('42166');
       const head = await app.inject({ method: 'GET', url: '/set/10280' });
       expect(head.body).not.toContain('6999');
     } finally {
@@ -795,7 +813,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect(card.headers['content-type']).toBe('image/jpeg');
       expect(await sharp(card.rawPayload).metadata()).toMatchObject({ width: 1200, height: 630 });
 
-      const map = (await app.inject({ method: 'GET', url: '/sitemap.xml' })).body;
+      const map = (await sitemapText()).text;
       expect(map).toContain('/blog</loc>');
       expect(map).toContain(`/blog/${slug}</loc><lastmod>2026-10-02</lastmod>`);
     } finally {

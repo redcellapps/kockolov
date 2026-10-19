@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { config } from '../../config.js';
 import { one, query } from '../../db.js';
 import { renderCollectionCard, renderSetCard } from '../../seo/og.js';
@@ -85,23 +85,44 @@ export async function publicRoutes(app: FastifyInstance) {
     return slug ? collection(reply, 'theme', slug) : reply.code(404).send('');
   });
 
+  // one index and three sitemaps: pages and themes, sets in stock, sets out of stock; Search Console
+  // then shows for each group how many URLs Google has taken in
+  const xml = (reply: FastifyReply, urls: string[]) =>
+    reply
+      .type('application/xml; charset=utf-8')
+      .header('Cache-Control', 'public, max-age=3600')
+      .send(['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', ...urls, '</urlset>'].join('\n'));
+  const url = (path: string, lastmod?: string) =>
+    `<url><loc>${site()}${path}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ''}</url>`;
+  const setUrls = async (inStock: boolean) =>
+    (
+      await query<{ set_num: string; updated: string }>(
+        `SELECT o.set_num, to_char(max(o.price_changed_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS updated
+           FROM public_offers o WHERE o.set_num IS NOT NULL AND o.active
+          GROUP BY o.set_num
+         HAVING bool_or(o.in_stock) = $1 ORDER BY o.set_num`,
+        [inStock],
+      )
+    ).map((r) => url(`/set/${encodeURIComponent(r.set_num)}`, r.updated));
+
   app.get('/sitemap.xml', async (_req, reply) => {
     if (!config.PUBLIC_MODE) return reply.code(404).send('');
-    const sets = await query<{ set_num: string; updated: string }>(
-      `SELECT o.set_num, to_char(max(o.price_changed_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS updated
-         FROM public_offers o WHERE o.set_num IS NOT NULL AND o.active
-        GROUP BY o.set_num ORDER BY o.set_num`,
-    );
+    const today = new Date().toISOString().slice(0, 10);
+    const entries = ['pages', 'sets', 'sets-oos'].map((n) => `<sitemap><loc>${site()}/sitemap-${n}.xml</loc><lastmod>${today}</lastmod></sitemap>`);
+    return reply
+      .type('application/xml; charset=utf-8')
+      .header('Cache-Control', 'public, max-age=3600')
+      .send(['<?xml version="1.0" encoding="UTF-8"?>', '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', ...entries, '</sitemapindex>'].join('\n'));
+  });
+
+  app.get('/sitemap-pages.xml', async (_req, reply) => {
+    if (!config.PUBLIC_MODE) return reply.code(404).send('');
     const themes = await query<{ slug: string }>(
       `SELECT DISTINCT s.theme_slug AS slug FROM sets s JOIN public_offers o ON o.set_num = s.set_num
         WHERE s.theme_slug IS NOT NULL AND o.active AND o.in_stock ORDER BY 1`,
     );
     const posts = await listPosts();
-    const url = (path: string, lastmod?: string) =>
-      `<url><loc>${site()}${path}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ''}</url>`;
-    const body = [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    return xml(reply, [
       url('/'),
       url('/ponude'),
       url('/teme'),
@@ -110,9 +131,9 @@ export async function publicRoutes(app: FastifyInstance) {
       url('/blog', posts[0]?.date),
       ...posts.map((post) => url(`/blog/${post.slug}`, post.date)),
       ...themes.map((t) => url(`/pretraga?theme=${encodeURIComponent(t.slug)}`)),
-      ...sets.map((s) => url(`/set/${encodeURIComponent(s.set_num)}`, s.updated)),
-      '</urlset>',
-    ].join('\n');
-    return reply.type('application/xml; charset=utf-8').header('Cache-Control', 'public, max-age=3600').send(body);
+    ]);
   });
+
+  app.get('/sitemap-sets.xml', async (_req, reply) => (config.PUBLIC_MODE ? xml(reply, await setUrls(true)) : reply.code(404).send('')));
+  app.get('/sitemap-sets-oos.xml', async (_req, reply) => (config.PUBLIC_MODE ? xml(reply, await setUrls(false)) : reply.code(404).send('')));
 }
