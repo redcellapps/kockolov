@@ -4,8 +4,8 @@ seoTitle: LEGO pasoš: pečati iz LEGO prodavnica sirom sveta | Kockolov
 description: Amsterdam kao muzej od kockica, Dubai kao Formula 1, ali to je ta fora. Šta je LEGO pasoš, kako se dobija i zašto je poseta LEGO prodavnici postala putovanje za sebe.
 date: 2026-10-20
 author: Milan Đorđević
-image: lego-pasos-ulaz-dubai.jpg
-imageAlt: Ulaz u LEGO prodavnicu na aerodromu u Dubaiju, sa velikim LEGO logoom i zidom od žutih i belih kocki
+image: lego-pasos-naslovna.jpg
+imageAlt: Žuta naslovnica sa tekstom „Skupljam LEGO prodavnice“ i fotografijom ulaza u LEGO prodavnicu na aerodromu u Dubaiju
 keywords: LEGO pasoš, LEGO Store Amsterdam, LEGO Dubai, LEGO prodavnice, LEGO pečati, LEGO Passport, LEGO kolekcionarstvo
 ---
 
