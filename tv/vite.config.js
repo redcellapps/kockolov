@@ -2,10 +2,14 @@
 import { defineConfig } from 'vite'
 import legacy from '@vitejs/plugin-legacy'
 import blitsVitePlugins from '@lightningjs/blits/vite'
+import { readFileSync } from 'node:fs'
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 // One build for both TVs (Samsung 2018+ = Chromium 56, LG 2018+ = Chromium 53): ES5 + polyfills.
 // `legacy` only runs on `vite build`; `vite dev` serves modern code for a desktop browser.
 export default defineConfig(({ command }) => ({
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // the packaged app loads from file:// (Tizen, webOS), so every asset path must be relative
   base: './',
   plugins: [

@@ -1,4 +1,4 @@
-import type { DealsResponse, SearchResponse, SetDetail, Stats, Theme } from './types'
+import type { DealsResponse, SearchResponse, SetDetail, Shop, Stats, Theme } from './types'
 
 /** Where the API lives: https://kockolov.rs in the packaged app, a local server in development */
 export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) || 'https://kockolov.rs'
@@ -40,6 +40,7 @@ export const api = {
   set: (setNum: string) => get<SetDetail>(`/api/sets/${encodeURIComponent(setNum)}`),
   themes: () => get<Theme[]>('/api/themes'),
   stats: () => get<Stats>('/api/stats'),
+  shops: () => get<Shop[]>('/api/shops'),
   search: (q: { q?: string; theme?: string; sort?: string; page?: number; size?: number }) =>
     get<SearchResponse>('/api/sets', { q: q.q, theme: q.theme, sort: q.sort, page: q.page, size: q.size ?? 48, stock: 1 }),
 }
