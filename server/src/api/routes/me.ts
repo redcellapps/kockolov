@@ -55,14 +55,22 @@ export async function meRoutes(app: FastifyInstance) {
   });
 
   app.get('/api/me/watchlist', { preHandler: requireUser }, async (req) => {
-    const nums = (await query<{ set_num: string }>('SELECT set_num FROM watchlist WHERE user_id = $1', [req.user!.id])).map(
-      (r) => r.set_num,
+    const watched = await query<{ set_num: string; seen_price: number | null; created_at: string }>(
+      'SELECT set_num, seen_price, created_at FROM watchlist WHERE user_id = $1',
+      [req.user!.id],
     );
-    if (!nums.length) return { items: [] };
+    if (!watched.length) return { items: [] };
+    const byNum = new Map(watched.map((w) => [w.set_num, w]));
     // reuse the search query so cards look identical everywhere
-    const s = buildSearch({ setNums: nums, stock: false, sort: 'price_asc', size: 96, audience: 'members' });
+    const s = buildSearch({ setNums: watched.map((w) => w.set_num), stock: false, sort: 'price_asc', size: 96, audience: 'members' });
     const rows = await query(s.sql, s.params);
-    return { items: rows.map(({ total, search_text, created_at, ...r }) => r) };
+    // seen_price = the best price the last time the user was told about it (the TV shows the change since then)
+    return {
+      items: rows.map(({ total, search_text, created_at, ...r }) => {
+        const w = byNum.get(r.set_num as string);
+        return { ...r, watched_since: w?.created_at ?? null, seen_price: w?.seen_price ?? null };
+      }),
+    };
   });
 
   app.put<{ Params: { setNum: string } }>('/api/me/watchlist/:setNum', { preHandler: requireUser }, async (req, reply) => {
