@@ -22,8 +22,12 @@ da lokalni server pusti CORS za dev server). Bez `.env.development` aplikacija z
 pregledač na `localhost` ne dobija CORS, pa za pregled produkcijskih podataka koristi `vite preview` sa proksijem:
 
 ```bash
-VITE_API_BASE=/ npx vite build --outDir dist-shots && npx vite preview --outDir dist-shots --port 5175
+VITE_API_BASE=/ npx vite build --outDir dist-shots && npx vite preview --outDir dist-shots --port 5175 --host
 ```
+
+(`VITE_API_BASE` = bilo šta što nije `http(s)://` adresa znači „isti origin“; u Git Bash-u na Windowsu `/`
+postane `C:/Program Files/Git/`, što je svejedno. Ako se `vite preview` u Git Bash-u odmah ugasi, pokreni ga
+iz PowerShell-a ili dodaj `< /dev/null`.)
 
 Provere: `npm run typecheck`, `npm test` (vitest: formatiranje cena, množina, grafikon, mapiranje API-ja),
 `node scripts/shots.mjs [url] [folder]` pravi screenshotove 1920×1080 (traži Playwright: `npm i --no-save playwright && npx playwright install chromium`).

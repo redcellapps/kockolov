@@ -46,7 +46,7 @@ export default defineConfig(({ command }) => ({
   },
   build: {
     outDir: 'dist',
-    target: 'es2015',
+    // no `target` here: plugin-legacy sets it from `targets` (a target of our own only earns a warning)
     minify: 'terser',
     sourcemap: false,
   },

@@ -1,7 +1,17 @@
 import type { DealsResponse, SearchResponse, SetDetail, Shop, Stats, Theme } from './types'
 
-/** Where the API lives: https://kockolov.rs in the packaged app, a local server in development */
-export const API_BASE: string = ((import.meta.env.VITE_API_BASE as string | undefined) || 'https://kockolov.rs').replace(/\/$/, '')
+/**
+ * Where the API lives: https://kockolov.rs in the packaged app (no VITE_API_BASE), another server in
+ * development (VITE_API_BASE=http://localhost:8080), or the page's own origin for `vite preview` with its
+ * proxy (any value that is not an http(s) URL, e.g. VITE_API_BASE=/ — Git Bash on Windows rewrites "/"
+ * into "C:/Program Files/Git/", which is why "not a URL" rather than "/" is the test).
+ */
+function apiBase(): string {
+  const raw = import.meta.env.VITE_API_BASE as string | undefined
+  if (raw === undefined || raw === '') return 'https://kockolov.rs'
+  return /^https?:\/\//.test(raw) ? raw.replace(/\/$/, '') : ''
+}
+export const API_BASE: string = apiBase()
 
 export class ApiError extends Error {
   constructor(
