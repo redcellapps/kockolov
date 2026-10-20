@@ -1,0 +1,17 @@
+{
+  "id": "rs.kockolov.tv",
+  "version": "1.0.0",
+  "vendor": "Redcellapps",
+  "type": "web",
+  "main": "index.html",
+  "title": "Kockolov",
+  "appDescription": "Uporedi cene LEGO® setova u Srbiji",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "iconColor": "#ffcf00",
+  "splashBackground": "splash.png",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true,
+  "requiredMemory": 120,
+  "requiredACG": []
+}

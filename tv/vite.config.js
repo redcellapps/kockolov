@@ -37,6 +37,13 @@ export default defineConfig(({ command }) => ({
   server: {
     fs: { allow: ['..'] },
   },
+  // `vite preview` of a build made with VITE_API_BASE=/ (relative URLs): the live API answers through the proxy
+  preview: {
+    proxy: {
+      '/api': { target: 'https://kockolov.rs', changeOrigin: true },
+      '/media': { target: 'https://kockolov.rs', changeOrigin: true },
+    },
+  },
   build: {
     outDir: 'dist',
     target: 'es2015',
