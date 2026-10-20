@@ -6,13 +6,12 @@ import Themes from './pages/Themes'
 import ThemeSets from './pages/ThemeSets'
 import About from './pages/About'
 
-// Page switches are instant. Animated page transitions (even 200 ms alpha fades) were seen to stall
-// half-way in Chromium until the next key press, leaving the new page dim or the old one on top —
-// revisit on a real TV before adding fades.
+// Page switches are instant and nothing is animated by the router: `before` is applied directly, and
+// with no `in`/`out` the router has no animation promise to wait for. Animated transitions (even with
+// duration 0) were seen to never finish in Chrome, which left the router "navigating" and every key
+// dead, or the new page half-transparent. Revisit on a real TV before adding fades.
 const pageTransition = {
-  before: { prop: 'alpha', value: 0 },
-  in: { prop: 'alpha', value: 1, duration: 0 },
-  out: { prop: 'alpha', value: 0, duration: 0 },
+  before: { prop: 'alpha', value: 1 },
 }
 
 export default Blits.Application({

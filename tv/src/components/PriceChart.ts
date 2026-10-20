@@ -71,6 +71,7 @@ export default Blits.Component('PriceChart', {
       const out: Bar[] = []
       let min = Infinity
       for (const p of pts) if (p.price < min) min = p.price
+      const flat = pts.every((p) => p.price === min) // nothing to highlight when the price never moved
       for (let i = 0; i < n; i++) {
         const p = pts[i]
         const frac = (p.price - lo) / (hi - lo || 1)
@@ -80,7 +81,7 @@ export default Blits.Component('PriceChart', {
           x: Math.round(this.plotX + i * step),
           y: this.plotY + this.plotH - h,
           h,
-          color: p.price === min ? colors.green : colors.chart,
+          color: p.price === min && !flat ? colors.green : colors.chart,
         })
       }
       return out

@@ -170,7 +170,9 @@ export default Blits.Component('SetPage', {
       this.load()
     },
     focus() {
+      // while loading, park the focus on the top bar so keys don't land on the previous (kept-alive) page
       if (this.status === 'ready') this.focusSection()
+      else this.$select('nav').$focus()
     },
   },
   watch: {

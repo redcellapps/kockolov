@@ -93,6 +93,7 @@ export default Blits.Component('Home', {
     focus() {
       if (this.exiting) this.$select('exit').$focus()
       else if (this.status === 'ready') this.focusSection()
+      else this.$select('nav').$focus()
     },
   },
   watch: {
