@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Samsung Tizen TV package descriptor. The build script (scripts/build-tizen.mjs) copies this next to
+  the built app and replaces __VERSION__ from package.json and __PACKAGE__ from TIZEN_PACKAGE_ID
+  (the 10-character package ID that Samsung Seller Office assigns; "kockolovTV" is for development).
+  Reference: Samsung Developers → Smart TV → Configuring Web Applications.
+-->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://kockolov.rs/tv" version="__VERSION__" viewmodes="maximized">
+  <!-- Tizen 4.0 = 2018 models, the oldest we support (Chromium 56) -->
+  <tizen:application id="__PACKAGE__.Kockolov" package="__PACKAGE__" required_version="4.0"/>
+  <content src="index.html"/>
+  <feature name="http://tizen.org/feature/screen.size.all"/>
+  <icon src="icon.png"/>
+  <name>Kockolov</name>
+  <description>Uporedi cene LEGO® setova u Srbiji</description>
+  <author href="https://kockolov.rs" email="kontakt@kockolov.rs">Redcellapps</author>
+  <tizen:profile name="tv-samsung"/>
+  <!-- the number keys on the remote (registered with tizen.tvinputdevice at launch) -->
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <!-- the only host the app talks to -->
+  <access origin="https://kockolov.rs" subdomains="true"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable" pointing-device-support="disable"/>
+</widget>

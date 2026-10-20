@@ -1,7 +1,7 @@
 import type { DealsResponse, SearchResponse, SetDetail, Shop, Stats, Theme } from './types'
 
 /** Where the API lives: https://kockolov.rs in the packaged app, a local server in development */
-export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) || 'https://kockolov.rs'
+export const API_BASE: string = ((import.meta.env.VITE_API_BASE as string | undefined) || 'https://kockolov.rs').replace(/\/$/, '')
 
 export class ApiError extends Error {
   constructor(

@@ -1,9 +1,11 @@
 import type { Platform } from './index'
 
-// Samsung Tizen TV. Arrows, Enter and Back (10009) arrive without registration; the number keys
-// must be registered through tizen.tvinputdevice (privilege http://tizen.org/privilege/tv.inputdevice
-// in config.xml), otherwise the TV keeps them for channel switching.
-// Reference: Samsung Developers → Smart TV → Remote Control (key codes), Web API → TVInputDevice.
+// Samsung Tizen TV (developer.samsung.com → Smart TV → Remote Control, Terminating Applications):
+// - arrows (37–40), Enter (13) and Back (10009) arrive without registration
+// - the number keys (48–57) must be registered through tizen.tvinputdevice, otherwise the TV keeps
+//   them for channel switching; needs http://tizen.org/privilege/tv.inputdevice in config.xml
+// - Exit (10182) is sent to the app; a long press of Return/Exit always terminates the app
+// - Back on the first page shows our own dialog, "Izađi" calls tizen.application…exit()
 
 declare const tizen: {
   tvinputdevice?: { registerKeyBatch(keys: string[], ok?: () => void, err?: (e: unknown) => void): void }
