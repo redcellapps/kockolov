@@ -22,7 +22,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return key.length === expected.length && timingSafeEqual(key, expected);
 }
 
-const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');
+export const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');
 
 export interface SessionUser {
   id: number;
@@ -47,17 +47,39 @@ function bearer(req: FastifyRequest): string | undefined {
   return h?.startsWith('Bearer ') ? h.slice(7).trim() || undefined : undefined;
 }
 
-export async function createSession(reply: FastifyReply, userId: number): Promise<void> {
+/** What the app header says: 'tv' for the Smart TV app, 'app' for the phones (any other value) */
+export const appKind = (req: FastifyRequest): 'web' | 'app' | 'tv' =>
+  !isAppRequest(req) ? 'web' : String(req.headers[APP_HEADER]).toLowerCase() === 'tv' ? 'tv' : 'app';
+
+/**
+ * A session token for a device that signs in without a cookie (the phones, the TV): kept for
+ * APP_SESSION_DAYS. Returned to the caller, who hands it to the device.
+ */
+export async function createDeviceSession(userId: number, kind: 'app' | 'tv', deviceName?: string | null): Promise<string> {
   const token = randomBytes(32).toString('base64url');
-  const app = isAppRequest(reply.request);
-  // the app stays signed in for a year; the site for SESSION_DAYS
-  const expires = new Date(Date.now() + (app ? config.APP_SESSION_DAYS : config.SESSION_DAYS) * 86400_000);
-  await query('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [hashToken(token), userId, expires]);
+  const expires = new Date(Date.now() + config.APP_SESSION_DAYS * 86400_000);
+  await query('INSERT INTO sessions (token_hash, user_id, expires_at, kind, device_name) VALUES ($1, $2, $3, $4, $5)', [
+    hashToken(token),
+    userId,
+    expires,
+    kind,
+    deviceName ?? null,
+  ]);
   await query('UPDATE users SET last_login_at = now() WHERE id = $1', [userId]);
-  if (app) {
-    reply.header(TOKEN_HEADER, token);
+  return token;
+}
+
+export async function createSession(reply: FastifyReply, userId: number): Promise<void> {
+  const kind = appKind(reply.request);
+  if (kind !== 'web') {
+    // the app stays signed in for a year
+    reply.header(TOKEN_HEADER, await createDeviceSession(userId, kind, (reply.request.headers['user-agent'] ?? '').slice(0, 120) || null));
     return;
   }
+  const token = randomBytes(32).toString('base64url');
+  const expires = new Date(Date.now() + config.SESSION_DAYS * 86400_000);
+  await query('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [hashToken(token), userId, expires]);
+  await query('UPDATE users SET last_login_at = now() WHERE id = $1', [userId]);
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
     httpOnly: true,
@@ -76,12 +98,18 @@ export async function destroySession(req: FastifyRequest, reply: FastifyReply): 
 export async function userFromRequest(req: FastifyRequest): Promise<SessionUser | null> {
   const token = bearer(req) ?? req.cookies[SESSION_COOKIE];
   if (!token) return null;
-  return one<SessionUser>(
+  const hash = hashToken(token);
+  const user = await one<SessionUser>(
     `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.news_enabled, u.currency
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()`,
-    [hashToken(token)],
+    [hash],
   );
+  // "last seen" for the devices list, at most once an hour per session
+  if (user && bearer(req)) {
+    query("UPDATE sessions SET last_used_at = now() WHERE token_hash = $1 AND (last_used_at IS NULL OR last_used_at < now() - interval '1 hour')", [hash]).catch(() => {});
+  }
+  return user;
 }
 
 export function normalizeEmail(email: string): string {

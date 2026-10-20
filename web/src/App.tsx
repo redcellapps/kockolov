@@ -16,6 +16,7 @@ import DeleteAccountPage from './pages/DeleteAccount';
 import SearchPage from './pages/Search';
 import SetDetail from './pages/SetDetail';
 import UnsubscribePage from './pages/Unsubscribe';
+import TvPage from './pages/Tv';
 
 /** While the site is private, every page except login needs a session. */
 function Gate({ children, needUser, needAdmin }: { children: ReactNode; needUser?: boolean; needAdmin?: boolean }) {
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="/set/:setNum" element={<Gate><SetDetail /></Gate>} />
         <Route path="/pracenje" element={<Gate needUser><WatchlistPage /></Gate>} />
         <Route path="/nalog" element={<Gate needUser><AccountPage /></Gate>} />
+        <Route path="/tv" element={<Gate needUser><TvPage /></Gate>} />
         <Route path="/admin" element={<Gate needAdmin><AdminPage /></Gate>} />
         <Route path="/admin/ponude" element={<Gate needAdmin><AdminOffersPage /></Gate>} />
         <Route path="*" element={<NotFoundPage />} />
