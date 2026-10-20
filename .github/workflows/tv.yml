@@ -1,0 +1,126 @@
+name: TV apps
+
+# Builds the Smart TV app (tv/) and packages it for Samsung Tizen (.wgt) and LG webOS (.ipk).
+# Packages land as workflow artifacts and on the pre-release "tv-test" (each build replaces them).
+# Repository secrets (Tizen signing; without them the .wgt is unsigned and can't be installed on a TV):
+#   TIZEN_AUTHOR_P12_BASE64         author certificate (.p12) as base64 — made in Tizen Studio Certificate Manager
+#   TIZEN_AUTHOR_PASSWORD           its password
+#   TIZEN_DISTRIBUTOR_P12_BASE64    Samsung distributor certificate (.p12) as base64 (holds the TVs' DUIDs for dev installs)
+#   TIZEN_DISTRIBUTOR_PASSWORD      its password
+# Repository variable (optional): TIZEN_PACKAGE_ID = the 10-character package ID from Samsung Seller Office
+on:
+  push:
+    branches: [main, tv]
+    paths: ['tv/**', '.github/workflows/tv.yml']
+  pull_request:
+    paths: ['tv/**', '.github/workflows/tv.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: tv-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TIZEN_STUDIO_VERSION: '6.1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: tv
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tv/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      # ---- screenshots of the built app (what the TV will show), for the review before merging ----
+      # (a second build with relative API URLs; `vite preview` proxies /api and /media to kockolov.rs,
+      # because the live server only sends CORS headers to the packaged apps' origins)
+      - name: Screenshots 1920×1080
+        run: |
+          npm i --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+          VITE_API_BASE=/ npx vite build --outDir dist-shots
+          npx vite preview --outDir dist-shots --port 5175 &
+          sleep 3
+          node scripts/shots.mjs http://localhost:5175 shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv-screenshots
+          path: tv/shots
+          retention-days: 30
+
+      # ---- LG webOS ----
+      - name: webOS CLI
+        run: npm i -g @webos-tools/cli
+      - name: Package .ipk
+        run: node scripts/build-webos.mjs
+
+      # ---- Samsung Tizen ----
+      - name: Tizen Studio CLI
+        run: |
+          set -e
+          installer="web-cli_Tizen_Studio_${TIZEN_STUDIO_VERSION}_ubuntu-64.bin"
+          curl -fsSL -o "$installer" "https://download.tizen.org/sdk/Installer/tizen-studio_${TIZEN_STUDIO_VERSION}/${installer}"
+          chmod +x "$installer"
+          ./"$installer" --accept-license --no-java-check "$HOME/tizen-studio" > /dev/null
+          echo "$HOME/tizen-studio/tools/ide/bin" >> "$GITHUB_PATH"
+          echo "$HOME/tizen-studio/tools" >> "$GITHUB_PATH"
+      # (secrets can't be tested in a step's `if`; the step itself skips when the author certificate is missing)
+      - name: Tizen certificate profile
+        env:
+          TIZEN_AUTHOR_P12_BASE64: ${{ secrets.TIZEN_AUTHOR_P12_BASE64 }}
+          TIZEN_AUTHOR_PASSWORD: ${{ secrets.TIZEN_AUTHOR_PASSWORD }}
+          TIZEN_DISTRIBUTOR_P12_BASE64: ${{ secrets.TIZEN_DISTRIBUTOR_P12_BASE64 }}
+          TIZEN_DISTRIBUTOR_PASSWORD: ${{ secrets.TIZEN_DISTRIBUTOR_PASSWORD }}
+        run: |
+          set -e
+          if [ -z "$TIZEN_AUTHOR_P12_BASE64" ]; then
+            echo "TIZEN_AUTHOR_P12_BASE64 not set: the .wgt will be unsigned"
+            exit 0
+          fi
+          mkdir -p "$HOME/certs"
+          echo "$TIZEN_AUTHOR_P12_BASE64" | base64 -d > "$HOME/certs/author.p12"
+          args=(-n kockolov -a "$HOME/certs/author.p12" -p "$TIZEN_AUTHOR_PASSWORD")
+          if [ -n "$TIZEN_DISTRIBUTOR_P12_BASE64" ]; then
+            echo "$TIZEN_DISTRIBUTOR_P12_BASE64" | base64 -d > "$HOME/certs/distributor.p12"
+            args+=(-d "$HOME/certs/distributor.p12" -dp "$TIZEN_DISTRIBUTOR_PASSWORD")
+          fi
+          tizen security-profiles add "${args[@]}"
+          echo "TIZEN_PROFILE=kockolov" >> "$GITHUB_ENV"
+      - name: Package .wgt
+        env:
+          TIZEN_PACKAGE_ID: ${{ vars.TIZEN_PACKAGE_ID }}
+        run: node scripts/build-tizen.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv-packages
+          path: |
+            tv/build/webos/*.ipk
+            tv/build/tizen/*.wgt
+          retention-days: 30
+
+      # the packages as downloads: Releases → "tv-test" (each build replaces them)
+      - name: Packages as downloads
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          cp build/webos/*.ipk kockolov-tv.ipk
+          cp build/tizen/Kockolov.wgt kockolov-tv.wgt
+          gh release view tv-test >/dev/null 2>&1 || gh release create tv-test --prerelease --target "$GITHUB_SHA" \
+            --title "Kockolov za Smart TV (probna verzija)" \
+            --notes "Probne verzije za instalaciju u developer modu: kockolov-tv.ipk (LG webOS, ares-install) i kockolov-tv.wgt (Samsung Tizen; instalira se samo ako je CI potpisao paket). Svaki novi build zamenjuje fajlove."
+          gh release upload tv-test kockolov-tv.ipk kockolov-tv.wgt --clobber
