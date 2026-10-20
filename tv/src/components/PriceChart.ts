@@ -3,7 +3,7 @@ import { colors } from '../theme'
 // colors and sizes are written literally in templates: the Blits precompiler reads templates before JS runs (see src/theme.ts)
 import type { DayPoint } from '../lib/history'
 import { niceRange } from '../lib/history'
-import { num, shortDate } from '../lib/format'
+import { money, moneyNum, shortDate } from '../lib/format'
 import { t } from '../i18n'
 
 interface Bar {
@@ -129,13 +129,13 @@ export default Blits.Component('PriceChart', {
       return Math.round(this.plotY + this.plotH - frac * this.plotH)
     },
     refLabel(): string {
-      return t('set.rrp', { amount: `${num(Number(this.reference))} RSD` })
+      return t('set.rrp', { amount: money(Number(this.reference)) })
     },
     maxLabel(): string {
-      return (this.points as DayPoint[]).length ? num((this.range as readonly number[])[1]) : ''
+      return (this.points as DayPoint[]).length ? moneyNum((this.range as readonly number[])[1]) : ''
     },
     minLabel(): string {
-      return (this.points as DayPoint[]).length ? num((this.range as readonly number[])[0]) : ''
+      return (this.points as DayPoint[]).length ? moneyNum((this.range as readonly number[])[0]) : ''
     },
     firstDate(): string {
       const pts = this.points as DayPoint[]

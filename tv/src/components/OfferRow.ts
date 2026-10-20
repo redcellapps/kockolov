@@ -1,6 +1,6 @@
 import Blits from '@lightningjs/blits'
 // colors and sizes are written literally in templates: the Blits precompiler reads templates before JS runs (see src/theme.ts)
-import { rsd } from '../lib/format'
+import { money } from '../lib/format'
 import { t } from '../i18n'
 
 /** One shop's offer: name (and marketplace seller), stock, price. Focusable row, 1000×72. */
@@ -23,7 +23,7 @@ export default Blits.Component('OfferRow', {
       return this.seller ? `${this.shop} · ${this.seller}` : String(this.shop)
     },
     priceText(): string {
-      return rsd(Number(this.price))
+      return money(Number(this.price))
     },
     stockText(): string {
       return this.inStock ? t('set.offers.inStock') : t('set.offers.outOfStock')

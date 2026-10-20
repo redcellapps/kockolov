@@ -1,7 +1,7 @@
 import Blits from '@lightningjs/blits'
 // colors and sizes are written literally in templates: the Blits precompiler reads templates before JS runs (see src/theme.ts)
 import { picture } from '../api/client'
-import { clip, discountPct, rsd, savingText } from '../lib/format'
+import { clip, discountPct, money, savingText } from '../lib/format'
 import { t } from '../i18n'
 
 /** The deal of the day as one big frame on the home page: picture, name, price vs LEGO Store, shop. 1728×400. */
@@ -70,14 +70,14 @@ export default Blits.Component('Hero', {
       return parts.join(' · ')
     },
     priceText(): string {
-      return rsd(this.price as number | null)
+      return money(this.price as number | null)
     },
     saving(): string {
       return savingText(this.reference as number | null, this.price as number | null)
     },
     rrpText(): string {
       return discountPct(this.reference as number | null, this.price as number | null) > 0
-        ? t('home.top.rrp', { amount: rsd(this.reference as number | null) })
+        ? t('home.top.rrp', { amount: money(this.reference as number | null) })
         : ''
     },
     shopText(): string {

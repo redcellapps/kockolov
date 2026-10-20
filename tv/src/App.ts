@@ -5,6 +5,9 @@ import Search from './pages/Search'
 import Themes from './pages/Themes'
 import ThemeSets from './pages/ThemeSets'
 import About from './pages/About'
+import Pair from './pages/Pair'
+import Account from './pages/Account'
+import Watchlist from './pages/Watchlist'
 
 // Page switches are instant and nothing is animated by the router: `before` is applied directly, and
 // with no `in`/`out` the router has no animation promise to wait for. Animated transitions (even with
@@ -26,5 +29,8 @@ export default Blits.Application({
     { path: '/teme', component: Themes, options: { keepAlive: true }, transition: pageTransition },
     { path: '/teme/:slug', component: ThemeSets, options: { backtrack: true } as never, transition: pageTransition },
     { path: '/o-aplikaciji', component: About, transition: pageTransition },
+    { path: '/prijava', component: Pair, transition: pageTransition },
+    { path: '/nalog', component: Account, transition: pageTransition },
+    { path: '/praceno', component: Watchlist, options: { keepAlive: true }, transition: pageTransition },
   ],
 })

@@ -1,9 +1,10 @@
 import Blits from '@lightningjs/blits'
 import { card, safe } from '../theme'
 // colors and sizes are written literally in templates: the Blits precompiler reads templates before JS runs (see src/theme.ts)
-import { api, picture } from '../api/client'
+import { api, clearCache, picture } from '../api/client'
+import { signedIn } from '../lib/session'
 import type { SetDetail, SetSummary } from '../api/types'
-import { clip, discountPct, rsd } from '../lib/format'
+import { clip, discountPct, money } from '../lib/format'
 import { dailyLowest, type DayPoint } from '../lib/history'
 import { qrDataUrl } from '../lib/qr'
 import { t } from '../i18n'
@@ -15,8 +16,9 @@ import Row, { type RowItem } from '../components/Row'
 
 const SITE = 'https://kockolov.rs'
 const NAV = 0
-const OFFERS = 1
-const RELATED = 2
+const WATCH = 1
+const OFFERS = 2
+const RELATED = 3
 const RELATED_Y = 1080
 
 export function offersToList(d: SetDetail): OfferItem[] {
@@ -81,6 +83,12 @@ export default Blits.Component('SetPage', {
           <Text :content="$qrTitle" font="jakarta-bold" size="22" color="#16150f" x="112" y="226" mount="{x: 0.5}" />
           <Text :content="$qrLink" font="jakarta" size="16" color="#5d5a4c" x="112" y="258" mount="{x: 0.5}" />
         </Element>
+        <!-- watch button under the QR: the page's own focus when the section is WATCH -->
+        <Element x="1600" y="456" w="224" h="60" rounded="30" :color="$section === 1 && $$hasFocus ? '#ffcf00' : ($watched ? '#2f2d23' : '#23221a')"
+          :border="{w: 3, color: $watched ? '#4ade80' : '#3a382c'}"
+          :scale.transition="{value: $section === 1 && $$hasFocus ? 1.05 : 1, duration: 160}">
+          <Text :content="$watchText" font="jakarta-bold" size="24" :color="$section === 1 && $$hasFocus ? '#16150f' : ($watched ? '#4ade80' : '#ffffff')" x="112" y="15" mount="{x: 0.5}" />
+        </Element>
         <!-- offers + chart -->
         <OfferList ref="offers" x="96" y="636" :items="$offers" w="1000" h="396" visible="4" />
         <PriceChart x="1140" y="636" w="684" h="384" :points="$points" :reference="$reference" />
@@ -117,6 +125,8 @@ export default Blits.Component('SetPage', {
       qrTitle: t('set.qr.title'),
       disclaimer: t('set.disclaimer'),
       relatedTitle: '',
+      watched: false,
+      busy: false,
     }
   },
   computed: {
@@ -136,7 +146,7 @@ export default Blits.Component('SetPage', {
       return this.themeW + 18 + String(this.numberText).length * 12 + 24
     },
     priceText(): string {
-      return rsd(this.price)
+      return money(this.price)
     },
     atText(): string {
       return this.shop ? t('set.at', { shop: this.shop }) : ''
@@ -144,16 +154,19 @@ export default Blits.Component('SetPage', {
     saving(): string {
       const pct = discountPct(this.reference, this.price)
       if (!pct || !this.reference || !this.price) return ''
-      return t('set.youSave', { amount: rsd(this.reference - this.price), pct })
+      return t('set.youSave', { amount: money(this.reference - this.price), pct })
     },
     rrpText(): string {
-      return this.reference ? t('set.rrp', { amount: rsd(this.reference) }) : t('set.rrp.unknown')
+      return this.reference ? t('set.rrp', { amount: money(this.reference) }) : t('set.rrp.unknown')
     },
     lowText(): string {
       const parts: string[] = []
-      if (this.lowestEver) parts.push(t('set.lowestEver', { amount: rsd(this.lowestEver) }))
-      if (this.lowest30 && this.lowest30 !== this.lowestEver) parts.push(t('set.lowest30', { amount: rsd(this.lowest30) }))
+      if (this.lowestEver) parts.push(t('set.lowestEver', { amount: money(this.lowestEver) }))
+      if (this.lowest30 && this.lowest30 !== this.lowestEver) parts.push(t('set.lowest30', { amount: money(this.lowest30) }))
       return parts.join(' · ')
+    },
+    watchText(): string {
+      return this.watched ? t('watch.button.on') : t('watch.button')
     },
     qrLink(): string {
       return `kockolov.rs/set/${this.setnum}`
@@ -204,6 +217,7 @@ export default Blits.Component('SetPage', {
         this.points = dailyLowest(d.history, 90)
         this.related = d.related.map(summaryToCard)
         this.relatedTitle = t('set.related', { theme: this.theme })
+        this.watched = !!d.watched
         this.status = 'ready'
         // set the QR texture once the page is shown: a texture given to a hidden node is sometimes never loaded
         this.$setTimeout(() => {
@@ -215,9 +229,31 @@ export default Blits.Component('SetPage', {
       }
     },
     focusSection() {
+      if (this.section === WATCH) {
+        this.$focus()
+        return
+      }
       const ref = this.section === NAV ? 'nav' : this.section === OFFERS ? 'offers' : 'related'
       const el = this.$select(ref)
       if (el && el.$focus) el.$focus()
+    },
+    async toggleWatch() {
+      if (!signedIn()) {
+        this.$router.to('/prijava')
+        return
+      }
+      if (this.busy) return
+      this.busy = true
+      const setNum = String(this.setnum)
+      try {
+        const r = this.watched ? await api.unwatch(setNum) : await api.watch(setNum)
+        this.watched = r.watched
+        clearCache(`/api/sets/${encodeURIComponent(setNum)}`)
+      } catch (e) {
+        this.$log.error('watch', e)
+      } finally {
+        this.busy = false
+      }
     },
     onLoaded() {
       this.failed = false
@@ -243,12 +279,14 @@ export default Blits.Component('SetPage', {
     down() {
       let next = this.section
       if (this.status === 'ready' && this.section < RELATED) next++
+      if (next === OFFERS && this.offers.length === 0) next = this.related.length ? RELATED : this.section
       if (next === RELATED && this.related.length === 0) next = this.section
       if (next !== this.section) this.section = next
       else this.focusSection()
     },
     enter() {
       if (this.status === 'error') this.load()
+      else if (this.section === WATCH) this.toggleWatch()
     },
     left() {},
     right() {},

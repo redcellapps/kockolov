@@ -23,7 +23,7 @@ export default Blits.Component('Row', {
           <Component is="$kind" :for="(item, index) in $items" :key="$item.key" ref="card" :item="$item" :index="$index"
             :x="$index * ($cardW + $gap)"
             :setNum="$item.setNum" :name="$item.name" :price="$item.price" :reference="$item.reference"
-            :discount="$item.discount" :offers="$item.offers" :slug="$item.slug" :count="$item.count"
+            :discount="$item.discount" :offers="$item.offers" :slug="$item.slug" :count="$item.count" :note="$item.note" :cheaper="$item.cheaper"
             :w="$cardW" :h="$cardH" />
         </Element>
       </Element>

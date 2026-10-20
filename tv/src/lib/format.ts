@@ -19,6 +19,35 @@ export function rsd(n: number | null | undefined): string {
   return `${num(n)} RSD`
 }
 
+// ---- display currency: prices are stored in RSD; a signed-in account may read them in EUR ----
+let display: { currency: 'RSD' | 'EUR'; rate: number } = { currency: 'RSD', rate: 1 }
+
+/** Set after sign-in from the account's setting and today's NBS rate (RSD for 1 EUR) */
+export function setDisplayCurrency(currency: 'RSD' | 'EUR', rate: number): void {
+  display = currency === 'EUR' && rate > 0 ? { currency, rate } : { currency: 'RSD', rate: 1 }
+}
+export const displayCurrency = () => display.currency
+
+/** "62,45 €" from an RSD amount (comma decimal, like the site) */
+export function eur(rsdAmount: number): string {
+  const v = rsdAmount / display.rate
+  const whole = Math.floor(v)
+  const cents = Math.round((v - whole) * 100)
+  const c = cents === 100 ? 0 : cents
+  return `${num(cents === 100 ? whole + 1 : whole)},${c < 10 ? '0' : ''}${c} €`
+}
+
+/** An RSD amount in the reader's currency: "7.319 RSD" or "62,45 €" */
+export function money(n: number | null | undefined): string {
+  if (n === null || n === undefined) return '—'
+  return display.currency === 'EUR' ? eur(n) : rsd(n)
+}
+
+/** Bare number in the reader's currency, for chart axes: "7.319" or "62" */
+export function moneyNum(n: number): string {
+  return display.currency === 'EUR' ? num(Math.round(n / display.rate)) : num(n)
+}
+
 /** Percentage below the reference price, rounded: (7799, 5752) → 26; 0 when not cheaper or no reference */
 export function discountPct(reference: number | null | undefined, price: number | null | undefined): number {
   if (!reference || !price || price >= reference) return 0
@@ -29,7 +58,7 @@ export function discountPct(reference: number | null | undefined, price: number 
 export function savingText(reference: number | null | undefined, price: number | null | undefined): string {
   const pct = discountPct(reference, price)
   if (!pct || !reference || !price) return ''
-  return t('home.top.saving', { amount: rsd(reference - price), pct })
+  return t('home.top.saving', { amount: money(reference - price), pct })
 }
 
 /** "danas" / "juče" / "pre 3 dana" for an ISO timestamp, relative to now */
