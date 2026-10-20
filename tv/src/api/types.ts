@@ -63,7 +63,7 @@ export interface SearchResponse {
   size: number
   sort: string
   items: SetSummary[]
-  facets: { themes: Theme[]; shops: { shop_id: string; count: number }[] }
+  facets: { themes: { slug: string; count: number }[]; shops: { shop_id: string; count: number }[] }
 }
 
 export interface Theme {
@@ -120,6 +120,17 @@ export interface SetDetail {
   watched: boolean
   hidden_offers: number
   hidden_shops: number
+}
+
+export interface Shop {
+  id: string
+  name: string
+  url: string
+  kind: string
+  members_only: boolean
+  offers_in_stock: number
+  sellers: number
+  last_crawl: string | null
 }
 
 export interface Stats {
