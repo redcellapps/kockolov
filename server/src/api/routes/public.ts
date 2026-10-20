@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { config } from '../../config.js';
 import { one, query } from '../../db.js';
-import { renderCollectionCard, renderSetCard } from '../../seo/og.js';
+import { firstPicture, renderCollectionCard, renderSetCard } from '../../seo/og.js';
 import { keyPart, sendCard, setCardFor } from '../../seo/cards.js';
 import { loadCollection, loadSet, version } from '../../seo/pages.js';
 import { listPosts } from '../../blog/posts.js';
@@ -69,6 +69,21 @@ export async function publicRoutes(app: FastifyInstance) {
     if (!s) return reply.code(404).send('');
     const { card, key, prefix, alternatives } = setCardFor(s);
     return sendCard(reply, key, prefix, () => renderSetCard(card, alternatives));
+  });
+
+  // ---- product pictures, squared on white and shrunk (the TV app's WebGL textures need a same-origin
+  // picture with CORS headers, which the shops' CDNs don't send; the full-size photos are also too big
+  // for a TV's memory). ?w= is one of the fixed sizes so the disk cache (OG_CACHE_DIR/pics) stays small. ----
+  const PICTURE_SIZES = [160, 320, 640];
+  app.get<{ Params: { file: string }; Querystring: { w?: string } }>('/media/set/:file', async (req, reply) => {
+    const setNum = jpgName(req.params.file);
+    const w = Number(req.query.w) || 320;
+    if (!setNum || !PICTURE_SIZES.includes(w)) return reply.code(404).send('');
+    const s = await loadSet(setNum);
+    const pic = s ? await firstPicture([s.image_url, ...s.alt_images], w) : null;
+    if (!pic) return reply.code(404).send('');
+    const buf = Buffer.from(pic.slice(pic.indexOf(',') + 1), 'base64');
+    return reply.type('image/jpeg').header('Cache-Control', 'public, max-age=86400').send(buf);
   });
 
   async function collection(reply: import('fastify').FastifyReply, kind: 'home' | 'deals' | 'theme', slug?: string) {
