@@ -408,6 +408,10 @@ async function setPage(setNum: string): Promise<PageMeta> {
     status: 200,
     path,
     canonical: path,
+    // a set no public shop has in stock is only a name and "not in stock": kept out of the index (and the
+    // sitemap) so Google doesn't judge the site by thousands of empty pages; it comes back on its own once
+    // a shop has it again. "follow" keeps the links to similar sets.
+    robots: s.best_price ? undefined : 'noindex, follow',
     title,
     description,
     type: 'product',
