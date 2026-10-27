@@ -34,6 +34,10 @@ const schema = z.object({
   // where the app's pages come from (iOS, Android): these may call the API from another origin
   APP_ORIGINS: z.string().default('capacitor://localhost,https://localhost'),
 
+  // Visitor statistics (Umami, self-hosted, no cookies): both set = the site and the apps report page views
+  UMAMI_URL: z.string().optional(),
+  UMAMI_WEBSITE_ID: z.string().optional(),
+
   // Crawler
   CRAWLER_USER_AGENT: z
     .string()

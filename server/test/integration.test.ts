@@ -48,7 +48,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
   const { hashPassword } = await import('../src/api/auth.js');
   let mock: Awaited<ReturnType<typeof startMockShops>>;
   let app: Awaited<ReturnType<typeof buildApp>>;
-  /** the sitemap index and the three sitemaps it lists, as one text */
+  /** the sitemap index and the sitemaps it lists, as one text */
   const sitemapText = async () => {
     const index = await app.inject({ method: 'GET', url: '/sitemap.xml' });
     const parts = [...index.body.matchAll(/<loc>[^<]*?(\/sitemap-[a-z-]+\.xml)<\/loc>/g)].map((m) => m[1]);
@@ -373,11 +373,19 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     config.PUBLIC_MODE = true;
     try {
       const robots = (await app.inject({ method: 'GET', url: '/robots.txt' })).body;
-      expect(robots).toContain('Disallow: /api/');
+      // Google draws the pages with JavaScript, so it may fetch the API; the API's answers are noindex
+      expect(robots).not.toContain('Disallow: /api');
+      expect(robots).toContain('Disallow: /admin');
       expect(robots).toContain('Sitemap: ');
+      const api = await app.inject({ method: 'GET', url: '/api/sets?q=10280' });
+      expect(api.headers['x-robots-tag']).toBe('noindex');
+      expect((await app.inject({ method: 'GET', url: '/api/nema-ovoga' })).headers['x-robots-tag']).toBe('noindex');
+      expect((await app.inject({ method: 'GET', url: '/robots.txt' })).headers['x-robots-tag']).toBeUndefined();
       const map = await sitemapText();
       expect(map.index.headers['content-type']).toContain('application/xml');
-      expect(map.parts).toEqual(['/sitemap-pages.xml', '/sitemap-sets.xml', '/sitemap-sets-oos.xml']);
+      // sets nobody has in stock are not offered to search engines
+      expect(map.parts).toEqual(['/sitemap-pages.xml', '/sitemap-sets.xml']);
+      expect((await app.inject({ method: 'GET', url: '/sitemap-sets-oos.xml' })).statusCode).toBe(404);
       expect(map.text).toContain('/set/10280</loc>');
       expect(map.text).toContain('/privatnost</loc>');
     } finally {
@@ -421,6 +429,25 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect(set.html).toContain('Najniža cena: 7.319');
       expect(set.html).toContain('<h2>Sve ponude</h2>');
       expect(set.html).toMatch(/<a href="\/set\/\d+[^"]*">LEGO \d+/);
+
+      expect(set.m.robots).toBeUndefined();
+
+      // a set no public shop has in stock: still a page for visitors, but out of the index and the
+      // sitemap until a shop has it again; its links to similar sets are still followed
+      const inStock = await query<{ id: string }>(
+        "SELECT o.id FROM offers o JOIN public_offers p ON p.id = o.id WHERE o.set_num = '10280' AND o.active AND o.in_stock",
+      );
+      expect(inStock.length).toBeGreaterThan(0);
+      await query('UPDATE offers SET in_stock = false WHERE id = ANY($1)', [inStock.map((r) => r.id)]);
+      try {
+        const gone = await head('/set/10280');
+        expect(gone.m).toMatchObject({ status: 200, robots: 'noindex, follow' });
+        expect(gone.html).toContain('<meta name="robots" content="noindex, follow" />');
+        expect((await sitemapText()).text).not.toContain('/set/10280</loc>');
+      } finally {
+        await query('UPDATE offers SET in_stock = true WHERE id = ANY($1)', [inStock.map((r) => r.id)]);
+      }
+      expect((await head('/set/10280')).m.robots).toBeUndefined();
 
       // unknown sets and pages are real 404s; private and search pages stay out of the index
       expect((await head('/set/00000')).m).toMatchObject({ status: 404, robots: 'noindex' });

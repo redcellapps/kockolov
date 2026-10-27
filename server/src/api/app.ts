@@ -60,6 +60,9 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
 
   app.addHook('onRequest', async (req, reply) => {
     if (!req.url.startsWith('/api/') || req.method === 'OPTIONS') return;
+    // robots.txt lets crawlers fetch the API (Google needs it to draw the pages), but the JSON itself
+    // must never appear in search results
+    reply.header('X-Robots-Tag', 'noindex');
     req.user = await userFromRequest(req);
     const open = OPEN_PATHS.some((p) => req.url.startsWith(p));
     if (!config.PUBLIC_MODE && !open && !req.user) {

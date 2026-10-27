@@ -194,6 +194,8 @@ export interface MeResponse {
   registrationOpen: boolean;
   /** NBS middle rate: RSD for 1 EUR (day is null while only the fallback is known) */
   fx?: { eur: { rate: number; day: string | null } };
+  /** Umami address and website id; null while statistics are off */
+  analytics?: { url: string; id: string } | null;
 }
 
 export interface BlogImage {

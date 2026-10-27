@@ -137,3 +137,19 @@ export const UndoIcon = (p: P) => (
     <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
   </svg>
 );
+
+export const ShareIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="18" cy="5" r="2.6" />
+    <circle cx="6" cy="12" r="2.6" />
+    <circle cx="18" cy="19" r="2.6" />
+    <path d="m8.3 10.8 7.4-4.4M8.3 13.2l7.4 4.4" />
+  </svg>
+);
+export const InstagramIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="3" width="18" height="18" rx="5" />
+    <circle cx="12" cy="12" r="4.2" />
+    <circle cx="17.3" cy="6.7" r=".6" fill="currentColor" />
+  </svg>
+);

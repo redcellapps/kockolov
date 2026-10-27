@@ -65,6 +65,9 @@ export async function authRoutes(app: FastifyInstance) {
     registrationOpen: config.registrationOpen,
     // for showing prices in euros (users who chose EUR)
     fx: { eur: await eurRate() },
+    // where the page views go (null = no statistics)
+    analytics:
+      config.UMAMI_URL && config.UMAMI_WEBSITE_ID ? { url: config.UMAMI_URL.replace(/\/$/, ''), id: config.UMAMI_WEBSITE_ID } : null,
   }));
 
   app.post('/api/auth/login', async (req, reply) => {

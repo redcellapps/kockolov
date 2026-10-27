@@ -180,6 +180,33 @@ docker compose exec app node server/dist/cli.js digest --email you@example.com
 
 To close sign-up again but keep the site public: `REGISTRATION_OPEN=false`.
 
+## 9. Visitor statistics (Umami)
+
+Counts visits without cookies, on your own server: pages, where visitors come from (e.g. `?utm_source=instagram`),
+and whether they use the site in a browser, the installed site (PWA) or the Android/iOS app (tags `web`, `pwa`,
+`app-android`, `app-ios`). Search words are never sent. Admins and "Do Not Track" browsers aren't counted.
+
+1. **DNS:** an A record `stats.kockolov.rs` → 159.69.146.251 (the same place as step 1).
+2. **Compose:** in `/opt/kockolov`
+   ```bash
+   git pull
+   echo "UMAMI_APP_SECRET=$(openssl rand -hex 32)" >> .env
+   sed -i 's#^COMPOSE_FILE=.*#&:deploy/myvesta/compose.umami.yml#' .env      # adds the Umami file to COMPOSE_FILE
+   docker compose up -d db
+   docker compose exec db psql -U kockolov -c "CREATE DATABASE umami"
+   docker compose up -d umami
+   curl -s http://127.0.0.1:3200/api/heartbeat                              # {"ok":true}
+   ```
+3. **nginx:** copy `umami.tpl` and `umami.stpl` to `/usr/local/vesta/data/templates/web/nginx/`, in myVesta add the web
+   domain `stats.kockolov.rs` (proxy template "umami"), then enable Let's Encrypt SSL for it (as in step 6).
+4. **Umami:** open https://stats.kockolov.rs, sign in with Umami's first-run account (name and password are in its
+   documentation), change the password at once, then Settings → Websites → Add website (name Kockolov, domain
+   kockolov.rs) and copy its **Website ID**.
+5. **Kockolov:** in `.env` set `UMAMI_URL=https://stats.kockolov.rs` and `UMAMI_WEBSITE_ID=<the id>`, then
+   `docker compose up -d --force-recreate app`. The site and the apps read these from the server, so an app
+   update isn't needed.
+6. Check: open kockolov.rs in a private window (not signed in as admin) and look at Umami → Realtime.
+
 ## Updating
 
 ```bash

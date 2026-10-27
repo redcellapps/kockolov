@@ -1,0 +1,17 @@
+# Visitor statistics (Umami, https://umami.is): self-hosted, no cookies, one container next to Kockolov.
+# It uses the same Postgres server with its own database "umami" (created once, deploy/myvesta/README.md §9).
+# Enabled through .env:  COMPOSE_FILE=docker-compose.yml:deploy/myvesta/compose.docker19.yml:deploy/myvesta/compose.umami.yml
+services:
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    restart: unless-stopped
+    security_opt: ["seccomp=unconfined"]
+    environment:
+      DATABASE_URL: postgresql://kockolov:${POSTGRES_PASSWORD}@db:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?set UMAMI_APP_SECRET in .env}
+    depends_on:
+      db:
+        condition: service_healthy
+    # only reachable from the server itself; nginx (template "umami") serves https://stats.kockolov.rs
+    ports:
+      - "127.0.0.1:3200:3000"

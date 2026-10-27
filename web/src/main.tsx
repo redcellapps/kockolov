@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, HashRouter, useNavigate } from 'react-router';
+import { BrowserRouter, HashRouter, useLocation, useNavigate } from 'react-router';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 import { ApiError } from './lib/api';
+import { trackPage } from './lib/analytics';
 import { AuthProvider } from './lib/auth';
 import { isApp, loadAppToken } from './lib/platform';
 import { startPwa } from './lib/pwa';
@@ -26,6 +27,15 @@ const queryClient = new QueryClient({
   },
 });
 
+/** One statistics page view for every page the visitor opens (the app never reloads) */
+function PageTracker() {
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    trackPage();
+  }, [pathname, search]);
+  return null;
+}
+
 /** Inside the Android/iOS app: back button, notification taps and kockolov.rs links open pages here */
 function NativeBridge() {
   const navigate = useNavigate();
@@ -43,6 +53,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <Router>
         <NativeBridge />
+        <PageTracker />
         <AuthProvider>
           <ErrorBoundary>
             <App />

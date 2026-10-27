@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, CheckIcon, ExternalIcon, LockIcon, TrendDown } from '../components/icons';
+import { ShareButton } from '../components/ShareButton';
 import { PriceHistoryChart } from '../components/PriceHistoryChart';
 import { ProductImage, SetCard } from '../components/SetCard';
 import { EmptyState, ErrorState, ShopDot, Skeleton, buttonClasses, cx } from '../components/ui';
 import { WatchButton } from '../components/WatchButton';
 import { t, tn } from '../i18n';
+import { trackEvent } from '../lib/analytics';
 import { api, ApiError, type SetDetail as SetDetailData } from '../lib/api';
 import { ageLabel, ago, dateLong, displayCurrency, money, rateText, reasonText, shopName } from '../lib/format';
 import { useAuth } from '../lib/auth';
@@ -120,6 +122,7 @@ export default function SetDetail() {
                 <div className="mt-5 flex flex-wrap gap-2">
                   <a
                     href={best.url}
+                    onClick={() => trackEvent('kupi', { prodavnica: best.shop_id, mesto: 'glavno' })}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
                     className={buttonClasses('primary', 'lg', 'min-w-[13rem] flex-1 whitespace-nowrap sm:flex-none')}
@@ -127,6 +130,7 @@ export default function SetDetail() {
                     {t('set.goToShop')} <ExternalIcon size={18} />
                   </a>
                   <WatchButton setNum={set.set_num} className="h-13" />
+                  <ShareButton path={`/set/${set.set_num}`} title={`LEGO ${set.set_num} ${set.name}`} text={t('share.text', { price: money(best.price_rsd) })} />
                 </div>
               </>
             ) : hidden > 0 ? (
@@ -231,6 +235,7 @@ export default function SetDetail() {
                       <td className="w-0 py-4 pr-3 pl-1 sm:pr-5 sm:pl-0">
                         <a
                           href={o.url}
+                          onClick={() => trackEvent('kupi', { prodavnica: o.shop_id, mesto: 'tabela' })}
                           target="_blank"
                           rel="noopener noreferrer nofollow"
                           className={cx(

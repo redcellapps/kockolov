@@ -1,3 +1,4 @@
+import { trackEvent } from '../lib/analytics';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { LogoMark } from '../components/Logo';
@@ -110,6 +111,7 @@ export default function LoginPage() {
         await refresh(); // LoginRoute then redirects to where the user was going
       } else if (mode === 'register') {
         await api('/api/auth/register', { method: 'POST', json: { email, password, name } });
+        trackEvent('registracija');
         setSent({ kind: 'signup', email: email.trim() });
       } else {
         await api('/api/auth/forgot', { method: 'POST', json: { email } });
