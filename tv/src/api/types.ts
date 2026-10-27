@@ -143,3 +143,31 @@ export interface Stats {
   members_shops: number
   members_offers: number
 }
+
+export interface AuthMe {
+  user: { id: number; email: string; name: string; role: string; currency: 'RSD' | 'EUR' } | null
+  publicMode: boolean
+  fx: { eur: { rate: number; day: string | null } }
+}
+
+export interface Pairing {
+  code: string
+  secret: string
+  expiresIn: number
+  url: string
+}
+
+export interface PairStatus {
+  status: 'pending' | 'confirmed' | 'expired'
+  token?: string
+  user?: { name: string; currency: 'RSD' | 'EUR' }
+}
+
+export interface WatchedSet extends SetSummary {
+  watched_since: string | null
+  seen_price: number | null
+}
+
+export interface WatchlistResponse {
+  items: WatchedSet[]
+}

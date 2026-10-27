@@ -3,10 +3,32 @@ import App from './App'
 import { fonts } from './theme'
 import { loadPlatform } from './platform'
 import { setPlatform } from './platform/current'
+import { loadSession, setFxRate, setSession, signedIn, updateUser } from './lib/session'
+import { setDisplayCurrency } from './lib/format'
+import { api } from './api/client'
 
 const platform = loadPlatform()
 setPlatform(platform)
 platform.init()
+
+// the account paired earlier: check the token still works and pick up the currency + today's rate
+loadSession()
+if (signedIn()) {
+  api
+    .me()
+    .then((me) => {
+      if (!me.user) {
+        setSession(null) // removed from the account page, or expired
+        return
+      }
+      updateUser({ name: me.user.name, currency: me.user.currency })
+      setFxRate(me.fx.eur.rate)
+      setDisplayCurrency(me.user.currency, me.fx.eur.rate)
+    })
+    .catch(() => {
+      // offline: keep the stored session, prices stay in RSD until the next start
+    })
+}
 
 const font = (family: string, file: string) => ({
   family,

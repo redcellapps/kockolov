@@ -3,7 +3,8 @@
 Jedna Lightning 3 / Blits aplikacija (1920×1080, daljinski) koja se pakuje za **Samsung Tizen** (.wgt) i
 **LG webOS** (.ipk). Čita isti REST API kao sajt i mobilne aplikacije (https://kockolov.rs/api). Verzija 1 je
 bez prijave: početna (ponuda dana, najveći popusti, teme), pretraga, teme, stranica seta (ponude, istorija
-cene, QR za telefon) i O aplikaciji.
+cene, QR za telefon) i O aplikaciji. Faza 2 dodaje prijavu kodom (vidi dole): posle nje se vide sve prodavnice,
+praćeni setovi, dugme „Prati cenu“ na setu i cene u EUR ako je tako podešeno u nalogu.
 
 Podržani televizori: Samsung od 2018 (Tizen 4.0, Chromium 56) i LG od 2018 (webOS 4.x, Chromium 53).
 Build je jedan ES5 paket sa polyfill-ima (`@vitejs/plugin-legacy`, cilj `chrome >= 53`).
@@ -115,6 +116,10 @@ Ključevi i sertifikati nikad ne idu u repo.
    tizen run -p <paket>.Kockolov -t <uređaj>
    ```
    Web Inspector: Device Manager → desni klik na aplikaciju → *Inspect*.
+4. Bez računara, sa USB-a: Developer mode **On** na TV-u, `.wgt` u folder `userwidget` u korenu FAT32 USB-a,
+   USB u TV → aplikacija se instalira sama (Apps → ikona; ponekad treba restart). Da li ovaj put prima i
+   *nepotpisan* paket iz CI-ja (`tv-test` release) nije provereno — ako TV odbije, dodaj autorski sertifikat
+   u GitHub secrets pa CI potpisuje svaki paket.
 
 ## Predaja u prodavnice
 
@@ -141,8 +146,16 @@ Ključevi i sertifikati nikad ne idu u repo.
 - LG QA proverava rad na nekoliko webOS verzija (test se vraća sa izveštajem ako nešto padne); nova verzija =
   veći `version` u package.json.
 
-## Faza 2 (posle odobrenja)
+## Prijava na TV-u (faza 2)
 
-Povezivanje televizora sa nalogom bez kucanja lozinke (TV prikaže kod + QR, korisnik potvrdi na telefonu dok
-je prijavljen na kockolov.rs, TV dobije token i šalje `x-kockolov-app` + `Bearer`). Traži nove serverske
-rute i migraciju; tada se vide sve prodavnice i praćeni setovi.
+Lozinka se nikad ne kuca na daljinskom. Meni → **Prijava**: TV zatraži `POST /api/tv/pair` i prikaže
+6-znakovni kod i QR ka `https://kockolov.rs/tv?kod=…`. Korisnik na telefonu (prijavljen na sajt) potvrdi kod;
+TV anketira `GET /api/tv/pair/:kod?secret=…` na 3 s i, kad dobije `confirmed`, čuva token u
+`localStorage` (`kockolov.tv.session`) i od tada šalje `x-kockolov-app: tv` + `Authorization: Bearer`.
+Kod važi 10 minuta; posle isteka „Novi kod“. Pri startu aplikacija proverava token kroz `/api/me`
+(i uzima valutu + kurs); nevažeći token briše sesiju.
+
+Posle prijave: svih 17 prodavnica, meni dobija **Praćeno** i **Nalog**, set ima „Prati cenu“ / „Pratiš“,
+početna red „Praćeno: pojeftinilo“. **Nalog → Odjavi televizor** poziva `/api/logout` i briše sesiju; uređaj
+se može ukloniti i na sajtu (Nalog → Televizor). Server: `migrations/011_tv_pairing.sql`,
+`src/api/routes/tv.ts`.

@@ -2,7 +2,7 @@ import Blits from '@lightningjs/blits'
 import { card } from '../theme'
 // colors and sizes are written literally in templates: the Blits precompiler reads templates before JS runs (see src/theme.ts)
 import { picture } from '../api/client'
-import { clip, rsd } from '../lib/format'
+import { clip, money } from '../lib/format'
 import { t, tn } from '../i18n'
 
 /** One LEGO set in a row or grid: picture, name, best price, discount badge. 280×360. */
@@ -24,7 +24,7 @@ export default Blits.Component('SetCard', {
       <Text :content="$title" font="jakarta-semibold" size="24" color="#ffffff" x="20" y="224" :maxwidth="$w - 40" maxlines="2" lineheight="30" />
       <!-- price -->
       <Text :content="$priceText" font="jakarta-extrabold" size="30" color="#ffcf00" x="20" y="288" />
-      <Text :content="$meta" font="jakarta" size="20" color="#b6b2a1" x="20" y="324" :maxwidth="$w - 40" maxlines="1" />
+      <Text :content="$note || $meta" font="jakarta" size="20" :color="$note ? ($cheaper ? '#4ade80' : '#b6b2a1') : '#b6b2a1'" x="20" y="324" :maxwidth="$w - 40" maxlines="1" />
     </Element>
   `,
   props: {
@@ -34,6 +34,8 @@ export default Blits.Component('SetCard', {
     reference: 0 as number | null,
     discount: 0,
     offers: 0,
+    note: '', // replaces the meta line (the watchlist shows the price change here)
+    cheaper: false,
     w: card.w,
     h: card.h,
   },
@@ -48,7 +50,7 @@ export default Blits.Component('SetCard', {
       return clip(String(this.name || ''), 44)
     },
     priceText(): string {
-      return rsd(this.price as number | null)
+      return money(this.price as number | null)
     },
     discountText(): string {
       return t('card.discount', { pct: this.discount })

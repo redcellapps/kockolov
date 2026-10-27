@@ -68,4 +68,7 @@ await shot('16-theme-scroll', ['ArrowDown', 'ArrowDown'], 1200)
 
 // about, through the top bar
 await shot('17-about', ['ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowRight', 'Enter'], 2500)
+
+// sign-in page: code + QR (the focus stays on the top bar, "Prijava" is the last item)
+await shot('18-pair', ['ArrowRight', 'Enter'], 3000)
 await browser.close()
