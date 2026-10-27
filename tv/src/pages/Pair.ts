@@ -25,8 +25,8 @@ export default Blits.Component('Pair', {
       <Element :show="$state === 'code'" x="96" y="340" w="760" h="200" rounded="28" color="#23221a">
         <Text :content="$codeText" font="jakarta-extrabold" size="120" color="#ffcf00" x="380" y="28" mount="{x: 0.5}" letterspacing="14" />
       </Element>
-      <Text :show="$state === 'code'" :content="$status" font="jakarta-semibold" size="24" color="#b6b2a1" x="96" y="570" />
-      <Element :show="$state === 'code'" x="96" y="572" w="24" h="24" rounded="6" color="#ffcf00" :alpha="$blink" :x="$statusX" />
+      <Element :show="$state === 'code'" x="96" y="578" w="18" h="18" rounded="9" color="#ffcf00" :alpha.transition="{value: $blink, duration: 400}" />
+      <Text :show="$state === 'code'" :content="$status" font="jakarta-semibold" size="24" color="#b6b2a1" x="126" y="570" />
       <Text :show="$state === 'code'" :content="$expires" font="jakarta" size="22" color="#7d7a6c" x="96" y="612" />
       <!-- expired / error -->
       <Element :show="$state === 'expired' || $state === 'error'" x="96" y="340" w="760" h="200" rounded="28" color="#23221a">
@@ -57,7 +57,6 @@ export default Blits.Component('Pair', {
       expiresAt: 0,
       expires: '',
       blink: 1,
-      statusX: 0,
       pollTimer: null as ReturnType<typeof setTimeout> | null,
       title: t('pair.title'),
       intro: t('pair.intro'),

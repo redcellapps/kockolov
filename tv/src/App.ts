@@ -10,11 +10,14 @@ import Account from './pages/Account'
 import Watchlist from './pages/Watchlist'
 
 // Page switches are instant and nothing is animated by the router: `before` is applied directly, and
-// with no `in`/`out` the router has no animation promise to wait for. Animated transitions (even with
+// with no `in` the router has no animation promise to wait for. Animated `in` transitions (even with
 // duration 0) were seen to never finish in Chrome, which left the router "navigating" and every key
 // dead, or the new page half-transparent. Revisit on a real TV before adding fades.
+// `out` is applied to the leaving page without being awaited; Blits 2.14 reads `out.end` even when
+// it is missing (an unhandled TypeError per navigation), so it gets a harmless no-op.
 const pageTransition = {
   before: { prop: 'alpha', value: 1 },
+  out: { prop: 'alpha', value: 1, duration: 0 },
 }
 
 export default Blits.Application({
