@@ -148,6 +148,8 @@ export interface AuthMe {
   user: { id: number; email: string; name: string; role: string; currency: 'RSD' | 'EUR' } | null
   publicMode: boolean
   fx: { eur: { rate: number; day: string | null } }
+  /** Umami address and website id; null while statistics are off */
+  analytics?: { url: string; id: string } | null
 }
 
 export interface Pairing {

@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Button } from '../components/ui';
 import { t } from '../i18n';
+import { trackEvent } from '../lib/analytics';
 import { api } from '../lib/api';
 import { usePageTitle } from '../lib/title';
 
@@ -13,6 +14,7 @@ export default function TvPage() {
   const [code, setCode] = useState(params.get('kod') ?? '');
   const confirm = useMutation({
     mutationFn: () => api<{ ok: true; device: string | null }>('/api/me/tv/confirm', { method: 'POST', json: { code } }),
+    onSuccess: (r) => trackEvent('tv-uparen', { uredjaj: r.device ?? 'TV' }),
   });
 
   return (

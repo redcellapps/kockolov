@@ -146,6 +146,13 @@ Ključevi i sertifikati nikad ne idu u repo.
 - LG QA proverava rad na nekoliko webOS verzija (test se vraća sa izveštajem ako nešto padne); nova verzija =
   veći `version` u package.json.
 
+## Statistika poseta
+
+Ista Umami statistika kao na sajtu (bez kolačića i ličnih podataka): aplikacija šalje po jedan pregled
+stranice na svaku promenu rute (`src/lib/analytics.ts`, samo putanja tipa `/set/75192`, nikad upit pretrage)
+direktno na `<UMAMI_URL>/api/send`, sa tagom `tv-tizen` / `tv-webos`, i događaj `tv-uparen` kad se TV upari.
+Adresu i ID sajta dobija iz `/api/auth/me` (`analytics`); dok server to ne vrati, ništa se ne šalje.
+
 ## Prijava na TV-u (faza 2)
 
 Lozinka se nikad ne kuca na daljinskom. Meni → **Prijava**: TV zatraži `POST /api/tv/pair` i prikaže
