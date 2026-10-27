@@ -8,6 +8,7 @@ import About from './pages/About'
 import Pair from './pages/Pair'
 import Account from './pages/Account'
 import Watchlist from './pages/Watchlist'
+import { trackPage } from './lib/analytics'
 
 // Page switches are instant and nothing is animated by the router: `before` is applied directly, and
 // with no `in` the router has no animation promise to wait for. Animated `in` transitions (even with
@@ -25,15 +26,23 @@ export default Blits.Application({
     <Element w="1920" h="1080" color="#16150f">
       <RouterView />
     </Element>`,
-  routes: [
-    { path: '/', component: Home, options: { keepAlive: true }, transition: pageTransition },
-    { path: '/set/:setnum', component: SetPage, options: { backtrack: true } as never, transition: pageTransition },
-    { path: '/pretraga', component: Search, options: { keepAlive: true }, transition: pageTransition },
-    { path: '/teme', component: Themes, options: { keepAlive: true }, transition: pageTransition },
-    { path: '/teme/:slug', component: ThemeSets, options: { backtrack: true } as never, transition: pageTransition },
-    { path: '/o-aplikaciji', component: About, transition: pageTransition },
-    { path: '/prijava', component: Pair, transition: pageTransition },
-    { path: '/nalog', component: Account, transition: pageTransition },
-    { path: '/praceno', component: Watchlist, options: { keepAlive: true }, transition: pageTransition },
-  ],
+  router: {
+    hooks: {
+      afterEach(to) {
+        // one page view per route change (the route only, no query)
+        trackPage((to as { hash?: string }).hash || to.path || '/')
+      },
+    },
+    routes: [
+      { path: '/', component: Home, options: { keepAlive: true }, transition: pageTransition },
+      { path: '/set/:setnum', component: SetPage, options: { backtrack: true } as never, transition: pageTransition },
+      { path: '/pretraga', component: Search, options: { keepAlive: true }, transition: pageTransition },
+      { path: '/teme', component: Themes, options: { keepAlive: true }, transition: pageTransition },
+      { path: '/teme/:slug', component: ThemeSets, options: { backtrack: true } as never, transition: pageTransition },
+      { path: '/o-aplikaciji', component: About, transition: pageTransition },
+      { path: '/prijava', component: Pair, transition: pageTransition },
+      { path: '/nalog', component: Account, transition: pageTransition },
+      { path: '/praceno', component: Watchlist, options: { keepAlive: true }, transition: pageTransition },
+    ],
+  },
 })

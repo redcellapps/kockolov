@@ -6,6 +6,7 @@ import { qrDataUrl } from '../lib/qr'
 import { setSession, setFxRate } from '../lib/session'
 import { setDisplayCurrency } from '../lib/format'
 import { platform } from '../platform/current'
+import { trackEvent } from '../lib/analytics'
 import TopBar from '../components/TopBar'
 
 const POLL_MS = 3000
@@ -126,6 +127,7 @@ export default Blits.Component('Pair', {
           if (r.status === 'confirmed' && r.token && r.user) {
             setSession({ token: r.token, user: r.user })
             clearCache()
+            trackEvent('tv-uparen')
             await this.applyAccount()
             this.doneText = t('pair.done', { name: r.user.name })
             this.state = 'done'
