@@ -1092,6 +1092,41 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: auth })).json().user).toBeNull();
   });
 
+  it('pairs a Smart TV with the account through a code confirmed on the site', async () => {
+    const tv = { 'x-kockolov-app': 'tv' };
+    // the TV asks for a code
+    const pair = await app.inject({ method: 'POST', url: '/api/tv/pair', headers: tv, payload: { platform: 'webos' } });
+    expect(pair.statusCode).toBe(200);
+    const { code, secret, url } = pair.json();
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+    expect(url).toContain(`/tv?kod=${code}`);
+    // nothing yet; a wrong secret is as good as no code
+    expect((await app.inject({ method: 'GET', url: `/api/tv/pair/${code}?secret=${secret}`, headers: tv })).json()).toEqual({ status: 'pending' });
+    expect((await app.inject({ method: 'GET', url: `/api/tv/pair/${code}?secret=nope`, headers: tv })).statusCode).toBe(404);
+    // confirming needs a signed-in user; typos in the code are forgiven (lowercase, dash, 0 for O)
+    expect((await app.inject({ method: 'POST', url: '/api/me/tv/confirm', payload: { code } })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'POST', url: '/api/me/tv/confirm', headers: { cookie }, payload: { code: 'ZZZZZZ' } })).statusCode).toBe(404);
+    const typed = code.slice(0, 3).toLowerCase() + '-' + code.slice(3).replace(/O/g, '0');
+    const confirm = await app.inject({ method: 'POST', url: '/api/me/tv/confirm', headers: { cookie }, payload: { code: typed } });
+    expect(confirm.json()).toEqual({ ok: true, device: 'LG TV' });
+    // the TV picks up its token exactly once
+    const done = (await app.inject({ method: 'GET', url: `/api/tv/pair/${code}?secret=${secret}`, headers: tv })).json();
+    expect(done.status).toBe('confirmed');
+    expect(done.user.name).toBe('Milan');
+    expect(done.token).toMatch(/^[\w-]{40,}$/);
+    expect((await app.inject({ method: 'GET', url: `/api/tv/pair/${code}?secret=${secret}`, headers: tv })).statusCode).toBe(404);
+    // ... and is signed in as a member: all shops, the watchlist
+    const auth = { ...tv, authorization: `Bearer ${done.token}` };
+    expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: auth })).json().user.email).toBe('milan@example.com');
+    expect((await app.inject({ method: 'PUT', url: '/api/me/watchlist/10280', headers: auth })).json()).toEqual({ ok: true, watched: true });
+    // the account lists the TV and can remove it
+    const devices = (await app.inject({ method: 'GET', url: '/api/me/devices', headers: { cookie } })).json().devices;
+    const device = devices.find((d: { kind: string }) => d.kind === 'tv');
+    expect(device).toMatchObject({ kind: 'tv', device_name: 'LG TV' });
+    expect((await app.inject({ method: 'DELETE', url: `/api/me/devices/${device.id}`, headers: { cookie } })).json()).toEqual({ ok: true });
+    expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: auth })).json().user).toBeNull();
+  });
+
   it('learns box barcodes from the LEGO Store, so the app can open a set by scanning it', async () => {
     const { fillEans, eanFromProductJson } = await import('../src/crawler/ean.js');
     expect(eanFromProductJson('{"product":{"variants":[{"barcode":""},{"barcode":"5702017 584379"}]}}')).toBe('5702017584379');

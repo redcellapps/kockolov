@@ -169,7 +169,7 @@ const DEFAULT: Omit<PageMeta, 'path'> = {
   type: 'website',
 };
 
-const PRIVATE_PATHS = ['/prijava', '/registracija', '/zaboravljena-lozinka', '/nalog', '/pracenje', '/admin'];
+const PRIVATE_PATHS = ['/prijava', '/registracija', '/zaboravljena-lozinka', '/nalog', '/pracenje', '/admin', '/tv'];
 const PRIVATE_PREFIXES = ['/poziv/', '/potvrda/', '/odjava/'];
 
 export async function pageMeta(rawPath: string, params: URLSearchParams): Promise<PageMeta> {

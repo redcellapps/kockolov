@@ -11,6 +11,7 @@ import { APP_HEADER, type SessionUser, TOKEN_HEADER, userFromRequest } from './a
 import { adminRoutes } from './routes/admin.js';
 import { blogRoutes } from './routes/blog.js';
 import { publicRoutes } from './routes/public.js';
+import { tvRoutes } from './routes/tv.js';
 import { pushRoutes } from './routes/push.js';
 import { injectHead, pageMeta } from '../seo/pages.js';
 import { authRoutes } from './routes/auth.js';
@@ -23,7 +24,7 @@ declare module 'fastify' {
   }
 }
 
-const OPEN_PATHS = ['/api/auth/', '/api/health', '/api/unsubscribe/'];
+const OPEN_PATHS = ['/api/auth/', '/api/health', '/api/unsubscribe/', '/api/tv/pair'];
 
 export function webDistDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -88,6 +89,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(publicRoutes);
   await app.register(blogRoutes);
   await app.register(pushRoutes);
+  await app.register(tvRoutes);
 
   const dist = webDistDir();
   if (existsSync(dist)) {

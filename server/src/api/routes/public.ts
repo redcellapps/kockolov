@@ -51,6 +51,7 @@ export async function publicRoutes(app: FastifyInstance) {
       'User-agent: *',
       'Disallow: /admin',
       'Disallow: /nalog',
+      'Disallow: /tv',
       'Disallow: /pracenje',
       'Disallow: /poziv/',
       'Disallow: /potvrda/',
