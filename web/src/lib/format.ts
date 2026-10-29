@@ -63,6 +63,8 @@ export const SHOPS: Record<string, { name: string; short: string; dot: string }>
   eplaneta: { name: 'ePlaneta', short: 'ePlaneta', dot: '#4f46e5' },
   oddo: { name: 'ODDO igračke', short: 'ODDO', dot: '#2dd4bf' },
   kliklak: { name: 'Kliklak', short: 'Kliklak', dot: '#64748b' },
+  decijisvet: { name: 'Dečiji svet', short: 'Dečiji svet', dot: '#e85d3a' },
+  lotosplus: { name: 'Lotos Plus', short: 'Lotos Plus', dot: '#b45309' },
 };
 
 export function shopName(id: string | null | undefined): string {

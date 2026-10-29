@@ -12,7 +12,8 @@ import { parseOddoPage } from '../src/crawler/adapters/oddo.js';
 import { parsePertiniPage, setNumFromPertiniImage } from '../src/crawler/adapters/pertini.js';
 import { parseShoppsterPage, shoppsterAdapter, shoppsterRetry } from '../src/crawler/adapters/shoppster.js';
 import { parseTehnomanija, setNumFromTehnomanijaName } from '../src/crawler/adapters/tehnomanija.js';
-import { abckockaAdapter, setNumFromImage, wooProductToOffer, wooStoreAdapter } from '../src/crawler/adapters/woocommerce.js';
+import { lotosplusAdapter, parseLotosProducts, setNumFromLotosImage } from '../src/crawler/adapters/lotosplus.js';
+import { abckockaAdapter, decijisvetAdapter, setNumFromImage, wooProductToOffer, wooStoreAdapter } from '../src/crawler/adapters/woocommerce.js';
 import { buildNameIndex, isMinifigCode, matchOffer, notASet, plausiblePrice } from '../src/crawler/matching.js';
 import type { CrawlContext, PageResult, RawOffer } from '../src/crawler/types.js';
 import type { PoliteFetcher } from '../src/lib/http.js';
@@ -53,7 +54,7 @@ describe('every new shop is members-only', () => {
   it('marks all shops except the original three', () => {
     const shops = allAdapters().map((a) => a.shop);
     expect(shops.filter((s) => !s.membersOnly).map((s) => s.id)).toEqual(['lstore', 'kockarium', 'ananas']);
-    expect(shops.filter((s) => s.membersOnly)).toHaveLength(14);
+    expect(shops.filter((s) => s.membersOnly)).toHaveLength(16);
     expect(new Set(shops.map((s) => s.id)).size).toBe(shops.length);
   });
 });
@@ -322,6 +323,98 @@ describe('WooCommerce Store API (Toyzzz, ABC Kocka)', () => {
     const { ctx } = fakeCtx({ [`${b}/wp-json/wc/store/v1/products?per_page=100&page=1`]: JSON.stringify([set, barbie, fig, nerf, disneyFig]) });
     const pages = await collect(abckockaAdapter(b).crawl(ctx));
     expect(pages.flatMap((p) => p.offers.map((o) => o.externalId))).toEqual([String(set.id), String(fig.id), '9003']);
+  });
+});
+
+describe('WooCommerce sale price only in sale_price (Švrća)', () => {
+  it('takes the lower of price and sale_price', () => {
+    const p = {
+      id: 226096,
+      name: 'Lego minecraft the tnt jungle house',
+      permalink: 'https://svrcashop.com/proizvod/lego-minecraft-the-tnt-jungle-house-le21275/',
+      sku: '10025806',
+      on_sale: true,
+      prices: { price: '209900', regular_price: '209900', sale_price: '178415', currency_minor_unit: 2 },
+      is_in_stock: true,
+      images: [],
+    };
+    expect(wooProductToOffer(p)).toMatchObject({ priceRsd: 1784, regularPriceRsd: 2099 });
+    // a normal shop (sale_price = price) is unchanged
+    const same = { ...p, prices: { price: '178415', regular_price: '209900', sale_price: '178415', currency_minor_unit: 2 } };
+    expect(wooProductToOffer(same)).toMatchObject({ priceRsd: 1784, regularPriceRsd: 2099 });
+  });
+});
+
+describe('Dečiji svet (WooCommerce, internal SKUs)', () => {
+  const items = JSON.parse(fx('decijisvet/products-category444-p1.json'));
+  const offer = (id: number) => wooProductToOffer(items.find((p: { id: number }) => p.id === id), { skuIsSetNum: false, allCategoriesAreThemes: true })!;
+  it('takes the set number from the title, never the shop code', () => {
+    expect(offer(46362)).toMatchObject({ sku: '60400', skuGuess: null, priceRsd: 1349, regularPriceRsd: null, inStock: true, themeRaw: ['City'] });
+    expect(offer(56250)).toMatchObject({ sku: '42197', priceRsd: 1349 });
+    expect(offer(57320)).toMatchObject({ sku: '71048', priceRsd: 519 });
+    // the title wins over a picture of another set
+    expect(offer(57712)).toMatchObject({ sku: '77247', skuGuess: null });
+  });
+  it('uses the picture name only as a guess when the title has no full number', () => {
+    expect(offer(68477)).toMatchObject({ sku: null, skuGuess: '60493', ageMin: 7 });
+    // "…IRON 1121" is a cut-off 11211
+    expect(offer(68465)).toMatchObject({ sku: null, skuGuess: '11211' });
+  });
+  it('walks the LEGO category and skips other brands filed there', async () => {
+    const b = 'https://ds.test';
+    const { ctx, asked } = fakeCtx({ [`${b}/wp-json/wc/store/v1/products?category=444&per_page=100&page=1`]: JSON.stringify(items) });
+    const pages = await collect(decijisvetAdapter(b).crawl(ctx));
+    const got = pages.flatMap((p) => p.offers);
+    expect(got).toHaveLength(6);
+    expect(got.some((o) => /GOO JIT ZU/.test(o.title))).toBe(false);
+    expect(got.every((o) => o.sku !== '16471' && o.sku !== '11852')).toBe(true);
+    expect(asked).toHaveLength(1);
+  });
+});
+
+describe('Lotos Plus (Shopify collection)', () => {
+  const base = 'https://lotosplus.rs';
+  const { products } = JSON.parse(fx('lotosplus/products-p1.json'));
+  const offers = parseLotosProducts(products, base);
+  it('reads the set number from the description, else guesses it from the picture name', () => {
+    expect(offers.map((o) => [o.sku ?? null, o.skuGuess ?? null])).toEqual([
+      ['60407', null],
+      [null, '60490'],
+      ['60373', null],
+      [null, '31385'],
+      ['77118', null],
+      [null, '60443'],
+    ]);
+    expect(setNumFromLotosImage('https://cdn.shopify.com/s/files/1/0639/3210/4854/files/lego-sonic-the-hedgehog-77118-01.webp?v=1779884405')).toBe('77118');
+    expect(setNumFromLotosImage('https://cdn.shopify.com/s/files/x/lotos-plus-logo.png')).toBeNull();
+  });
+  it('maps price, stock, url, theme and age', () => {
+    expect(offers[0]).toMatchObject({
+      externalId: '8605213032598',
+      title: 'LEGO City Crveni dabldeker za razgledanje',
+      url: 'https://lotosplus.rs/products/lego-city-crveni-dabldeker-za-razgledanje',
+      priceRsd: 3840,
+      regularPriceRsd: null,
+      inStock: true,
+      ageMin: 7,
+    });
+    expect(offers[0].themeRaw).toContain('City');
+    expect(offers[2].inStock).toBe(false);
+    expect(offers[4].themeRaw).toContain('SONIC');
+    expect(offers[5].url).toBe('https://lotosplus.rs/products/lego-city-f1%C2%AE-pitstop-i-ekipa-sa-automobilom-ferrari');
+  });
+  it('reads the LEGO collection feed and stops after a short page', async () => {
+    const b = 'https://lp.test';
+    const asked: string[] = [];
+    const http = {
+      async getJson(url: string) {
+        asked.push(url);
+        return { products };
+      },
+    } as unknown as PoliteFetcher;
+    const pages = await collect(lotosplusAdapter(b).crawl({ http, log: () => {}, maxPages: 5 }));
+    expect(pages.map((p) => p.offers.length)).toEqual([6]);
+    expect(asked).toEqual([`${b}/collections/lego-kocke/products.json?limit=250&page=1`]);
   });
 });
 

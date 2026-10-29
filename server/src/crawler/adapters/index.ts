@@ -7,13 +7,14 @@ import { eplanetaAdapter } from './eplaneta.js';
 import { kliklakAdapter } from './kliklak.js';
 import { kockaAdapter } from './kocka.js';
 import { kockariumAdapter } from './kockarium.js';
+import { lotosplusAdapter } from './lotosplus.js';
 import { lstoreAdapter } from './lstore.js';
 import { babyparkAdapter, dexyAdapter, kockalendAdapter } from './nbshop.js';
 import { oddoAdapter } from './oddo.js';
 import { pertiniAdapter } from './pertini.js';
 import { shoppsterAdapter } from './shoppster.js';
 import { tehnomanijaAdapter } from './tehnomanija.js';
-import { abckockaAdapter, toyzzzAdapter } from './woocommerce.js';
+import { abckockaAdapter, decijisvetAdapter, toyzzzAdapter } from './woocommerce.js';
 
 /** Base URL override for one shop (config SHOP_BASE_URLS), else the adapter's default */
 function baseFor(id: string): string | undefined {
@@ -44,7 +45,9 @@ export function allAdapters(): ShopAdapter[] {
     babyparkAdapter(baseFor('babypark')),
     eplanetaAdapter(baseFor('eplaneta')),
     oddoAdapter(baseFor('oddo')),
-    kliklakAdapter(baseFor('kliklak')),
+    decijisvetAdapter(baseFor('decijisvet')),
+    lotosplusAdapter(baseFor('lotosplus')),
+    kliklakAdapter(baseFor('kliklak')), // slow pages: crawled last
   ];
 }
 

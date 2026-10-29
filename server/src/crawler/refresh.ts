@@ -30,7 +30,7 @@ interface SetRow {
 // (members-only shops after the public ones, roughly by how clean their titles are)
 const NAME_ORDER = [
   'lstore', 'kockarium', 'ananas', 'kocka', 'bigbang', 'ekupi', 'eplaneta', 'abckocka', 'shoppster', 'tehnomanija',
-  'kliklak', 'toyzzz', 'oddo', 'pertini', 'kockalend', 'dexy', 'babypark',
+  'kliklak', 'toyzzz', 'oddo', 'pertini', 'kockalend', 'dexy', 'babypark', 'decijisvet', 'lotosplus',
 ];
 
 /** A members-only shop's title as a set name: no number, shop code or brand; no ALL CAPS. */
