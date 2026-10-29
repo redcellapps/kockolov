@@ -207,6 +207,31 @@ and whether they use the site in a browser, the installed site (PWA) or the Andr
    update isn't needed.
 6. Check: open kockolov.rs in a private window (not signed in as admin) and look at Umami → Realtime.
 
+## 10. Instagram "set dana"
+
+Every morning at 08:30 the worker picks a popular set (in stock at a public shop, with a picture, many shops carry
+it or people watch it, a bonus for a real discount, a different theme than the last few posts, not repeated within
+60 days) and makes a 1080×1350 picture and a caption. Prices in it come from the public shops only; the members-only
+shops are just counted ("+ još 4 prodavnice uz nalog").
+
+- **Without an Instagram account connected** (the default) the post waits on the admin page (Administracija →
+  Instagram: set dana) and `ADMIN_ALERT_EMAIL` gets an e-mail with the picture and the caption. Save the picture,
+  copy the text, post from the phone, then click "Objavio sam ručno". "Drugi set" picks another one.
+- **To publish automatically** (once, ~15 minutes):
+  1. Instagram app → Settings → Account type and tools → switch to a **professional account** (Creator or Business).
+  2. https://developers.facebook.com/apps → Create app → use case "Manage messaging & content on Instagram"
+     (type Business). In the app: Instagram → **API setup with Instagram login** → "Generate access tokens" →
+     Add account → sign in with the Kockolov Instagram account. If Meta sends a tester invite instead, accept it at
+     https://www.instagram.com/accounts/manage_access/ (Tester invites) and come back.
+  3. Same place → **Generate token** for the account (permissions `instagram_business_basic` and
+     `instagram_business_content_publish`). Copy the long-lived token (usually starts with `IGAA`).
+  4. Administracija → Instagram nalog → paste it → Poveži. From the next morning posts go out by themselves.
+     The server renews the token every week (it would otherwise expire after 60 days); "Pauziraj" stops it for a while.
+  Standard access is enough for an account you own and added to the app, so no app review is needed.
+  Instagram must reach `https://kockolov.rs/og/ig/<id>.jpg` (it fetches the picture from there).
+- Put `kockolov.rs` (with `?utm_source=instagram`) in the profile's bio: the captions say "link u bio-u".
+- Another time: `INSTAGRAM_CRON=0 9 * * *` in `.env`, then `docker compose up -d worker`; empty turns it off.
+
 ## Updating
 
 ```bash

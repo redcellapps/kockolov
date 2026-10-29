@@ -22,6 +22,22 @@ import { applyRule, loadRules, normalizePhrase, releaseRule, type HideRule } fro
 import { LINK_FILTERS, OFFER_SORTS, UnknownSetError, dropOrphanSets, linkOffer, listOffers, lookupSet, resetLink } from '../../crawler/links.js';
 import { normalizeText } from '../../lib/normalize.js';
 import { hashPassword, normalizeEmail } from '../auth.js';
+import {
+  InstagramError,
+  PostStateError,
+  connectAccount,
+  disconnectAccount,
+  getAccount,
+  getPost,
+  markPostedByHand,
+  preparePost,
+  publishPost,
+  recentPosts,
+  setPaused,
+  skipPost,
+  todaysPost,
+  type InstagramPost,
+} from '../../social/instagram.js';
 
 /** Offers waiting for a decision: not linked, not "not a set", not hidden */
 const OPEN = "match_method IS DISTINCT FROM 'merch' AND match_method IS DISTINCT FROM 'hidden' AND match_method IS DISTINCT FROM 'hidden_rule'";
@@ -362,5 +378,88 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!mailConfigured()) return reply.code(503).send({ error: 'Slanje mejlova nije podešeno (SMTP_HOST).' });
     const retried = await retryAnnouncement(id, (m) => req.log.info(m));
     return { ok: true, retried };
+  });
+
+  // ---- Instagram "set dana" ----
+  const igPost = (p: InstagramPost | null) =>
+    p && { ...p, image: `/og/ig/${p.id}.jpg`, filename: `kockolov-${p.day}-${p.set_num}.jpg` };
+  const igId = (raw: string) => {
+    const id = Number(raw);
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  };
+  const igFail = (reply: FastifyReply, err: unknown) => {
+    if (err instanceof PostStateError) return reply.code(409).send({ error: 'Ova objava više ne čeka (objavljena je ili preskočena).' });
+    if (err instanceof InstagramError) return reply.code(502).send({ error: `Instagram: ${err.message}` });
+    throw err;
+  };
+
+  app.get('/api/admin/instagram', async () => {
+    const acc = await getAccount();
+    return {
+      account: acc && { username: acc.username, paused: acc.paused, refreshed_at: acc.refreshed_at },
+      schedule: config.INSTAGRAM_CRON,
+      today: igPost(await todaysPost()),
+      recent: (await recentPosts(14)).map(igPost),
+    };
+  });
+
+  // today's post now, without waiting for the morning job
+  app.post('/api/admin/instagram/prepare', async (_req, reply) => {
+    const p = await preparePost();
+    if (!p) return reply.code(404).send({ error: 'Nijedan set trenutno ne ispunjava uslove (na stanju u javnoj prodavnici, sa slikom).' });
+    return { ok: true, post: igPost(p) };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/admin/instagram/:id/skip', async (req, reply) => {
+    const id = igId(req.params.id);
+    if (!id) return reply.code(404).send({ error: 'Nije pronađeno' });
+    try {
+      return { ok: true, post: igPost(await skipPost(id)) };
+    } catch (err) {
+      return igFail(reply, err);
+    }
+  });
+
+  app.post<{ Params: { id: string } }>('/api/admin/instagram/:id/posted', async (req, reply) => {
+    const id = igId(req.params.id);
+    if (!id) return reply.code(404).send({ error: 'Nije pronađeno' });
+    try {
+      await markPostedByHand(id);
+      return { ok: true, post: igPost(await getPost(id)) };
+    } catch (err) {
+      return igFail(reply, err);
+    }
+  });
+
+  app.post<{ Params: { id: string } }>('/api/admin/instagram/:id/publish', async (req, reply) => {
+    const id = igId(req.params.id);
+    if (!id) return reply.code(404).send({ error: 'Nije pronađeno' });
+    try {
+      return { ok: true, post: igPost(await publishPost(id, (m) => req.log.info(m))) };
+    } catch (err) {
+      return igFail(reply, err);
+    }
+  });
+
+  app.post('/api/admin/instagram/account', async (req, reply) => {
+    const body = z.object({ token: z.string().trim().min(20).max(1000) }).safeParse(req.body ?? {});
+    if (!body.success) return reply.code(400).send({ error: 'Nalepi ceo pristupni token (access token).' });
+    try {
+      const acc = await connectAccount(body.data.token);
+      return { ok: true, account: { username: acc.username, paused: acc.paused, refreshed_at: acc.refreshed_at } };
+    } catch (err) {
+      return igFail(reply, err);
+    }
+  });
+
+  app.post('/api/admin/instagram/account/pause', async (req) => {
+    const body = z.object({ paused: z.boolean() }).parse(req.body ?? {});
+    await setPaused(body.paused);
+    return { ok: true };
+  });
+
+  app.delete('/api/admin/instagram/account', async () => {
+    await disconnectAccount();
+    return { ok: true };
   });
 }

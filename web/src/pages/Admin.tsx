@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { AdminNav } from '../components/admin/AdminNav';
 import { Announcements } from '../components/admin/Announcements';
 import { Barcodes } from '../components/admin/Barcodes';
+import { Instagram } from '../components/admin/Instagram';
 import { OfferReview } from '../components/admin/OfferReview';
 import { Button, ShopDot, Spinner, cx } from '../components/ui';
 import { t } from '../i18n';
@@ -276,6 +277,8 @@ export default function AdminPage() {
           </table>
         </div>
       </Box>
+
+      <Instagram />
 
       <Announcements />
     </div>

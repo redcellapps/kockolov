@@ -59,6 +59,8 @@ const schema = z.object({
   TZ_NAME: z.string().default('Europe/Belgrade'),
   CRAWL_CRON: z.string().default('30 5 * * *'),
   DIGEST_CRON: z.string().default('0 7 * * *'),
+  // Instagram "set dana": prepared (and published, when an account is connected) every morning; empty = off
+  INSTAGRAM_CRON: z.string().default('30 8 * * *'),
 
   // E-mail (morning digest)
   SMTP_HOST: z.string().optional(),
@@ -92,6 +94,13 @@ const schema = z.object({
   FCM_SERVICE_ACCOUNT: z.string().optional(),
   // LEGO Store product pages read per crawl to learn the box barcodes (for scanning in the app); 0 = off
   EAN_PER_RUN: z.coerce.number().default(400),
+
+  // Instagram API (Instagram Login): where it lives and how long to wait for Instagram to take the picture
+  INSTAGRAM_GRAPH_URL: z.string().default('https://graph.instagram.com'),
+  INSTAGRAM_API_VERSION: z.string().default('v25.0'),
+  INSTAGRAM_POLL_MS: z.coerce.number().default(10000),
+  // a set isn't posted again within this many days
+  INSTAGRAM_REPEAT_DAYS: z.coerce.number().default(60),
 
   // Link-preview images (and the product photos in them) kept on disk — a Docker volume in
   // production — so a shared link shows its picture at once, also right after a deploy

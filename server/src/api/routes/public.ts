@@ -1,10 +1,11 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { config } from '../../config.js';
 import { one, query } from '../../db.js';
-import { firstPicture, renderCollectionCard, renderSetCard } from '../../seo/og.js';
+import { cached, firstPicture, renderCollectionCard, renderInstagramCard, renderSetCard } from '../../seo/og.js';
 import { keyPart, sendCard, setCardFor } from '../../seo/cards.js';
 import { loadCollection, loadSet, version } from '../../seo/pages.js';
 import { listPosts } from '../../blog/posts.js';
+import { getPost } from '../../social/instagram.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const site = () => config.APP_URL.replace(/\/$/, '');
@@ -71,6 +72,17 @@ export async function publicRoutes(app: FastifyInstance) {
     if (!s) return reply.code(404).send('');
     const { card, key, prefix, alternatives } = setCardFor(s);
     return sendCard(reply, key, prefix, () => renderSetCard(card, alternatives));
+  });
+
+  // ---- the Instagram "set dana" picture (1080×1350), drawn from what the post froze; Instagram itself
+  // fetches it from here when the worker publishes ----
+  app.get<{ Params: { file: string } }>('/og/ig/:file', async (req, reply) => {
+    const id = Number(jpgName(req.params.file));
+    const p = Number.isSafeInteger(id) && id > 0 ? await getPost(id) : null;
+    if (!p) return reply.code(404).send('');
+    const prefix = `ig-${id}-`;
+    const buf = await cached(`${prefix}${version(p.card)}`, () => renderInstagramCard(p.card), prefix);
+    return reply.type('image/jpeg').header('Cache-Control', 'public, max-age=86400').send(buf);
   });
 
   // ---- product pictures, squared on white and shrunk (the TV app's WebGL textures need a same-origin

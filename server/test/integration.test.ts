@@ -1170,4 +1170,133 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     expect(sheet).toContain('<t>76476</t>');
     expect((await app.inject({ method: 'GET', url: '/api/admin/eans.xlsx' })).statusCode).toBe(401);
   });
+  it('prepares the Instagram "set dana" every morning and publishes it once an account is connected', async () => {
+    const ig = await import('../src/social/instagram.js');
+    const { todayLocal } = await import('../src/lib/time.js');
+    const sharp = (await import('sharp')).default;
+    const admin = (method: 'GET' | 'POST' | 'DELETE', url: string, payload?: object) =>
+      app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    await query('DELETE FROM instagram_posts');
+    await query('DELETE FROM instagram_account');
+
+    // Instagram's API, answered here; everything else (product pictures) goes out as usual
+    const real = globalThis.fetch;
+    const calls: { url: string; body: string }[] = [];
+    let containerStatus = 'FINISHED';
+    const json = (o: object, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (!url.startsWith('https://graph.instagram.test/')) return real(input, init);
+      calls.push({ url, body: init?.body ? String(init.body) : '' });
+      const u = new URL(url);
+      const tok = u.searchParams.get('access_token') ?? new URLSearchParams(String(init?.body ?? '')).get('access_token');
+      if (!tok?.startsWith('IGAA-dobar') && !tok?.startsWith('IGAA-novi')) return json({ error: { message: 'Invalid OAuth access token' } }, 400);
+      switch (u.pathname) {
+        case '/v25.0/me':
+          return json({ user_id: '1784', username: 'kockolov' });
+        case '/v25.0/1784/media':
+          return json({ id: 'c1' });
+        case '/v25.0/c1':
+          return json({ status_code: containerStatus, id: 'c1' });
+        case '/v25.0/1784/media_publish':
+          return json({ id: 'm1' });
+        case '/v25.0/m1':
+          return json({ permalink: 'https://www.instagram.com/p/abc/' });
+        case '/refresh_access_token':
+          return json({ access_token: 'IGAA-novi-token-0123456789', token_type: 'bearer', expires_in: 5183944 });
+      }
+      return json({ error: { message: 'unknown' } }, 404);
+    });
+    const saved = { url: config.INSTAGRAM_GRAPH_URL, poll: config.INSTAGRAM_POLL_MS, alert: config.ADMIN_ALERT_EMAIL };
+    config.INSTAGRAM_GRAPH_URL = 'https://graph.instagram.test';
+    config.INSTAGRAM_POLL_MS = 0;
+    config.ADMIN_ALERT_EMAIL = 'milan@example.com';
+    mail.on = true;
+    mail.sent.length = 0;
+    const yesterday = () => query('UPDATE instagram_posts SET day = day - 1');
+    try {
+      // no account yet: the post is made and waits for the admin, who gets an e-mail
+      const first = (await ig.instagramJob())!;
+      expect(first).toMatchObject({ status: 'ready', day: todayLocal() });
+      // the price is the best one everyone sees (members-only shops only counted)
+      const pub = await one<{ min: number }>(
+        'SELECT min(price_rsd)::int AS min FROM public_offers WHERE set_num = $1 AND active AND in_stock',
+        [first.set_num],
+      );
+      expect(first.card.bestPrice).toBe(pub!.min);
+      expect(first.caption).toContain(`(${first.set_num})`);
+      expect(first.caption).toContain('#kockolov');
+      expect(mail.sent.at(-1)).toMatchObject({ to: 'milan@example.com', subject: expect.stringContaining('spremna') });
+      expect(calls).toHaveLength(0);
+      expect((await ig.instagramJob())!.id).toBe(first.id); // the same morning again: nothing new
+
+      // the picture (Instagram fetches it from here)
+      const pic = await app.inject({ method: 'GET', url: `/og/ig/${first.id}.jpg` });
+      expect([pic.statusCode, pic.headers['content-type']]).toEqual([200, 'image/jpeg']);
+      expect(await sharp(pic.rawPayload).metadata()).toMatchObject({ width: 1080, height: 1350, format: 'jpeg' });
+      expect((await app.inject({ method: 'GET', url: '/og/ig/999999.jpg' })).statusCode).toBe(404);
+
+      // the admin asks for another set, then posts it from the phone
+      expect((await admin('GET', '/api/admin/instagram')).json()).toMatchObject({
+        account: null,
+        today: { id: first.id, image: `/og/ig/${first.id}.jpg`, filename: `kockolov-${first.day}-${first.set_num}.jpg` },
+      });
+      const other = (await admin('POST', `/api/admin/instagram/${first.id}/skip`)).json().post;
+      expect(other.set_num).not.toBe(first.set_num);
+      expect((await admin('POST', `/api/admin/instagram/${first.id}/skip`)).statusCode).toBe(409);
+      expect((await admin('POST', `/api/admin/instagram/${other.id}/posted`)).json().post.status).toBe('posted_by_hand');
+      expect((await app.inject({ method: 'GET', url: '/api/admin/instagram' })).statusCode).toBe(401);
+
+      // a wrong token is refused; the right one connects the account
+      expect((await admin('POST', '/api/admin/instagram/account', { token: 'IGAA-los-token-000000000000' })).statusCode).toBe(502);
+      expect((await admin('POST', '/api/admin/instagram/account', { token: 'IGAA-dobar-token-0123456789' })).json().account).toMatchObject({
+        username: 'kockolov',
+        paused: false,
+      });
+
+      // the next morning it publishes by itself, a set not posted lately
+      await yesterday();
+      calls.length = 0;
+      const next = (await ig.instagramJob())!;
+      expect(next).toMatchObject({ status: 'published', media_id: 'm1', permalink: 'https://www.instagram.com/p/abc/' });
+      expect([first.set_num, other.set_num]).not.toContain(next.set_num);
+      const create = new URLSearchParams(calls.find((c) => c.url.endsWith('/1784/media'))!.body);
+      expect(create.get('image_url')).toBe(`${config.APP_URL.replace(/\/$/, '')}/og/ig/${next.id}.jpg`);
+      expect(create.get('caption')).toBe(next.caption);
+      expect(new URLSearchParams(calls.find((c) => c.url.endsWith('/media_publish'))!.body).get('creation_id')).toBe('c1');
+
+      // Instagram refuses the picture: marked as failed, the admin hears about it and can try again
+      await yesterday();
+      containerStatus = 'ERROR';
+      const bad = (await ig.instagramJob())!;
+      expect(bad).toMatchObject({ status: 'failed', error: expect.stringContaining('ERROR') });
+      expect(mail.sent.at(-1)!.subject).toContain('nije uspela');
+      containerStatus = 'FINISHED';
+      expect((await admin('POST', `/api/admin/instagram/${bad.id}/publish`)).json().post.status).toBe('published');
+
+      // paused: the post is made, not published
+      await yesterday();
+      await admin('POST', '/api/admin/instagram/account/pause', { paused: true });
+      expect((await ig.instagramJob())!.status).toBe('ready');
+      await admin('POST', '/api/admin/instagram/account/pause', { paused: false });
+
+      // the token is renewed once a week
+      await query("UPDATE instagram_account SET refreshed_at = now() - interval '8 days'");
+      await ig.refreshTokenIfDue();
+      expect(await one('SELECT token FROM instagram_account')).toEqual({ token: 'IGAA-novi-token-0123456789' });
+      expect(calls.at(-1)!.url).toContain('grant_type=ig_refresh_token');
+      const before = calls.length;
+      await ig.refreshTokenIfDue();
+      expect(calls.length).toBe(before);
+
+      expect((await admin('DELETE', '/api/admin/instagram/account')).statusCode).toBe(200);
+      expect((await admin('GET', '/api/admin/instagram')).json().account).toBeNull();
+    } finally {
+      spy.mockRestore();
+      config.INSTAGRAM_GRAPH_URL = saved.url;
+      config.INSTAGRAM_POLL_MS = saved.poll;
+      config.ADMIN_ALERT_EMAIL = saved.alert;
+      mail.on = false;
+    }
+  });
 });
