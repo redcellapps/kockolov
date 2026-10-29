@@ -25,6 +25,8 @@ sets also have a LEGO Store price to compare against. Ananas alone lists 1,569 L
         ├─ refresh set name / theme / image / reference price / search text
         └─ deals   score = % below LEGO Store + gap to next offer + new low + savings
 07:00  worker ── morning e-mail ──> every user with the digest on (top deals + watched sets)
+08:30  worker ── Instagram "set dana" ──> picture + caption; published when an account is connected,
+                                          otherwise waiting on the admin page (+ e-mail to the admin)
 ```
 
 Safety rails in the crawler:

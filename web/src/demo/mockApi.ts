@@ -425,6 +425,8 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
       return ok({ subject: String(body?.subject ?? ''), html: newsPreview(String(body?.subject ?? ''), String(body?.body ?? ''), String(state.user!.name ?? '')) });
     }
     if (path.startsWith('/api/admin/announcements')) return err(409, 'U ovom pregledu se mejlovi ne šalju.');
+    if (path === '/api/admin/instagram' && method === 'GET') return ok({ account: null, schedule: '30 8 * * *', today: null, recent: [] });
+    if (path.startsWith('/api/admin/instagram')) return err(409, 'U ovom pregledu se ne objavljuje na Instagramu.');
   }
 
   return err(404, 'Nije pronađeno');

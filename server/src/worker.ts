@@ -7,6 +7,7 @@ import { alertOnCrawlProblems } from './jobs/alerts.js';
 import { refreshEurRate } from './fx.js';
 import { sendDigests } from './mail/digest.js';
 import { sendWatchAlerts } from './push/alerts.js';
+import { instagramJob } from './social/instagram.js';
 
 const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
 
@@ -39,13 +40,24 @@ async function digestJob() {
   }
 }
 
+async function instagram() {
+  try {
+    await instagramJob(log);
+  } catch (err) {
+    log(`posao: instagram objava nije uspela: ${(err as Error).stack ?? err}`);
+  }
+}
+
 async function main() {
   await migrate(log);
   await seedReferenceData();
   await refreshEurRate(log);
   cron.schedule(config.CRAWL_CRON, crawlJob, { timezone: config.TZ_NAME, name: 'crawl' });
   cron.schedule(config.DIGEST_CRON, digestJob, { timezone: config.TZ_NAME, name: 'digest' });
-  log(`worker: preuzimanje "${config.CRAWL_CRON}", pregled "${config.DIGEST_CRON}" (${config.TZ_NAME})`);
+  if (config.INSTAGRAM_CRON) cron.schedule(config.INSTAGRAM_CRON, instagram, { timezone: config.TZ_NAME, name: 'instagram' });
+  log(
+    `worker: preuzimanje "${config.CRAWL_CRON}", pregled "${config.DIGEST_CRON}", instagram "${config.INSTAGRAM_CRON || 'isključen'}" (${config.TZ_NAME})`,
+  );
   if (process.argv.includes('--crawl-now')) await crawlJob();
 }
 

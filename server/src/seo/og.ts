@@ -158,11 +158,15 @@ export function plural(n: number, one: string, few: string, many: string): strin
 
 // ---- shared pieces ----
 function background(...children: Child[]): El {
+  return sizedBackground(OG_WIDTH, OG_HEIGHT, ...children);
+}
+
+function sizedBackground(width: number, height: number, ...children: Child[]): El {
   return h(
     'div',
     {
-      width: OG_WIDTH,
-      height: OG_HEIGHT,
+      width,
+      height,
       position: 'relative',
       backgroundColor: C.yellow,
       backgroundImage: `radial-gradient(circle at 0% 0%, #ffe680 0%, rgba(255,230,128,0) 55%), radial-gradient(circle at 100% 100%, ${C.yellowDeep} 0%, rgba(242,184,0,0) 60%)`,
@@ -202,8 +206,8 @@ function tile(src: string | null, size: number, style: Style = {}): El {
   );
 }
 
-function render(el: El): Promise<Buffer> {
-  return satori(el as never, { width: OG_WIDTH, height: OG_HEIGHT, fonts })
+function render(el: El, width = OG_WIDTH, height = OG_HEIGHT): Promise<Buffer> {
+  return satori(el as never, { width, height, fonts })
     .then((svg) => sharp(Buffer.from(svg)).jpeg({ quality: 86, mozjpeg: true, chromaSubsampling: '4:4:4' }).toBuffer());
 }
 
@@ -293,6 +297,122 @@ export async function renderSetCard(c: SetCard, alternatives: string[] = []): Pr
         ),
       ),
     ),
+  );
+}
+
+// ---- Instagram "set dana" (1080×1350, the tallest a feed post shows) ----
+export const IG_WIDTH = 1080;
+export const IG_HEIGHT = 1350;
+
+export interface InstagramCard {
+  setNum: string;
+  name: string;
+  theme: string | null;
+  imageUrl: string | null;
+  /** other shops' photos of the set, used when its own picture can't be loaded */
+  alternatives: string[];
+  /** best price in the public shops (the ones everyone sees) */
+  bestPrice: number;
+  /** LEGO Store regular price, for the saving */
+  refPrice: number | null;
+  shopLabel: string;
+  /** members-only shops that also have the set in stock */
+  moreShops: number;
+  /** the morning the prices were read, YYYY-MM-DD */
+  day: string;
+}
+
+const MONTHS_GEN = ['januara', 'februara', 'marta', 'aprila', 'maja', 'juna', 'jula', 'avgusta', 'septembra', 'oktobra', 'novembra', 'decembra'];
+/** "2026-10-29" -> "29. oktobra" */
+export function dayGenitive(day: string): string {
+  const [, m, d] = day.split('-').map(Number);
+  return `${d}. ${MONTHS_GEN[m - 1]}`;
+}
+
+export async function renderInstagramCard(c: InstagramCard): Promise<Buffer> {
+  const pic = await firstPicture([c.imageUrl, ...c.alternatives], 1200);
+  const saving = c.refPrice && c.refPrice > c.bestPrice ? c.refPrice - c.bestPrice : 0;
+  const pct = saving && c.refPrice ? Math.round((100 * saving) / c.refPrice) : 0;
+  // a long name takes two lines: the picture gives up some room for it
+  const long = c.name.length > 28;
+  const nameSize = c.name.length > 52 ? 48 : long ? 56 : 66;
+  const tileSize = c.name.length > 34 ? 640 : 700;
+  const priceText = rsd(c.bestPrice);
+
+  return render(
+    sizedBackground(
+      IG_WIDTH,
+      IG_HEIGHT,
+      h(
+        'div',
+        { position: 'absolute', left: 64, right: 64, top: 52, bottom: 56, flexDirection: 'column' },
+        // brand and the label
+        h(
+          'div',
+          { alignItems: 'center', justifyContent: 'space-between' },
+          brand(52),
+          h(
+            'div',
+            { backgroundColor: C.ink, color: C.yellow, fontSize: 28, fontWeight: 800, padding: '9px 20px', borderRadius: 999, letterSpacing: 1 },
+            'SET DANA',
+          ),
+        ),
+        h('div', { justifyContent: 'center', marginTop: 34 }, tile(pic, tileSize)),
+        // set number, theme and name
+        h(
+          'div',
+          { alignItems: 'center', gap: 16, marginTop: 46 },
+          h(
+            'div',
+            { backgroundColor: C.ink, color: C.yellow, fontSize: 28, fontWeight: 800, padding: '7px 18px', borderRadius: 999 },
+            `LEGO® ${c.setNum}`,
+          ),
+          c.theme ? h('div', { fontSize: 28, fontWeight: 700, color: C.muted }, c.theme) : null,
+        ),
+        h(
+          'div',
+          { marginTop: 16, fontSize: nameSize, fontWeight: 800, lineHeight: 1.06, letterSpacing: -1.5, lineClamp: 2, display: 'block' },
+          c.name,
+        ),
+        h('div', { flexGrow: 1, minHeight: 18 }),
+        // price, and what it is compared with
+        h(
+          'div',
+          { alignItems: 'flex-end', justifyContent: 'space-between' },
+          h(
+            'div',
+            { flexDirection: 'column' },
+            h('div', { fontSize: 30, fontWeight: 700, color: C.muted, marginBottom: 4 }, `najniža cena ${dayGenitive(c.day)}`),
+            h('div', { fontSize: priceText.length > 10 ? 100 : 116, fontWeight: 800, letterSpacing: -5, lineHeight: 1 }, priceText),
+            h('div', { fontSize: 30, fontWeight: 700, marginTop: 10 }, c.shopLabel),
+          ),
+          h(
+            'div',
+            { flexDirection: 'column', alignItems: 'flex-end', gap: 12, marginBottom: 4 },
+            pct >= 3
+              ? h('div', { backgroundColor: C.red, color: '#fff', fontSize: 44, fontWeight: 800, padding: '8px 18px', borderRadius: 16 }, `−${pct}%`)
+              : null,
+            pct >= 3
+              ? h(
+                  'div',
+                  { fontSize: 26, fontWeight: 500, color: C.muted, gap: 8 },
+                  h('span', { textDecoration: 'line-through' }, rsd(c.refPrice)),
+                  h('span', {}, 'LEGO® Store'),
+                )
+              : null,
+            c.moreShops > 0
+              ? h(
+                  'div',
+                  { fontSize: 26, fontWeight: 700, color: C.muted },
+                  `+ još ${c.moreShops} ${plural(c.moreShops, 'prodavnica', 'prodavnice', 'prodavnica')} uz nalog`,
+                )
+              : null,
+          ),
+        ),
+      ),
+    ),
+    IG_WIDTH,
+    IG_HEIGHT,
   );
 }
 
