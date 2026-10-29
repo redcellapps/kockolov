@@ -221,3 +221,28 @@ export interface BlogPost extends BlogSummary {
   html: string;
   keywords: string[];
 }
+
+/** A "set dana" that went out on Instagram, with the set's price today (page /ig) */
+export interface IgFeedItem {
+  id: number;
+  /** YYYY-MM-DD */
+  day: string;
+  set_num: string;
+  name: string;
+  theme_name: string | null;
+  /** the post's picture, 1080×1350 */
+  image: string;
+  /** the same, 540 wide */
+  thumb: string;
+  permalink: string | null;
+  /** the price the post showed that morning */
+  post_price: number;
+  /** today's best price at the public shops; null = not in stock anywhere now */
+  best_price: number | null;
+  best_shop: string | null;
+  best_seller: string | null;
+}
+export interface IgFeed {
+  username: string | null;
+  items: IgFeedItem[];
+}
