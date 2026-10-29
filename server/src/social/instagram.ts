@@ -6,10 +6,15 @@ import { todayLocal } from '../lib/time.js';
 import { dayGenitive, plural, type InstagramCard } from '../seo/og.js';
 
 // Instagram "set dana": every morning one popular set, as a 1080×1350 picture (served at
-// /og/ig/<id>.jpg) and a caption. With an Instagram account connected the worker publishes it
-// through the Instagram API (Instagram Login: graph.instagram.com, a long-lived user token with
-// instagram_business_basic + instagram_business_content_publish); without one it stays ready on the
-// admin page and the admin gets an e-mail, to post it from the phone.
+// /og/ig/<id>.jpg) and a caption. With an Instagram account connected the worker publishes it;
+// without one it stays ready on the admin page and the admin gets an e-mail, to post it from the phone.
+// Two ways to connect, by the token the admin pastes:
+// - Instagram login ("IGAA…"): graph.instagram.com, a long-lived user token with
+//   instagram_business_basic + instagram_business_content_publish, renewed here every week;
+// - Facebook login ("EAA…"): graph.facebook.com through the Facebook Page the Instagram account is
+//   linked to. A long-lived user token (instagram_basic, instagram_content_publish, pages_show_list,
+//   pages_read_engagement, business_management) is turned into that Page's token, which doesn't expire.
+// Publishing is the same call sequence on both.
 //
 // Prices in the post come from the public shops only, like everything a visitor sees; the
 // members-only shops are only counted ("+ još 4 prodavnice uz nalog").
@@ -221,20 +226,32 @@ export class PostStateError extends Error {
 
 // ---- the Instagram account and API ----
 
+export type ApiKind = 'instagram' | 'facebook';
+
 export interface InstagramAccount {
   token: string;
   user_id: string;
   username: string;
   refreshed_at: string;
   paused: boolean;
+  api: ApiKind;
+  page_name: string;
 }
 
-export const getAccount = () => one<InstagramAccount>('SELECT token, user_id, username, refreshed_at, paused FROM instagram_account WHERE id = 1');
+const ACCOUNT_COLS = 'token, user_id, username, refreshed_at, paused, api, page_name';
+export const getAccount = () => one<InstagramAccount>(`SELECT ${ACCOUNT_COLS} FROM instagram_account WHERE id = 1`);
 
 export class InstagramError extends Error {}
 
-async function graph<T>(method: 'GET' | 'POST', pathAndQuery: string, token: string, form?: Record<string, string>, versioned = true): Promise<T> {
-  const base = config.INSTAGRAM_GRAPH_URL.replace(/\/$/, '');
+async function graph<T>(
+  method: 'GET' | 'POST',
+  pathAndQuery: string,
+  token: string,
+  form?: Record<string, string>,
+  versioned = true,
+  api: ApiKind = 'instagram',
+): Promise<T> {
+  const base = (api === 'facebook' ? config.FACEBOOK_GRAPH_URL : config.INSTAGRAM_GRAPH_URL).replace(/\/$/, '');
   const url = new URL(`${base}/${versioned ? `${config.INSTAGRAM_API_VERSION}/` : ''}${pathAndQuery}`);
   let body: URLSearchParams | undefined;
   if (method === 'GET') url.searchParams.set('access_token', token);
@@ -254,19 +271,67 @@ async function graph<T>(method: 'GET' | 'POST', pathAndQuery: string, token: str
   return data as T;
 }
 
-/** Checks the token with Instagram and keeps it (the admin pastes it once). */
+/** A Facebook token (Facebook login) rather than an Instagram one */
+export const isFacebookToken = (token: string) => /^EAA/.test(token.trim());
+
+interface PageWithIg {
+  id: string;
+  name?: string;
+  access_token?: string;
+  instagram_business_account?: { id: string; username?: string };
+}
+
+/**
+ * Facebook login: from a user token, the Page (and its token) whose Instagram account we publish to;
+ * a Page token is taken as it is. A Page token got with a long-lived user token doesn't expire.
+ */
+async function facebookAccount(token: string): Promise<{ token: string; user_id: string; username: string; page_name: string }> {
+  const fields = 'id,name,access_token,instagram_business_account{id,username}';
+  let pages: PageWithIg[];
+  try {
+    pages = (await graph<{ data?: PageWithIg[] }>('GET', `me/accounts?fields=${fields}&limit=100`, token, undefined, true, 'facebook')).data ?? [];
+  } catch (err) {
+    // a Page token has no "accounts": it is the Page itself
+    const page = await graph<PageWithIg>('GET', 'me?fields=id,name,instagram_business_account{id,username}', token, undefined, true, 'facebook').catch(() => {
+      throw err;
+    });
+    pages = [{ ...page, access_token: token }];
+  }
+  const page = pages.find((p) => p.instagram_business_account?.id && p.access_token);
+  if (!page) {
+    throw new InstagramError(
+      pages.length
+        ? 'Nijedna tvoja Facebook stranica nije povezana sa Instagram profesionalnim nalogom (stranica → Podešavanja → Linked accounts → Instagram).'
+        : 'Token ne vidi nijednu Facebook stranicu: pri pravljenju tokena izaberi stranicu Kockolov i dozvole pages_show_list i business_management.',
+    );
+  }
+  return {
+    token: page.access_token!,
+    user_id: page.instagram_business_account!.id,
+    username: page.instagram_business_account!.username ?? '',
+    page_name: page.name ?? '',
+  };
+}
+
+/** Checks the token with Instagram (or Facebook) and keeps what publishing needs (the admin pastes it once). */
 export async function connectAccount(token: string): Promise<InstagramAccount> {
   const t = token.trim();
-  const me = await graph<{ user_id?: string; id?: string; username?: string }>('GET', 'me?fields=user_id,username', t);
-  const userId = String(me.user_id ?? me.id ?? '');
-  if (!userId) throw new InstagramError('Instagram nije vratio ID naloga.');
+  let acc: { token: string; user_id: string; username: string; page_name: string; api: ApiKind };
+  if (isFacebookToken(t)) {
+    acc = { ...(await facebookAccount(t)), api: 'facebook' };
+  } else {
+    const me = await graph<{ user_id?: string; id?: string; username?: string }>('GET', 'me?fields=user_id,username', t);
+    const userId = String(me.user_id ?? me.id ?? '');
+    if (!userId) throw new InstagramError('Instagram nije vratio ID naloga.');
+    acc = { token: t, user_id: userId, username: me.username ?? '', page_name: '', api: 'instagram' };
+  }
   return (await one<InstagramAccount>(
-    `INSERT INTO instagram_account (id, token, user_id, username, refreshed_at, paused, updated_at)
-     VALUES (1, $1, $2, $3, now(), false, now())
+    `INSERT INTO instagram_account (id, token, user_id, username, refreshed_at, paused, updated_at, api, page_name)
+     VALUES (1, $1, $2, $3, now(), false, now(), $4, $5)
      ON CONFLICT (id) DO UPDATE SET token = EXCLUDED.token, user_id = EXCLUDED.user_id, username = EXCLUDED.username,
-       refreshed_at = now(), updated_at = now()
-     RETURNING token, user_id, username, refreshed_at, paused`,
-    [t, userId, me.username ?? ''],
+       refreshed_at = now(), updated_at = now(), api = EXCLUDED.api, page_name = EXCLUDED.page_name
+     RETURNING ${ACCOUNT_COLS}`,
+    [acc.token, acc.user_id, acc.username, acc.api, acc.page_name],
   ))!;
 }
 
@@ -278,10 +343,13 @@ export async function setPaused(paused: boolean): Promise<void> {
   await query('UPDATE instagram_account SET paused = $1, updated_at = now() WHERE id = 1', [paused]);
 }
 
-/** A long-lived token lasts 60 days; renewing it every week keeps it alive while the worker runs. */
+/**
+ * An Instagram-login token lasts 60 days; renewing it every week keeps it alive while the worker runs.
+ * (A Facebook Page token doesn't expire and isn't renewed.)
+ */
 export async function refreshTokenIfDue(log: Log = () => {}): Promise<void> {
   const acc = await one<InstagramAccount & { due: boolean }>(
-    "SELECT token, refreshed_at < now() - interval '7 days' AS due FROM instagram_account WHERE id = 1",
+    "SELECT token, refreshed_at < now() - interval '7 days' AS due FROM instagram_account WHERE id = 1 AND api = 'instagram'",
   );
   if (!acc?.due) return;
   try {
@@ -310,16 +378,18 @@ export async function publishPost(id: number, log: Log = () => {}): Promise<Inst
   );
   if (!p) throw new PostStateError();
   try {
-    const container = await graph<{ id: string }>('POST', `${acc.user_id}/media`, acc.token, { image_url: imageUrlFor(p), caption: p.caption });
+    const call = <T,>(method: 'GET' | 'POST', path: string, form?: Record<string, string>) =>
+      graph<T>(method, path, acc.token, form, true, acc.api);
+    const container = await call<{ id: string }>('POST', `${acc.user_id}/media`, { image_url: imageUrlFor(p), caption: p.caption });
     let status = 'IN_PROGRESS';
     for (let i = 0; i < 6 && status !== 'FINISHED'; i++) {
       if (i) await sleep(config.INSTAGRAM_POLL_MS);
-      status = (await graph<{ status_code?: string }>('GET', `${container.id}?fields=status_code`, acc.token)).status_code ?? 'IN_PROGRESS';
+      status = (await call<{ status_code?: string }>('GET', `${container.id}?fields=status_code`)).status_code ?? 'IN_PROGRESS';
       if (status === 'ERROR' || status === 'EXPIRED') throw new InstagramError(`Instagram nije prihvatio sliku (${status}).`);
     }
     if (status !== 'FINISHED') throw new InstagramError('Instagram nije stigao da obradi sliku; probaj ponovo.');
-    const media = await graph<{ id: string }>('POST', `${acc.user_id}/media_publish`, acc.token, { creation_id: container.id });
-    const link = await graph<{ permalink?: string }>('GET', `${media.id}?fields=permalink`, acc.token).catch(() => ({ permalink: undefined }));
+    const media = await call<{ id: string }>('POST', `${acc.user_id}/media_publish`, { creation_id: container.id });
+    const link = await call<{ permalink?: string }>('GET', `${media.id}?fields=permalink`).catch(() => ({ permalink: undefined }));
     log(`instagram: objavljen set ${p.set_num} (${media.id})`);
     return (await one<InstagramPost>(
       `UPDATE instagram_posts SET status = 'published', media_id = $2, permalink = $3, published_at = now()
