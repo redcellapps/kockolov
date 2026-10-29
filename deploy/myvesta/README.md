@@ -229,6 +229,19 @@ shops are just counted ("+ još 4 prodavnice uz nalog").
      The server renews the token every week (it would otherwise expire after 60 days); "Pauziraj" stops it for a while.
   Standard access is enough for an account you own and added to the app, so no app review is needed.
   Instagram must reach `https://kockolov.rs/og/ig/<id>.jpg` (it fetches the picture from there).
+- **Facebook login instead** (when the Meta dashboard offers only "API setup with Facebook login", as it did for
+  Milan's account in October 2026):
+  1. A Facebook Page for Kockolov (Facebook → Pages → Create new Page), linked to the professional Instagram
+     account: the Page → Settings → Linked accounts → Instagram → Connect.
+  2. In the Meta app: Use cases → Customize → API setup with Facebook login → **Add required content permissions**.
+  3. https://developers.facebook.com/tools/explorer → Meta App: the Kockolov app → User or Page: User Token →
+     permissions `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`,
+     `business_management` → **Generate Access Token**; in the dialog choose the Kockolov Page and Instagram account.
+  4. https://developers.facebook.com/tools/debug/accesstoken → paste the token → Debug → **Extend Access Token** →
+     copy the long-lived token (starts with `EAA`).
+  5. Administracija → Instagram nalog → paste → Poveži. The server finds the Page linked to Instagram and keeps the
+     Page's token, which doesn't expire (it stops working only if you change the Facebook password or remove the app).
+     The admin page then shows "preko Facebook stranice „Kockolov“".
 - Put `kockolov.rs` (with `?utm_source=instagram`) in the profile's bio: the captions say "link u bio-u".
 - Another time: `INSTAGRAM_CRON=0 9 * * *` in `.env`, then `docker compose up -d worker`; empty turns it off.
 

@@ -21,7 +21,7 @@ interface Post {
   filename: string;
 }
 interface Info {
-  account: { username: string; paused: boolean; refreshed_at: string } | null;
+  account: { username: string; paused: boolean; refreshed_at: string; api: 'instagram' | 'facebook'; page_name: string } | null;
   schedule: string;
   today: Post | null;
   recent: Post[];
@@ -193,7 +193,11 @@ export function Instagram() {
       <h3 className="mb-2 text-base font-extrabold">{t('admin.ig.account')}</h3>
       {acc ? (
         <div className="mb-6 flex flex-wrap items-center gap-3">
-          <span className="text-sm text-ink-2">{t('admin.ig.account.info', { user: acc.username, when: ago(acc.refreshed_at) })}</span>
+          <span className="text-sm text-ink-2">
+            {acc.api === 'facebook'
+              ? t('admin.ig.account.infoFb', { user: acc.username, page: acc.page_name })
+              : t('admin.ig.account.info', { user: acc.username, when: ago(acc.refreshed_at) })}
+          </span>
           <Button size="sm" variant="outline" disabled={busy} onClick={() => pause.mutate()}>
             {acc.paused ? t('admin.ig.resume') : t('admin.ig.pause')}
           </Button>

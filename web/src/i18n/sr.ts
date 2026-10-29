@@ -466,6 +466,7 @@ export const sr = {
   'admin.ig.byHand': 'Sačuvaj sliku, kopiraj tekst i objavi sa telefona, pa klikni „Objavio sam ručno“ da sutrašnji izbor to zna.',
   'admin.ig.account': 'Instagram nalog',
   'admin.ig.account.info': '@{user} · token obnovljen {when}',
+  'admin.ig.account.infoFb': '@{user} · preko Facebook stranice „{page}“ · token ne ističe',
   'admin.ig.pause': 'Pauziraj automatsko objavljivanje',
   'admin.ig.resume': 'Nastavi automatsko objavljivanje',
   'admin.ig.disconnect': 'Prekini vezu',
@@ -474,8 +475,8 @@ export const sr = {
   'admin.ig.connect': 'Poveži',
   'admin.ig.connected': 'Instagram nalog je povezan. Od sutra se objava pojavljuje sama.',
   'admin.ig.connect.hint':
-    'Nalepi dugotrajni pristupni token profesionalnog (Business ili Creator) Instagram naloga: Meta for Developers → tvoja aplikacija → Instagram → API setup with Instagram login → Generate token. Server ga sam obnavlja svake nedelje.',
-  'admin.ig.connect.ph': 'Pristupni token (IGAA…)',
+    'Nalepi pristupni token. Instagram login (počinje sa IGAA): Meta for Developers → aplikacija → Instagram → API setup with Instagram login → Generate token. Facebook login (počinje sa EAA): token iz Graph API Explorer-a, produžen u Access Token Debugger-u („Extend Access Token“); Instagram nalog mora biti povezan sa Facebook stranicom. Uputstvo: deploy/myvesta/README.md §10.',
+  'admin.ig.connect.ph': 'Pristupni token (IGAA… ili EAA…)',
   'admin.ig.recent': 'Prethodne objave',
   'admin.ig.status.ready': 'Spremna',
   'admin.ig.status.publishing': 'Objavljuje se…',

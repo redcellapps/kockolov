@@ -95,8 +95,10 @@ const schema = z.object({
   // LEGO Store product pages read per crawl to learn the box barcodes (for scanning in the app); 0 = off
   EAN_PER_RUN: z.coerce.number().default(400),
 
-  // Instagram API (Instagram Login): where it lives and how long to wait for Instagram to take the picture
+  // Instagram API (Instagram login): where it lives and how long to wait for Instagram to take the picture
   INSTAGRAM_GRAPH_URL: z.string().default('https://graph.instagram.com'),
+  // ...or through the Facebook Page the Instagram account is linked to (Facebook login)
+  FACEBOOK_GRAPH_URL: z.string().default('https://graph.facebook.com'),
   INSTAGRAM_API_VERSION: z.string().default('v25.0'),
   INSTAGRAM_POLL_MS: z.coerce.number().default(10000),
   // a set isn't posted again within this many days

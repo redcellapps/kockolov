@@ -1299,4 +1299,81 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       mail.on = false;
     }
   });
+  it('publishes to Instagram through a Facebook Page as well (Facebook login), with a Page token that does not expire', async () => {
+    const ig = await import('../src/social/instagram.js');
+    const admin = (method: 'GET' | 'POST' | 'DELETE', url: string, payload?: object) =>
+      app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    await query('DELETE FROM instagram_posts');
+    await query('DELETE FROM instagram_account');
+
+    const real = globalThis.fetch;
+    const calls: { url: string; token: string | null }[] = [];
+    const json = (o: object, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
+    const page = { id: 'p1', name: 'Kockolov', instagram_business_account: { id: '1785', username: 'kockolov' } };
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (!url.startsWith('https://graph.facebook.test/') && !url.startsWith('https://graph.instagram.test/')) return real(input, init);
+      const u = new URL(url);
+      const tok = u.searchParams.get('access_token') ?? new URLSearchParams(String(init?.body ?? '')).get('access_token');
+      calls.push({ url, token: tok });
+      if (url.startsWith('https://graph.instagram.test/')) return json({ error: { message: 'wrong host' } }, 400);
+      const isPage = tok === 'EAA-page-token-0123456789';
+      switch (u.pathname) {
+        case '/v25.0/me/accounts':
+          if (isPage) return json({ error: { message: '(#100) Tried accessing nonexisting field (accounts) on node type (Page)' } }, 400);
+          if (tok === 'EAA-user-bez-instagrama-0123456789') return json({ data: [{ id: 'p2', name: 'Druga', access_token: 'EAA-p2' }] });
+          return json({ data: [{ id: 'p2', name: 'Druga', access_token: 'EAA-p2' }, { ...page, access_token: 'EAA-page-token-0123456789' }] });
+        case '/v25.0/me':
+          return isPage ? json(page) : json({ error: { message: 'no' } }, 400);
+        case '/v25.0/1785/media':
+          return isPage ? json({ id: 'c2' }) : json({ error: { message: 'Invalid OAuth access token' } }, 400);
+        case '/v25.0/c2':
+          return json({ status_code: 'FINISHED' });
+        case '/v25.0/1785/media_publish':
+          return json({ id: 'm2' });
+        case '/v25.0/m2':
+          return json({ permalink: 'https://www.instagram.com/p/fb/' });
+      }
+      return json({ error: { message: 'unknown' } }, 404);
+    });
+    const saved = { ig: config.INSTAGRAM_GRAPH_URL, fb: config.FACEBOOK_GRAPH_URL, poll: config.INSTAGRAM_POLL_MS };
+    config.INSTAGRAM_GRAPH_URL = 'https://graph.instagram.test';
+    config.FACEBOOK_GRAPH_URL = 'https://graph.facebook.test';
+    config.INSTAGRAM_POLL_MS = 0;
+    try {
+      expect(ig.isFacebookToken(' EAAabc')).toBe(true);
+      expect(ig.isFacebookToken('IGAAabc')).toBe(false);
+      // a user token whose Pages have no Instagram account
+      const none = await admin('POST', '/api/admin/instagram/account', { token: 'EAA-user-bez-instagrama-0123456789' });
+      expect([none.statusCode, none.json().error]).toEqual([502, expect.stringContaining('Linked accounts')]);
+      // a user token: the Page linked to Instagram is found and its token kept
+      const ok = (await admin('POST', '/api/admin/instagram/account', { token: 'EAA-user-token-0123456789' })).json();
+      expect(ok.account).toMatchObject({ username: 'kockolov', api: 'facebook', page_name: 'Kockolov', paused: false });
+      expect(await one('SELECT token, user_id FROM instagram_account')).toEqual({ token: 'EAA-page-token-0123456789', user_id: '1785' });
+      // ...and a Page token works as it is
+      expect((await admin('POST', '/api/admin/instagram/account', { token: 'EAA-page-token-0123456789' })).json().account).toMatchObject({
+        username: 'kockolov',
+        page_name: 'Kockolov',
+      });
+
+      calls.length = 0;
+      const post = (await ig.instagramJob())!;
+      expect(post).toMatchObject({ status: 'published', media_id: 'm2', permalink: 'https://www.instagram.com/p/fb/' });
+      expect(calls.every((c) => c.url.startsWith('https://graph.facebook.test/v25.0/') && c.token === 'EAA-page-token-0123456789')).toBe(true);
+      expect(calls.map((c) => new URL(c.url).pathname)).toEqual(['/v25.0/1785/media', '/v25.0/c2', '/v25.0/1785/media_publish', '/v25.0/m2']);
+
+      // a Page token doesn't expire: nothing to renew
+      await query("UPDATE instagram_account SET refreshed_at = now() - interval '30 days'");
+      calls.length = 0;
+      await ig.refreshTokenIfDue();
+      expect(calls).toHaveLength(0);
+      expect((await admin('GET', '/api/admin/instagram')).json().account).toMatchObject({ api: 'facebook', page_name: 'Kockolov' });
+    } finally {
+      spy.mockRestore();
+      config.INSTAGRAM_GRAPH_URL = saved.ig;
+      config.FACEBOOK_GRAPH_URL = saved.fb;
+      config.INSTAGRAM_POLL_MS = saved.poll;
+      await query('DELETE FROM instagram_account');
+    }
+  });
 });

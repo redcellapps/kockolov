@@ -396,7 +396,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/api/admin/instagram', async () => {
     const acc = await getAccount();
     return {
-      account: acc && { username: acc.username, paused: acc.paused, refreshed_at: acc.refreshed_at },
+      account: acc && { username: acc.username, paused: acc.paused, refreshed_at: acc.refreshed_at, api: acc.api, page_name: acc.page_name },
       schedule: config.INSTAGRAM_CRON,
       today: igPost(await todaysPost()),
       recent: (await recentPosts(14)).map(igPost),
@@ -446,7 +446,7 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!body.success) return reply.code(400).send({ error: 'Nalepi ceo pristupni token (access token).' });
     try {
       const acc = await connectAccount(body.data.token);
-      return { ok: true, account: { username: acc.username, paused: acc.paused, refreshed_at: acc.refreshed_at } };
+      return { ok: true, account: { username: acc.username, paused: acc.paused, refreshed_at: acc.refreshed_at, api: acc.api, page_name: acc.page_name } };
     } catch (err) {
       return igFail(reply, err);
     }
