@@ -276,6 +276,7 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
 
   // blog posts, exported with the snapshot
   if (path === '/api/blog') return ok({ items: snap.blog?.items ?? [] });
+  if (path === '/api/instagram') return ok({ username: 'kockolov', items: [] });
   const blogPost = path.match(/^\/api\/blog\/([a-z0-9-]+)$/);
   if (blogPost) {
     const post = snap.blog?.posts?.[blogPost[1]];

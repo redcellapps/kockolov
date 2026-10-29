@@ -184,6 +184,44 @@ export function recentPosts(limit = 14): Promise<InstagramPost[]> {
   );
 }
 
+/** One post on the page behind the link in the bio (/ig): what was posted, and the set's price today */
+export interface FeedItem {
+  id: number;
+  day: string;
+  set_num: string;
+  name: string;
+  theme_name: string | null;
+  card: InstagramCard;
+  permalink: string | null;
+  /** today's best price at the public shops; null = not in stock anywhere now */
+  best_price: number | null;
+  best_shop: string | null;
+  best_seller: string | null;
+}
+
+/**
+ * The posts that went out (published by the worker or posted by hand), newest first. Instagram doesn't
+ * let anyone change the link in the bio through its API, so the bio keeps one link (kockolov.rs/ig) and
+ * this list is what changes behind it.
+ */
+export function postedFeed(limit = 24): Promise<FeedItem[]> {
+  return query<FeedItem>(
+    `SELECT p.id, to_char(p.day, 'YYYY-MM-DD') AS day, p.set_num, s.name, t.name AS theme_name, p.card, p.permalink,
+            b.price_rsd AS best_price, b.shop_id AS best_shop, b.seller AS best_seller
+       FROM instagram_posts p
+       JOIN sets s ON s.set_num = p.set_num
+       LEFT JOIN themes t ON t.slug = s.theme_slug
+       LEFT JOIN LATERAL (
+         SELECT price_rsd, shop_id, seller FROM public_offers o
+          WHERE o.set_num = p.set_num AND o.active AND o.in_stock ORDER BY price_rsd LIMIT 1
+       ) b ON true
+      WHERE p.status IN ('published', 'posted_by_hand')
+      ORDER BY p.day DESC, p.id DESC
+      LIMIT $1`,
+    [limit],
+  );
+}
+
 /** Makes today's post unless there is one already. null = no set qualifies (nothing in stock?). */
 export async function preparePost(day = todayLocal()): Promise<InstagramPost | null> {
   const existing = await todaysPost(day);

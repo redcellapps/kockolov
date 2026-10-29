@@ -1376,4 +1376,60 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       await query('DELETE FROM instagram_account');
     }
   });
+
+  it('keeps one link in the Instagram bio: /ig lists what was posted, newest first, with prices of today', async () => {
+    const ig = await import('../src/social/instagram.js');
+    const { pageMeta } = await import('../src/seo/pages.js');
+    const sharp = (await import('sharp')).default;
+    await query('DELETE FROM instagram_posts');
+    await query('DELETE FROM instagram_account');
+    const posts = [];
+    for (const day of ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']) posts.push((await ig.preparePost(day))!);
+    const [a, b, c, d] = posts;
+    await query("UPDATE instagram_posts SET status = 'published', permalink = 'https://www.instagram.com/p/a/' WHERE id = $1", [a.id]);
+    await query("UPDATE instagram_posts SET status = 'posted_by_hand' WHERE id = $1", [b.id]);
+    await query("UPDATE instagram_posts SET status = 'skipped' WHERE id = $1", [c.id]);
+    expect(d.status).toBe('ready'); // made, not posted yet: not on the page
+    // the morning of the post the set cost more than it does now
+    await query(`UPDATE instagram_posts SET card = jsonb_set(card, '{bestPrice}', to_jsonb((card->>'bestPrice')::int + 500)) WHERE id = $1`, [a.id]);
+    const best = async (setNum: string) =>
+      (await one<{ min: number | null }>('SELECT min(price_rsd)::int AS min FROM public_offers WHERE set_num = $1 AND active AND in_stock', [setNum]))!.min;
+
+    config.PUBLIC_MODE = true;
+    const gone = await query<{ id: string }>('SELECT id FROM offers WHERE set_num = $1 AND in_stock', [b.set_num]);
+    try {
+      const feed = (await app.inject({ method: 'GET', url: '/api/instagram' })).json();
+      expect(feed.username).toBeNull();
+      expect(feed.items.map((i: { id: number }) => i.id)).toEqual([b.id, a.id]);
+      expect(feed.items[1]).toMatchObject({
+        day: '2026-10-01',
+        set_num: a.set_num,
+        permalink: 'https://www.instagram.com/p/a/',
+        post_price: a.card.bestPrice + 500,
+        best_price: await best(a.set_num),
+        best_shop: expect.any(String),
+        image: expect.stringMatching(new RegExp(`^/og/ig/${a.id}\\.jpg\\?v=[\\w-]+$`)),
+        thumb: expect.stringMatching(new RegExp(`^/og/ig/${a.id}\\.jpg\\?w=540&v=[\\w-]+$`)),
+      });
+
+      // the grid gets a smaller copy of the post's picture; no other sizes
+      const thumb = await app.inject({ method: 'GET', url: feed.items[1].thumb });
+      expect([thumb.statusCode, thumb.headers['content-type']]).toEqual([200, 'image/jpeg']);
+      expect(await sharp(thumb.rawPayload).metadata()).toMatchObject({ width: 540, height: 675, format: 'jpeg' });
+      expect((await app.inject({ method: 'GET', url: `/og/ig/${a.id}.jpg?w=2000` })).statusCode).toBe(404);
+      const full = await app.inject({ method: 'GET', url: `/og/ig/${a.id}.jpg` });
+      expect(await sharp(full.rawPayload).metadata()).toMatchObject({ width: 1080, height: 1350 });
+
+      // a set no public shop has any more stays on the page, without a price
+      await query('UPDATE offers SET in_stock = false WHERE id = ANY($1)', [gone.map((r) => r.id)]);
+      expect((await app.inject({ method: 'GET', url: '/api/instagram' })).json().items[0]).toMatchObject({ id: b.id, best_price: null, best_shop: null });
+
+      // the page has its own title for link previews and search
+      expect(await pageMeta('/ig', new URLSearchParams())).toMatchObject({ status: 200, canonical: '/ig', title: 'Set dana sa Instagrama | Kockolov' });
+    } finally {
+      config.PUBLIC_MODE = false;
+      await query('UPDATE offers SET in_stock = true WHERE id = ANY($1)', [gone.map((r) => r.id)]);
+      await query('DELETE FROM instagram_posts');
+    }
+  });
 });
