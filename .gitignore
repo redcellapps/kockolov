@@ -9,3 +9,4 @@ web/dist-demo/
 web/src/demo/snapshot.json
 cache/
 web/dist-app/
+web/public/lego-catalog.json

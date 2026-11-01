@@ -8,7 +8,7 @@ import { dateLong, money } from '../lib/format';
 import { usePageTitle } from '../lib/title';
 import { AdCard, CondBadge, adAgo } from './AdCard';
 import { ProtoBanner } from './ListingsPage';
-import { updateListing, useListings } from './store';
+import { priceChange, toggleWatch, updateListing, useListings, useWatches } from './store';
 
 export default function ListingDetail() {
   const { id } = useParams();
@@ -20,6 +20,7 @@ export default function ListingDetail() {
   const [msg, setMsg] = useState('');
   const [sent, setSent] = useState(false);
   const [reported, setReported] = useState(false);
+  const following = !!useWatches()[id ?? ''];
 
   useEffect(() => {
     if (id) updateListing(id, { views: (all.find((x) => x.id === id)?.views ?? 0) + 1 });
@@ -53,7 +54,7 @@ export default function ListingDetail() {
       <div className="mt-4 grid gap-8 lg:grid-cols-[1.15fr_1fr]">
         <div>
           <div className="relative overflow-hidden rounded-3xl border border-line bg-surface-2">
-            <img src={l.images[img]} alt={l.title} className="aspect-square w-full object-cover sm:aspect-[4/3]" />
+            <img src={l.images[img]} alt={l.title} className="aspect-[4/3] w-full object-cover" />
             <CondBadge c={l.condition} className="absolute left-4 top-4 shadow-sm" />
           </div>
           {l.images.length > 1 && (
@@ -73,8 +74,15 @@ export default function ListingDetail() {
           <div className="rounded-3xl border border-line bg-surface p-6">
             <p className="text-xs font-semibold text-ink-3">{t('ads.detail.posted', { when: adAgo(l.created_at) })} · {t('ads.detail.views', { n: l.views })}</p>
             <h1 className="mt-1 text-2xl font-extrabold leading-tight">{l.title}</h1>
-            <div className="tabular mt-3 text-3xl font-extrabold">{money(l.price_rsd)}</div>
+            <div className="mt-3 flex items-baseline gap-3">
+              <span className="tabular text-3xl font-extrabold">{money(l.price_rsd)}</span>
+              {priceChange(l) && <span className="tabular text-base font-bold text-ink-3 line-through">{money(priceChange(l))}</span>}
+            </div>
             <p className="text-sm font-semibold text-ink-3">{l.negotiable ? t('ads.negotiable') : t('ads.fixed')}</p>
+            {priceChange(l) && <p className="mt-2 inline-block rounded-lg bg-save-soft px-2.5 py-1 text-xs font-extrabold text-save">{t('ads.detail.priceDrop', { price: money(priceChange(l)) })}</p>}
+            <Button variant={following ? 'dark' : 'outline'} size="sm" className="mt-3 w-full" onClick={() => toggleWatch(l)}>
+              {following ? '♥ ' + t('ads.detail.following') : '♡ ' + t('ads.detail.follow')}
+            </Button>
             {cmp !== null && shopMin && (
               <p className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold ${cmp > 0 ? 'bg-save-soft text-save' : 'bg-surface-2 text-ink-2'}`}>
                 {cmp > 0 ? t('ads.cheaperThanShops', { pct: cmp }) : t('ads.pricierThanShops')} · {t('ads.shopsFrom', { price: money(shopMin) })}
@@ -85,7 +93,12 @@ export default function ListingDetail() {
               {row(t('ads.detail.condition'), t(`cond.${l.condition}`))}
               {row(t('ads.detail.box'), l.has_box ? t('ads.detail.yes') : t('ads.detail.no'))}
               {row(t('ads.detail.manual'), l.has_manual ? t('ads.detail.yes') : t('ads.detail.no'))}
+              {l.theme_name && row(t('ads.detail.theme'), l.theme_name)}
+              {l.year && row(t('ads.detail.year'), l.year)}
+              {l.pieces && row(t('ads.detail.pieces'), l.pieces.toLocaleString('sr-RS'))}
+              {l.minifigs !== null && row(t('ads.detail.minifigs'), l.minifigs)}
               {row(t('ads.detail.city'), l.city)}
+              {row(t('ads.detail.shipping'), t(`ship.${l.shipping}`))}
             </dl>
           </div>
 
@@ -94,7 +107,8 @@ export default function ListingDetail() {
               <span className="grid h-11 w-11 place-items-center rounded-full bg-brand text-lg font-extrabold">{l.seller[0]}</span>
               <div>
                 <div className="font-extrabold">{l.seller}</div>
-                <div className="text-xs text-ink-3">{t('ads.detail.memberSince', { date: dateLong(l.seller_since) })}</div>
+                <div className="text-xs text-ink-3">{l.seller_type === 'business' ? `${l.seller_business ?? ''} · ` : ''}{t('ads.detail.memberSince', { date: dateLong(l.seller_since) })}</div>
+                <div className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${l.seller_type === 'business' ? 'bg-save-soft text-save' : 'bg-surface-2 text-ink-2'}`}>{l.seller_type === 'business' ? t('ads.detail.sellerBusiness') : t('ads.detail.sellerPrivate')}</div>
               </div>
             </div>
             <div className="mt-4 grid gap-2">
