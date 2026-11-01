@@ -107,8 +107,7 @@ export default function ListingDetail() {
               <span className="grid h-11 w-11 place-items-center rounded-full bg-brand text-lg font-extrabold">{l.seller[0]}</span>
               <div>
                 <div className="font-extrabold">{l.seller}</div>
-                <div className="text-xs text-ink-3">{l.seller_type === 'business' ? `${l.seller_business ?? ''} · ` : ''}{t('ads.detail.memberSince', { date: dateLong(l.seller_since) })}</div>
-                <div className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${l.seller_type === 'business' ? 'bg-save-soft text-save' : 'bg-surface-2 text-ink-2'}`}>{l.seller_type === 'business' ? t('ads.detail.sellerBusiness') : t('ads.detail.sellerPrivate')}</div>
+                <div className="text-xs text-ink-3">{t('ads.detail.memberSince', { date: dateLong(l.seller_since) })}</div>
               </div>
             </div>
             <div className="mt-4 grid gap-2">

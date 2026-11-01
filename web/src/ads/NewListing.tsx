@@ -8,7 +8,7 @@ import { api, type SetDetail, type Theme } from '../lib/api';
 import { usePageTitle } from '../lib/title';
 import { ProtoBanner } from './ListingsPage';
 import { useAuth } from '../lib/auth';
-import { addListing, canSellNew, CONDITIONS, isNewCondition, loadCatalog, PHOTO_H, PHOTO_W, processPhoto, setPhone, useSeller, usePhone, type Condition } from './store';
+import { addListing, CONDITIONS, loadCatalog, PHOTO_H, PHOTO_W, processPhoto, setPhone, usePhone, type Condition } from './store';
 
 const area = 'w-full rounded-xl border border-line bg-surface p-3 text-[15px] outline-none transition focus:border-ink';
 
@@ -21,7 +21,6 @@ export default function NewListing() {
   const [setNum, setSetNum] = useState('');
   const [found, setFound] = useState<SetDetail['set'] | null>(null);
   const [lookup, setLookup] = useState<'idle' | 'busy' | 'none'>('idle');
-  const seller = useSeller();
   const themes = useQuery({ queryKey: ['themes'], queryFn: () => api<Theme[]>('/api/themes'), staleTime: 600_000 });
   const [setName, setSetName] = useState('');
   const [theme, setTheme] = useState('');
@@ -109,8 +108,6 @@ export default function NewListing() {
       minifigs: minifigs === '' ? null : Number(minifigs),
       shipping,
       price_history: [],
-      seller_type: seller.type,
-      seller_business: seller.type === 'business' ? seller.business.trim() : null,
       condition: cond,
       has_box: box,
       has_manual: manual,
@@ -189,20 +186,12 @@ export default function NewListing() {
             <div>
               <span className="mb-2 block text-sm font-bold text-ink-2">{t('ads.new.conditionLabel')}</span>
               <div className="grid gap-2">
-                {CONDITIONS.map((c) => {
-                  const locked = isNewCondition(c) && !canSellNew(seller);
-                  return (
-                    <label key={c} className={cx('flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold', locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer', cond === c ? 'border-ink bg-surface-2' : 'border-line')}>
-                      <input type="radio" name="cond" checked={cond === c} disabled={locked} onChange={() => setCond(c)} /> {t(`cond.${c}`)}
-                      {locked && <span aria-hidden>🔒</span>}
-                    </label>
-                  );
-                })}
-                {!canSellNew(seller) && (
-                  <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-ink-2">
-                    {t('ads.new.newLocked')} <Link to="/nalog" className="font-bold underline">{t('ads.new.newLockedLink')}</Link>
-                  </p>
-                )}
+                {CONDITIONS.map((c) => (
+                  <label key={c} className={cx('flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold', cond === c ? 'border-ink bg-surface-2' : 'border-line')}>
+                    <input type="radio" name="cond" checked={cond === c} onChange={() => setCond(c)} /> {t(`cond.${c}`)}
+                  </label>
+                ))}
+                <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-ink-2">{t('ads.new.usedOnly')}</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-6 text-sm font-semibold">

@@ -33,7 +33,6 @@ interface F {
   man: boolean;
   ship: boolean;
   hasSet: boolean;
-  seller: '' | 'business' | 'private';
 }
 const csv = (v: string | null) => (v ? v.split(',').filter(Boolean) : []);
 
@@ -51,7 +50,6 @@ function readF(p: URLSearchParams): F {
     man: p.get('man') === '1',
     ship: p.get('ship') === '1',
     hasSet: p.get('set') === '1',
-    seller: p.get('seller') === 'business' ? 'business' : p.get('seller') === 'private' ? 'private' : '',
   };
 }
 function writeF(f: F, sort: string): URLSearchParams {
@@ -68,12 +66,11 @@ function writeF(f: F, sort: string): URLSearchParams {
   if (f.man) p.set('man', '1');
   if (f.ship) p.set('ship', '1');
   if (f.hasSet) p.set('set', '1');
-  if (f.seller) p.set('seller', f.seller);
   if (sort !== 'new') p.set('sort', sort);
   return p;
 }
 
-type Facet = 'cond' | 'theme' | 'city' | 'seller';
+type Facet = 'cond' | 'theme' | 'city';
 /** All filters, except the group the counts are for (so every option shows how many ads it would give) */
 function matches(l: Listing, f: F, skip?: Facet): boolean {
   const hay = `${l.title} ${l.description} ${l.set_num ?? ''} ${l.theme_name ?? ''} ${l.city}`.toLowerCase();
@@ -82,7 +79,6 @@ function matches(l: Listing, f: F, skip?: Facet): boolean {
     (skip === 'cond' || !f.cond.length || f.cond.includes(l.condition)) &&
     (skip === 'theme' || !f.theme.length || f.theme.includes(l.theme_name ?? '')) &&
     (skip === 'city' || !f.city.length || f.city.includes(l.city)) &&
-    (skip === 'seller' || !f.seller || f.seller === l.seller_type) &&
     (!f.min || l.price_rsd >= Number(f.min)) &&
     (!f.max || l.price_rsd <= Number(f.max)) &&
     (!f.y1 || (l.year ?? 0) >= Number(f.y1)) &&
@@ -154,7 +150,6 @@ export default function ListingsPage() {
   const cCond = count('cond', (l) => l.condition);
   const cTheme = count('theme', (l) => l.theme_name);
   const cCity = count('city', (l) => l.city);
-  const cSeller = count('seller', (l) => l.seller_type);
   const themes = [...new Set(all.map((l) => l.theme_name).filter(Boolean) as string[])].map((k) => ({ key: k, label: k, count: cTheme.get(k) ?? 0 })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
   const cities = [...new Set(all.map((l) => l.city))].map((k) => ({ key: k, label: k, count: cCity.get(k) ?? 0 })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
@@ -168,13 +163,12 @@ export default function ListingsPage() {
     ...f.city.map((x) => ({ label: x, clear: () => set({ city: f.city.filter((y) => y !== x) }) })),
     ...(f.min || f.max ? [{ label: `${f.min || '0'} – ${f.max || '∞'} RSD`, clear: () => set({ min: '', max: '' }) }] : []),
     ...(f.y1 || f.y2 ? [{ label: `${f.y1 || '…'} – ${f.y2 || '…'}`, clear: () => set({ y1: '', y2: '' }) }] : []),
-    ...(f.seller ? [{ label: f.seller === 'business' ? t('ads.filter.sellerBusiness') : t('ads.filter.sellerPrivate'), clear: () => set({ seller: '' }) }] : []),
     ...(f.ship ? [{ label: t('ads.filter.shipsOnly'), clear: () => set({ ship: false }) }] : []),
     ...(f.box ? [{ label: t('ads.filter.withBox'), clear: () => set({ box: false }) }] : []),
     ...(f.man ? [{ label: t('ads.filter.withManual'), clear: () => set({ man: false }) }] : []),
     ...(f.hasSet ? [{ label: t('ads.filter.hasSet'), clear: () => set({ hasSet: false }) }] : []),
   ];
-  const clearAll = () => setSp(writeF({ q: '', cond: [], theme: [], city: [], min: '', max: '', y1: '', y2: '', box: false, man: false, ship: false, hasSet: false, seller: '' }, sort), { replace: true });
+  const clearAll = () => setSp(writeF({ q: '', cond: [], theme: [], city: [], min: '', max: '', y1: '', y2: '', box: false, man: false, ship: false, hasSet: false }, sort), { replace: true });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -226,15 +220,6 @@ export default function ListingsPage() {
           </Group>
           <Group title={t('ads.filter.city')}>
             <Checks options={cities} value={f.city} onChange={(city) => set({ city })} />
-          </Group>
-          <Group title={t('ads.filter.seller')}>
-            {(['', 'business', 'private'] as const).map((k) => (
-              <label key={k} className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
-                <input type="radio" name="seller" checked={f.seller === k} onChange={() => set({ seller: k })} />
-                <span className="flex-1">{k === '' ? t('ads.filter.all') : k === 'business' ? t('ads.filter.sellerBusiness') : t('ads.filter.sellerPrivate')}</span>
-                {k && <span className="tabular text-xs text-ink-3">{cSeller.get(k) ?? 0}</span>}
-              </label>
-            ))}
           </Group>
           <Group title={t('ads.filter.year')} open={false}>
             <div className="flex gap-2">

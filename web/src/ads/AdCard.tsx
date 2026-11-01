@@ -5,8 +5,7 @@ import { cx } from '../components/ui';
 import { AdWatchHeart } from './WatchButton';
 import { priceChange, type Listing } from './store';
 
-export const condTone = (c: Listing['condition']) =>
-  c === 'new_sealed' ? 'bg-save-soft text-save' : c === 'new_opened' ? 'bg-[#e8f0fd] text-accent' : c === 'parts' ? 'bg-surface-2 text-ink-2' : 'bg-[#fff4cf] text-[#7a5a00]';
+export const condTone = (c: Listing['condition']) => (c === 'parts' ? 'bg-surface-2 text-ink-2' : c === 'used_complete' ? 'bg-save-soft text-save' : 'bg-[#fff4cf] text-[#7a5a00]');
 
 export function CondBadge({ c, className }: { c: Listing['condition']; className?: string }) {
   return <span className={cx('inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide', condTone(c), className)}>{t(`cond.${c}`)}</span>;
@@ -45,7 +44,7 @@ export function AdCard({ l, footer }: { l: Listing; footer?: React.ReactNode }) 
               {priceChange(l) && <span className="rounded-md bg-save-soft px-1.5 py-0.5 text-[11px] font-extrabold text-save">↓</span>}
             </div>
             <div className="mt-0.5 flex items-center justify-between text-xs text-ink-3">
-              <span className="truncate">{l.city}{l.seller_type === 'business' ? ' · ' + t('ads.detail.sellerBusiness').split(' · ')[0] : ''}</span>
+              <span className="truncate">{l.city}</span>
               <span>{adAgo(l.created_at)}</span>
             </div>
           </div>

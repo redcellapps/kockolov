@@ -2,8 +2,9 @@
 // The real version replaces this file with API calls (/api/oglasi/*); pages and components stay as they are.
 import { useSyncExternalStore } from 'react';
 
-export type Condition = 'new_sealed' | 'new_opened' | 'used_complete' | 'used_incomplete' | 'parts';
-export const CONDITIONS: Condition[] = ['new_sealed', 'new_opened', 'used_complete', 'used_incomplete', 'parts'];
+/** Private persons sell used items only (no fiscal receipts), so there is no "new" condition */
+export type Condition = 'used_complete' | 'used_incomplete' | 'parts';
+export const CONDITIONS: Condition[] = ['used_complete', 'used_incomplete', 'parts'];
 
 export interface Listing {
   id: string;
@@ -24,8 +25,6 @@ export interface Listing {
   year: number | null;
   pieces: number | null;
   minifigs: number | null;
-  seller_type: 'private' | 'business';
-  seller_business: string | null;
   images: string[];
   seller: string;
   seller_since: string;
@@ -36,7 +35,7 @@ export interface Listing {
   views: number;
 }
 
-const KEY = 'kockolov.proto.listings.v3';
+const KEY = 'kockolov.proto.listings.v5';
 const PHONE_KEY = 'kockolov.proto.phone';
 const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
@@ -48,22 +47,22 @@ function brick(c1: string, c2: string, label: string): string {
 
 const SEED_RAW = [
   { id: 'a1', title: 'Millennium Falcon UCS, kompletan sa kutijom', description: 'Sklopljen jednom, stajao u vitrini. Sve kesice su unutra, uputstvo i kutija u odličnom stanju. Lično preuzimanje u Beogradu, može provera pred kupovinu.', set_num: '75192', theme_slug: 'star-wars', theme_name: 'Star Wars', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 58000, negotiable: true, city: 'Beograd', images: [brick('#6b7280', '#e5e7eb', '75192')], seller: 'Nikola M.', seller_since: '2026-09-02', seller_phone: '+381 64 111 2233', mine: false, status: 'active', created_at: day(1), views: 142 },
-  { id: 'a2', title: 'Buket ruža 10328, nov, neotvoren', description: 'Poklon koji mi ne treba. Folija na kutiji je netaknuta. Račun iz radnje postoji.', set_num: '10328', theme_slug: 'botanicals', theme_name: 'Botanicals', condition: 'new_sealed', has_box: true, has_manual: true, price_rsd: 4900, negotiable: false, city: 'Novi Sad', images: [brick('#e11d48', '#ffe4e6', '10328')], seller: 'Jelena P.', seller_since: '2026-10-11', seller_phone: '+381 63 222 3344', mine: false, status: 'active', created_at: day(0), views: 57 },
+  { id: 'a2', title: 'Buket ruža 10328, sklopljen, sa uputstvom', description: 'Sklopljen jednom i stajao u vitrini, kompletan. Kutija i uputstvo su sačuvani.', set_num: '10328', theme_slug: 'botanicals', theme_name: 'Botanicals', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 4900, negotiable: false, city: 'Novi Sad', images: [brick('#e11d48', '#ffe4e6', '10328')], seller: 'Jelena P.', seller_since: '2026-10-11', seller_phone: '+381 63 222 3344', mine: false, status: 'active', created_at: day(0), views: 57 },
   { id: 'a3', title: 'Lot: 12 Technic setova, bez kutija', description: 'Prodaje se zajedno ili pojedinačno (pitajte). Sve proverene po delovima, nedostaje nekoliko stikera.', set_num: null, theme_slug: 'technic', theme_name: 'Technic', condition: 'used_incomplete', has_box: false, has_manual: false, price_rsd: 24000, negotiable: true, city: 'Niš', images: [brick('#cf1419', '#fee2e2', 'TECHNIC')], seller: 'Marko D.', seller_since: '2026-08-20', seller_phone: null, mine: false, status: 'active', created_at: day(3), views: 211 },
-  { id: 'a4', title: 'Hogwarts dvorac 71043 – otvoren, nikad sklapan', description: 'Kutija otvorena zbog provere kesica, ništa nije sklapano. Kutija ima malo istrošenih ivica.', set_num: '71043', theme_slug: 'harry-potter', theme_name: 'Harry Potter', condition: 'new_opened', has_box: true, has_manual: true, price_rsd: 47000, negotiable: true, city: 'Beograd', images: [brick('#7c3aed', '#ede9fe', '71043')], seller: 'Ana S.', seller_since: '2026-07-14', seller_phone: '+381 65 333 4455', mine: false, status: 'active', created_at: day(5), views: 98 },
+  { id: 'a4', title: 'Hogwarts dvorac 71043 – kompletan, sa kutijom', description: 'Sklopljen jednom, sve kesice na broju. Kutija ima malo istrošenih ivica.', set_num: '71043', theme_slug: 'harry-potter', theme_name: 'Harry Potter', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 47000, negotiable: true, city: 'Beograd', images: [brick('#7c3aed', '#ede9fe', '71043')], seller: 'Ana S.', seller_since: '2026-07-14', seller_phone: '+381 65 333 4455', mine: false, status: 'active', created_at: day(5), views: 98 },
   { id: 'a5', title: 'Kesa figurica: 40 komada, Ninjago i City', description: 'Čiste, bez oštećenja štampe. Šaljem Postexpressom uz plaćanje pouzećem.', set_num: null, theme_slug: 'ninjago', theme_name: 'Ninjago', condition: 'parts', has_box: false, has_manual: false, price_rsd: 6500, negotiable: false, city: 'Kragujevac', images: [brick('#16a34a', '#dcfce7', 'FIGURICE')], seller: 'Stefan R.', seller_since: '2026-10-02', seller_phone: '+381 60 444 5566', mine: false, status: 'active', created_at: day(8), views: 33 },
   { id: 'a6', title: 'Monster Jam DIGatron 42199, sklopljen', description: 'Sve radi, povlačenje na nazad. Nedostaje kutija.', set_num: '42199', theme_slug: 'technic', theme_name: 'Technic', condition: 'used_complete', has_box: false, has_manual: true, price_rsd: 2700, negotiable: true, city: 'Subotica', images: [brick('#0ea5e9', '#e0f2fe', '42199')], seller: 'Dejan K.', seller_since: '2026-06-30', seller_phone: '+381 64 555 6677', mine: false, status: 'active', created_at: day(11), views: 120 },
-] as unknown as Omit<Listing, 'price_history' | 'shipping' | 'year' | 'pieces' | 'minifigs' | 'seller_type' | 'seller_business'>[];
+] as unknown as Omit<Listing, 'price_history' | 'shipping' | 'year' | 'pieces' | 'minifigs'>[];
 
 const EXTRA: Record<string, Partial<Listing>> = {
   a1: { year: 2017, pieces: 7541, minifigs: 8, shipping: 'pickup' },
-  a2: { year: 2025, pieces: 822, shipping: 'ships', seller_type: 'business', seller_business: 'Brick Shop Novi Sad' },
+  a2: { year: 2025, pieces: 822, shipping: 'ships' },
   a3: { shipping: 'ships', price_history: [{ price: 28000, at: day(6) }] },
-  a4: { year: 2018, pieces: 6020, minifigs: 27, shipping: 'pickup', seller_type: 'business', seller_business: 'Kocke Ana d.o.o.' },
+  a4: { year: 2018, pieces: 6020, minifigs: 27, shipping: 'pickup' },
   a5: { minifigs: 40, shipping: 'ships' },
   a6: { year: 2022, pieces: 220, shipping: 'ships' },
 };
-const SEED: Listing[] = SEED_RAW.map((l) => ({ price_history: [], shipping: 'pickup', year: null, pieces: null, minifigs: null, seller_type: 'private', seller_business: null, ...l, ...EXTRA[l.id] }) as Listing);
+const SEED: Listing[] = SEED_RAW.map((l) => ({ price_history: [], shipping: 'pickup', year: null, pieces: null, minifigs: null, ...l, ...EXTRA[l.id] }) as Listing);
 
 let cache: Listing[] | null = null;
 const subs = new Set<() => void>();
@@ -129,41 +128,6 @@ export function changePrice(id: string, price: number) {
   if (!l || price === l.price_rsd) return;
   updateListing(id, { price_rsd: price, price_history: [...l.price_history, { price: l.price_rsd, at: new Date().toISOString() }] });
 }
-
-// ---- seller profile: private person or registered seller issuing fiscal receipts (like KupujemProdajem)
-export interface SellerProfile {
-  type: 'private' | 'business';
-  business: string;
-  fiscal: boolean;
-}
-const SELLER_KEY = 'kockolov.proto.seller';
-const EMPTY_SELLER: SellerProfile = { type: 'private', business: '', fiscal: false };
-let sellerRaw = '';
-let sellerVal: SellerProfile = EMPTY_SELLER;
-export function getSeller(): SellerProfile {
-  try {
-    const raw = localStorage.getItem(SELLER_KEY) ?? '';
-    if (raw !== sellerRaw) {
-      sellerRaw = raw;
-      sellerVal = raw ? { ...EMPTY_SELLER, ...(JSON.parse(raw) as SellerProfile) } : EMPTY_SELLER;
-    }
-  } catch {
-    /* keep the last value */
-  }
-  return sellerVal;
-}
-export function setSeller(p: SellerProfile) {
-  try {
-    localStorage.setItem(SELLER_KEY, JSON.stringify(p));
-  } catch {
-    /* ignore */
-  }
-  emit();
-}
-export const useSeller = () => useSyncExternalStore(subscribe, getSeller);
-/** New products only from sellers who issue fiscal receipts */
-export const canSellNew = (p: SellerProfile) => p.type === 'business' && p.fiscal && p.business.trim().length > 1;
-export const isNewCondition = (c: Condition) => c === 'new_sealed' || c === 'new_opened';
 
 // ---- followed listings (the real version stores this on the server and sends push + e-mail)
 const WATCH_KEY = 'kockolov.proto.watches.v1';
