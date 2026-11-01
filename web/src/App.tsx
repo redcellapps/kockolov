@@ -20,6 +20,7 @@ import TvPage from './pages/Tv';
 import ListingDetail from './ads/ListingDetail';
 import ListingsPage from './ads/ListingsPage';
 import MyListings from './ads/MyListings';
+import MessagesPage from './ads/MessagesPage';
 import NewListing from './ads/NewListing';
 
 /** While the site is private, every page except login needs a session. */
@@ -69,6 +70,8 @@ export default function App() {
         <Route path="/oglasi" element={<Gate><ListingsPage /></Gate>} />
         <Route path="/oglasi/novi" element={<Gate needUser><NewListing /></Gate>} />
         <Route path="/oglasi/:id" element={<Gate><ListingDetail /></Gate>} />
+        <Route path="/poruke" element={<Gate needUser><MessagesPage /></Gate>} />
+        <Route path="/poruke/:id" element={<Gate needUser><MessagesPage /></Gate>} />
         <Route path="/moji-oglasi" element={<Gate needUser><MyListings /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />

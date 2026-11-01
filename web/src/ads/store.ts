@@ -35,7 +35,7 @@ export interface Listing {
   views: number;
 }
 
-const KEY = 'kockolov.proto.listings.v6';
+const KEY = 'kockolov.proto.listings.v7';
 const PHONE_KEY = 'kockolov.proto.phone';
 const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
@@ -52,6 +52,7 @@ const SEED_RAW = [
   { id: 'a4', title: 'Hogwarts dvorac 71043 – kompletan, sa kutijom', description: 'Sklopljen jednom, sve kesice na broju. Kutija ima malo istrošenih ivica.', set_num: '71043', theme_slug: 'harry-potter', theme_name: 'Harry Potter', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 47000, negotiable: true, city: 'Beograd', images: [brick('#7c3aed', '#ede9fe', '71043')], seller: 'Ana S.', seller_since: '2026-07-14', seller_phone: '+381 65 333 4455', mine: false, status: 'active', created_at: day(5), views: 98 },
   { id: 'a5', title: 'Kesa figurica: 40 komada, Ninjago i City', description: 'Čiste, bez oštećenja štampe. Šaljem Postexpressom uz plaćanje pouzećem.', set_num: null, theme_slug: 'ninjago', theme_name: 'Ninjago', condition: 'parts', has_box: false, has_manual: false, price_rsd: 6500, negotiable: false, city: 'Kragujevac', images: [brick('#16a34a', '#dcfce7', 'FIGURICE')], seller: 'Stefan R.', seller_since: '2026-10-02', seller_phone: '+381 60 444 5566', mine: false, status: 'active', created_at: day(8), views: 33 },
   { id: 'a6', title: 'Monster Jam DIGatron 42199, sklopljen', description: 'Sve radi, povlačenje na nazad. Nedostaje kutija.', set_num: '42199', theme_slug: 'technic', theme_name: 'Technic', condition: 'used_complete', has_box: false, has_manual: true, price_rsd: 2700, negotiable: true, city: 'Subotica', images: [brick('#0ea5e9', '#e0f2fe', '42199')], seller: 'Dejan K.', seller_since: '2026-06-30', seller_phone: '+381 64 555 6677', mine: false, status: 'active', created_at: day(11), views: 120 },
+  { id: 'a7', title: 'LEGO Friends 41700 kućica, kompletna', description: 'Kompletna kućica sa svim figuricama. Čuvana u kutiji, bez oštećenja.', set_num: '41700', theme_slug: 'friends', theme_name: 'Friends', condition: 'like_new', has_box: true, has_manual: true, price_rsd: 3200, negotiable: true, city: 'Niš', images: [brick('#ec4899', '#fce7f3', '41700')], seller: 'Ja', seller_since: '2026-11-01', seller_phone: null, mine: true, status: 'active', created_at: day(0), views: 12 },
 ] as unknown as Omit<Listing, 'price_history' | 'shipping' | 'year' | 'pieces' | 'minifigs'>[];
 
 const EXTRA: Record<string, Partial<Listing>> = {

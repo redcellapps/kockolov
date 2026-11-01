@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../components/ui';
 import { t } from '../i18n';
+import { setEmailOnMessage, useMsgPrefs } from './messages';
 import { getPhone, setPhone } from './store';
 
 const input = 'h-12 w-full rounded-xl border border-line bg-surface px-4 text-[15px] outline-none focus:border-ink';
@@ -9,6 +10,7 @@ const input = 'h-12 w-full rounded-xl border border-line bg-surface px-4 text-[1
 export function SellerCard() {
   const [v, setV] = useState(getPhone());
   const [ok, setOk] = useState(false);
+  const prefs = useMsgPrefs();
   const touch = () => setOk(false);
   return (
     <section className="rounded-3xl border border-line bg-surface p-6 sm:p-7">
@@ -25,6 +27,10 @@ export function SellerCard() {
         <label className="block">
           <span className="mb-1.5 block text-sm font-bold text-ink-2">{t('ads.new.phoneLabel')}</span>
           <input className={input} value={v} onChange={(e) => (setV(e.target.value), touch())} inputMode="tel" autoComplete="tel" placeholder="+381 6x xxx xxxx" />
+        </label>
+        <label className="flex items-start gap-2 text-sm font-semibold">
+          <input type="checkbox" className="mt-1" checked={prefs.emailOnMessage} onChange={(e) => setEmailOnMessage(e.target.checked)} />
+          <span>{t('msg.emailPref')}<span className="block text-xs font-normal text-ink-3">{t('msg.emailPrefHint')}</span></span>
         </label>
         <div className="flex items-center gap-3">
           <Button type="submit">{t('ads.sellerInfo.save')}</Button>

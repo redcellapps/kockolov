@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
+import { useUnread } from '../ads/messages';
 import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -58,6 +59,7 @@ function UserMenu() {
           <div className="my-1 h-px bg-line" />
           {[
             ['/pracenje', t('nav.watchlist')],
+            ['/poruke', t('nav.messages')],
             ['/moji-oglasi', t('nav.myAds')],
             ['/nalog', t('nav.account')],
             ...(user.role === 'admin' ? [['/admin', t('nav.admin')]] : []),
@@ -116,6 +118,7 @@ function Header() {
             <HeartIcon size={18} /> {t('nav.watchlist')}
           </NavLink>
         )}
+        {user && <MessagesLink />}
         <ScanButton className="hidden md:grid" />
         <UserMenu />
       </div>
@@ -236,5 +239,19 @@ export function Layout({ children }: { children: ReactNode }) {
       </main>
       <Footer />
     </div>
+  );
+}
+
+/** Envelope with the number of unread messages (classifieds prototype) */
+function MessagesLink() {
+  const unread = useUnread();
+  return (
+    <NavLink to="/poruke" aria-label={t('nav.messages')} className="relative grid h-10 w-10 place-items-center rounded-xl text-ink-2 hover:bg-surface-2 hover:text-ink">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="m4 7 8 6 8-6" />
+      </svg>
+      {unread > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-deal px-1 text-[10px] font-extrabold leading-none text-white">{unread}</span>}
+    </NavLink>
   );
 }

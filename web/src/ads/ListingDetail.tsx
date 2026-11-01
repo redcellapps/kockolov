@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { Button, EmptyState } from '../components/ui';
 import { t } from '../i18n';
 import { api, type SetDetail } from '../lib/api';
@@ -8,6 +8,7 @@ import { dateLong, money } from '../lib/format';
 import { usePageTitle } from '../lib/title';
 import { AdCard, CondBadge, adAgo } from './AdCard';
 import { ProtoBanner } from './ListingsPage';
+import { conversationFor, sendMessage } from './messages';
 import { priceChange, toggleWatch, updateListing, useListings, useWatches } from './store';
 
 export default function ListingDetail() {
@@ -18,7 +19,7 @@ export default function ListingDetail() {
   const [img, setImg] = useState(0);
   const [phone, setPhone] = useState(false);
   const [msg, setMsg] = useState('');
-  const [sent, setSent] = useState(false);
+  const nav = useNavigate();
   const [reported, setReported] = useState(false);
   const following = !!useWatches()[id ?? ''];
 
@@ -120,12 +121,21 @@ export default function ListingDetail() {
               ) : (
                 <p className="text-sm text-ink-3">{t('ads.detail.noPhone')}</p>
               )}
-              {sent ? (
-                <p className="rounded-xl bg-save-soft px-3 py-2 text-sm font-semibold text-save">{t('ads.detail.messageSent')}</p>
+              {l.mine ? (
+                <Link to="/poruke" className="flex h-11 items-center justify-center rounded-xl border border-line text-[15px] font-bold hover:border-ink-3">{t('msg.myAdInbox')}</Link>
               ) : (
                 <>
                   <textarea rows={3} className="w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-ink" placeholder={t('ads.detail.messagePlaceholder')} value={msg} onChange={(e) => setMsg(e.target.value)} />
-                  <Button onClick={() => setSent(true)}>{t('ads.detail.message')}</Button>
+                  <Button
+                    disabled={!msg.trim()}
+                    onClick={() => {
+                      const cid = conversationFor(l);
+                      sendMessage(cid, msg);
+                      nav(`/poruke/${cid}`);
+                    }}
+                  >
+                    {t('ads.detail.message')}
+                  </Button>
                 </>
               )}
             </div>
