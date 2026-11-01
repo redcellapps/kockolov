@@ -3,8 +3,8 @@
 import { useSyncExternalStore } from 'react';
 
 /** Private persons sell used items only (no fiscal receipts), so there is no "new" condition */
-export type Condition = 'used_complete' | 'used_incomplete' | 'parts';
-export const CONDITIONS: Condition[] = ['used_complete', 'used_incomplete', 'parts'];
+export type Condition = 'like_new' | 'used_complete' | 'used_incomplete' | 'parts';
+export const CONDITIONS: Condition[] = ['like_new', 'used_complete', 'used_incomplete', 'parts'];
 
 export interface Listing {
   id: string;
@@ -35,7 +35,7 @@ export interface Listing {
   views: number;
 }
 
-const KEY = 'kockolov.proto.listings.v5';
+const KEY = 'kockolov.proto.listings.v6';
 const PHONE_KEY = 'kockolov.proto.phone';
 const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
@@ -47,7 +47,7 @@ function brick(c1: string, c2: string, label: string): string {
 
 const SEED_RAW = [
   { id: 'a1', title: 'Millennium Falcon UCS, kompletan sa kutijom', description: 'Sklopljen jednom, stajao u vitrini. Sve kesice su unutra, uputstvo i kutija u odličnom stanju. Lično preuzimanje u Beogradu, može provera pred kupovinu.', set_num: '75192', theme_slug: 'star-wars', theme_name: 'Star Wars', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 58000, negotiable: true, city: 'Beograd', images: [brick('#6b7280', '#e5e7eb', '75192')], seller: 'Nikola M.', seller_since: '2026-09-02', seller_phone: '+381 64 111 2233', mine: false, status: 'active', created_at: day(1), views: 142 },
-  { id: 'a2', title: 'Buket ruža 10328, sklopljen, sa uputstvom', description: 'Sklopljen jednom i stajao u vitrini, kompletan. Kutija i uputstvo su sačuvani.', set_num: '10328', theme_slug: 'botanicals', theme_name: 'Botanicals', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 4900, negotiable: false, city: 'Novi Sad', images: [brick('#e11d48', '#ffe4e6', '10328')], seller: 'Jelena P.', seller_since: '2026-10-11', seller_phone: '+381 63 222 3344', mine: false, status: 'active', created_at: day(0), views: 57 },
+  { id: 'a2', title: 'Buket ruža 10328, kao nov, sa kutijom', description: 'Sklopljen jednom i stajao u vitrini, izgleda kao nov. Kutija i uputstvo su sačuvani.', set_num: '10328', theme_slug: 'botanicals', theme_name: 'Botanicals', condition: 'like_new', has_box: true, has_manual: true, price_rsd: 4900, negotiable: false, city: 'Novi Sad', images: [brick('#e11d48', '#ffe4e6', '10328')], seller: 'Jelena P.', seller_since: '2026-10-11', seller_phone: '+381 63 222 3344', mine: false, status: 'active', created_at: day(0), views: 57 },
   { id: 'a3', title: 'Lot: 12 Technic setova, bez kutija', description: 'Prodaje se zajedno ili pojedinačno (pitajte). Sve proverene po delovima, nedostaje nekoliko stikera.', set_num: null, theme_slug: 'technic', theme_name: 'Technic', condition: 'used_incomplete', has_box: false, has_manual: false, price_rsd: 24000, negotiable: true, city: 'Niš', images: [brick('#cf1419', '#fee2e2', 'TECHNIC')], seller: 'Marko D.', seller_since: '2026-08-20', seller_phone: null, mine: false, status: 'active', created_at: day(3), views: 211 },
   { id: 'a4', title: 'Hogwarts dvorac 71043 – kompletan, sa kutijom', description: 'Sklopljen jednom, sve kesice na broju. Kutija ima malo istrošenih ivica.', set_num: '71043', theme_slug: 'harry-potter', theme_name: 'Harry Potter', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 47000, negotiable: true, city: 'Beograd', images: [brick('#7c3aed', '#ede9fe', '71043')], seller: 'Ana S.', seller_since: '2026-07-14', seller_phone: '+381 65 333 4455', mine: false, status: 'active', created_at: day(5), views: 98 },
   { id: 'a5', title: 'Kesa figurica: 40 komada, Ninjago i City', description: 'Čiste, bez oštećenja štampe. Šaljem Postexpressom uz plaćanje pouzećem.', set_num: null, theme_slug: 'ninjago', theme_name: 'Ninjago', condition: 'parts', has_box: false, has_manual: false, price_rsd: 6500, negotiable: false, city: 'Kragujevac', images: [brick('#16a34a', '#dcfce7', 'FIGURICE')], seller: 'Stefan R.', seller_since: '2026-10-02', seller_phone: '+381 60 444 5566', mine: false, status: 'active', created_at: day(8), views: 33 },

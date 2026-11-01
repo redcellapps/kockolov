@@ -5,7 +5,7 @@ import { cx } from '../components/ui';
 import { AdWatchHeart } from './WatchButton';
 import { priceChange, type Listing } from './store';
 
-export const condTone = (c: Listing['condition']) => (c === 'parts' ? 'bg-surface-2 text-ink-2' : c === 'used_complete' ? 'bg-save-soft text-save' : 'bg-[#fff4cf] text-[#7a5a00]');
+export const condTone = (c: Listing['condition']) => (c === 'parts' ? 'bg-surface-2 text-ink-2' : c === 'like_new' ? 'bg-[#e8f0fd] text-accent' : c === 'used_complete' ? 'bg-save-soft text-save' : 'bg-[#fff4cf] text-[#7a5a00]');
 
 export function CondBadge({ c, className }: { c: Listing['condition']; className?: string }) {
   return <span className={cx('inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide', condTone(c), className)}>{t(`cond.${c}`)}</span>;
