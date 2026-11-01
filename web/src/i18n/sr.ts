@@ -749,7 +749,7 @@ export const sr = {
   'ads.count.other': "{n} oglasa",
   'ads.empty.title': "Nema oglasa za ove filtere",
   'ads.empty.text': "Probaj da promeniš filtere ili postavi svoj oglas.",
-  'cond.like_new': \"Korišćeno, kao novo\",
+  'cond.like_new': "Korišćeno, kao novo",
   'cond.used_complete': "Korišćeno, kompletno",
   'cond.used_incomplete': "Korišćeno, nekompletno",
   'cond.parts': "Delovi i figurice",
