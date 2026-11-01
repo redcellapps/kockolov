@@ -17,6 +17,10 @@ import SearchPage from './pages/Search';
 import SetDetail from './pages/SetDetail';
 import UnsubscribePage from './pages/Unsubscribe';
 import TvPage from './pages/Tv';
+import ListingDetail from './ads/ListingDetail';
+import ListingsPage from './ads/ListingsPage';
+import MyListings from './ads/MyListings';
+import NewListing from './ads/NewListing';
 
 /** While the site is private, every page except login needs a session. */
 function Gate({ children, needUser, needAdmin }: { children: ReactNode; needUser?: boolean; needAdmin?: boolean }) {
@@ -62,6 +66,10 @@ export default function App() {
         <Route path="/blog" element={<Gate><BlogListPage /></Gate>} />
         <Route path="/blog/:slug" element={<Gate><BlogPostPage /></Gate>} />
         <Route path="/" element={<Gate><Home /></Gate>} />
+        <Route path="/oglasi" element={<Gate><ListingsPage /></Gate>} />
+        <Route path="/oglasi/novi" element={<Gate needUser><NewListing /></Gate>} />
+        <Route path="/oglasi/:id" element={<Gate><ListingDetail /></Gate>} />
+        <Route path="/moji-oglasi" element={<Gate needUser><MyListings /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />
         <Route path="/teme" element={<Gate><ThemesPage /></Gate>} />

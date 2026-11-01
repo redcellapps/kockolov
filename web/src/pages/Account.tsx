@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
 import { PhoneCard } from '../components/PhoneSettings';
+import { SellerCard } from '../ads/SellerCard';
 import { TvDevicesCard } from '../components/TvDevices';
 import { Button, Toggle, cx } from '../components/ui';
 import { dateLong, rateText } from '../lib/format';
@@ -106,6 +107,8 @@ export default function AccountPage() {
           <p className="mt-1 text-sm text-ink-3">{t('account.news.hint')}</p>
         </div>
       </Card>
+
+      <SellerCard />
 
       <PhoneCard />
       <TvDevicesCard />

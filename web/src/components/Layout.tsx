@@ -58,6 +58,7 @@ function UserMenu() {
           <div className="my-1 h-px bg-line" />
           {[
             ['/pracenje', t('nav.watchlist')],
+            ['/moji-oglasi', t('nav.myAds')],
             ['/nalog', t('nav.account')],
             ...(user.role === 'admin' ? [['/admin', t('nav.admin')]] : []),
           ].map(([to, label]) => (
@@ -102,6 +103,9 @@ function Header() {
           <NavLink to="/teme" className={link}>
             {t('nav.themes')}
           </NavLink>
+          <NavLink to="/oglasi" className={link}>
+            {t('nav.ads')}
+          </NavLink>
           <NavLink to="/blog" className={link}>
             {t('nav.blog')}
           </NavLink>
@@ -127,6 +131,9 @@ function Header() {
             </NavLink>
             <NavLink to="/teme" className={link}>
               {t('nav.themes')}
+            </NavLink>
+            <NavLink to="/oglasi" className={link}>
+              {t('nav.ads')}
             </NavLink>
             <NavLink to="/blog" className={link}>
               {t('nav.blog')}

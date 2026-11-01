@@ -7,6 +7,7 @@ import { t } from '../i18n';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { usePageTitle } from '../lib/title';
+import { setPhone } from '../ads/store';
 
 export function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   const { label, ...rest } = props;
@@ -90,6 +91,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhoneVal] = useState('');
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<{ kind: 'signup' | 'forgot'; email: string } | null>(null);
@@ -112,6 +114,7 @@ export default function LoginPage() {
       } else if (mode === 'register') {
         await api('/api/auth/register', { method: 'POST', json: { email, password, name } });
         trackEvent('registracija');
+        if (phone.trim()) setPhone(phone.trim()); // prototype: kept in this browser only; the real version sends it with the sign-up
         setSent({ kind: 'signup', email: email.trim() });
       } else {
         await api('/api/auth/forgot', { method: 'POST', json: { email } });
@@ -187,6 +190,12 @@ export default function LoginPage() {
                 {t('login.forgot')}
               </button>
             )}
+          </div>
+        )}
+        {mode === 'register' && (
+          <div>
+            <Field label={t('register.phone')} value={phone} onChange={(e) => setPhoneVal(e.target.value)} autoComplete="tel" inputMode="tel" maxLength={24} />
+            <p className="mt-1.5 text-xs text-ink-3">{t('register.phoneHint')}</p>
           </div>
         )}
         {error && (
