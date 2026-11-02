@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { Button, cx } from '../components/ui';
 import { Field } from '../pages/Login';
 import { t } from '../i18n';
@@ -8,37 +8,44 @@ import { api, type SearchResponse, type SetDetail, type Theme } from '../lib/api
 import { usePageTitle } from '../lib/title';
 import { ProtoBanner } from './ListingsPage';
 import { useAuth } from '../lib/auth';
-import { addListing, CONDITIONS, loadCatalog, PHOTO_H, PHOTO_W, processPhoto, setPhone, usePhone, type Condition } from './store';
+import { addListing, changePrice, CONDITIONS, loadCatalog, PHOTO_H, PHOTO_W, processPhoto, setPhone, updateListing, useListings, usePhone, type Condition, type Listing } from './store';
 
 const area = 'w-full rounded-xl border border-line bg-surface p-3 text-[15px] outline-none transition focus:border-ink';
 
 export default function NewListing() {
-  usePageTitle(t('title.adNew'));
+  const { id } = useParams();
+  const l = useListings().find((x) => x.id === id);
+  if (id && (!l || !l.mine)) return <div className="mx-auto max-w-2xl px-4 py-16 text-center font-bold">{t('ads.detail.notFound')}</div>;
+  return <ListingForm key={id ?? 'new'} edit={l} />;
+}
+
+function ListingForm({ edit }: { edit?: Listing }) {
+  usePageTitle(edit ? t('title.adEdit') : t('title.adNew'));
   const nav = useNavigate();
   const { user } = useAuth();
   const savedPhone = usePhone();
   const [step, setStep] = useState(0);
-  const [setNum, setSetNum] = useState('');
+  const [setNum, setSetNum] = useState(edit?.set_num ?? '');
   const [found, setFound] = useState<SetDetail['set'] | null>(null);
   const [lookup, setLookup] = useState<'idle' | 'busy' | 'none'>('idle');
   const themes = useQuery({ queryKey: ['themes'], queryFn: () => api<Theme[]>('/api/themes'), staleTime: 600_000 });
   const [setName, setSetName] = useState('');
-  const [theme, setTheme] = useState('');
-  const [year, setYear] = useState('');
-  const [pieces, setPieces] = useState('');
-  const [minifigs, setMinifigs] = useState('');
+  const [theme, setTheme] = useState(edit?.theme_name ?? '');
+  const [year, setYear] = useState(edit?.year ? String(edit.year) : '');
+  const [pieces, setPieces] = useState(edit?.pieces ? String(edit.pieces) : '');
+  const [minifigs, setMinifigs] = useState(edit?.minifigs != null ? String(edit.minifigs) : '');
   const [fromCatalog, setFromCatalog] = useState(false);
-  const [shipping, setShipping] = useState<'pickup' | 'ships'>('pickup');
-  const [title, setTitle] = useState('');
-  const [desc, setDesc] = useState('');
-  const [cond, setCond] = useState<Condition>('used_complete');
-  const [box, setBox] = useState(true);
-  const [manual, setManual] = useState(true);
-  const [images, setImages] = useState<string[]>([]);
-  const [price, setPrice] = useState('');
-  const [negotiable, setNegotiable] = useState(true);
-  const [city, setCity] = useState('');
-  const [phone, setPh] = useState(savedPhone);
+  const [shipping, setShipping] = useState<'pickup' | 'ships'>(edit?.shipping ?? 'pickup');
+  const [title, setTitle] = useState(edit?.title ?? '');
+  const [desc, setDesc] = useState(edit?.description ?? '');
+  const [cond, setCond] = useState<Condition>(edit?.condition ?? 'used_complete');
+  const [box, setBox] = useState(edit?.has_box ?? true);
+  const [manual, setManual] = useState(edit?.has_manual ?? true);
+  const [images, setImages] = useState<string[]>(edit?.images ?? []);
+  const [price, setPrice] = useState(edit ? String(edit.price_rsd) : '');
+  const [negotiable, setNegotiable] = useState(edit?.negotiable ?? true);
+  const [city, setCity] = useState(edit?.city ?? '');
+  const [phone, setPh] = useState(edit?.seller_phone || savedPhone);
   const [err, setErr] = useState<string | null>(null);
 
   const [sugg, setSugg] = useState<{ num: string; name: string; theme: string }[]>([]);
@@ -124,36 +131,45 @@ export default function NewListing() {
     setErr(e);
     if (e) return;
     setPhone(phone.trim());
-    const id = addListing({
+    const fields = {
       title: title.trim(),
       description: desc.trim(),
       set_num: found?.set_num ?? (setNum.trim() || null),
-      theme_slug: found?.theme_slug ?? themes.data?.find((x) => x.name === theme)?.slug ?? null,
+      theme_slug: found?.theme_slug ?? themes.data?.find((x) => x.name === theme)?.slug ?? edit?.theme_slug ?? null,
       theme_name: theme || null,
       year: Number(year) || null,
       pieces: Number(pieces) || null,
       minifigs: minifigs === '' ? null : Number(minifigs),
       shipping,
-      price_history: [],
       condition: cond,
       has_box: box,
       has_manual: manual,
-      price_rsd: p,
       negotiable,
       city: city.trim(),
       images,
+      seller_phone: phone.trim(),
+    };
+    if (edit) {
+      updateListing(edit.id, fields);
+      changePrice(edit.id, p); // keeps the old price in the history, so followers get the "price dropped" notice
+      nav(`/oglasi/${edit.id}`);
+      return;
+    }
+    const newId = addListing({
+      ...fields,
+      price_rsd: p,
+      price_history: [],
       seller: user?.name || user?.email.split('@')[0] || 'Ja',
       seller_since: new Date().toISOString(),
-      seller_phone: phone.trim(),
     });
-    nav(`/oglasi/${id}`);
+    nav(`/oglasi/${newId}`);
   }
 
   const steps = [t('ads.new.step1'), t('ads.new.step2'), t('ads.new.step3'), t('ads.new.step4')];
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
       <ProtoBanner />
-      <h1 className="text-3xl font-extrabold tracking-tight">{t('ads.new.title')}</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight">{edit ? t('ads.edit.title') : t('ads.new.title')}</h1>
       <ol className="mt-5 flex gap-2">
         {steps.map((s, i) => (
           <li key={s} className="flex-1">
@@ -305,8 +321,8 @@ export default function NewListing() {
 
         {err && <p role="alert" className="rounded-xl bg-deal-soft px-3 py-2 text-sm font-semibold text-deal">{err}</p>}
         <div className="flex justify-between gap-3 pt-1">
-          {step > 0 ? <Button variant="ghost" onClick={() => go(step - 1)}>{t('ads.new.back')}</Button> : <Link to="/oglasi" className="inline-flex h-11 items-center px-4 text-sm font-bold text-ink-2">{t('ads.detail.back')}</Link>}
-          {step < 3 ? <Button onClick={() => go(step + 1)}>{t('ads.new.next')}</Button> : <Button onClick={publish}>{t('ads.new.publish')}</Button>}
+          {step > 0 ? <Button variant="ghost" onClick={() => go(step - 1)}>{t('ads.new.back')}</Button> : <Link to={edit ? `/oglasi/${edit.id}` : '/oglasi'} className="inline-flex h-11 items-center px-4 text-sm font-bold text-ink-2">{t('ads.detail.back')}</Link>}
+          {step < 3 ? <Button onClick={() => go(step + 1)}>{t('ads.new.next')}</Button> : <Button onClick={publish}>{edit ? t('ads.edit.save') : t('ads.new.publish')}</Button>}
         </div>
       </div>
     </div>

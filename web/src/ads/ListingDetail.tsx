@@ -122,7 +122,10 @@ export default function ListingDetail() {
                 <p className="text-sm text-ink-3">{t('ads.detail.noPhone')}</p>
               )}
               {l.mine ? (
+                <>
+                <Link to={`/oglasi/${l.id}/izmeni`} className="flex h-11 items-center justify-center rounded-xl bg-brand text-[15px] font-extrabold hover:brightness-95">{t('ads.edit.link')}</Link>
                 <Link to="/poruke" className="flex h-11 items-center justify-center rounded-xl border border-line text-[15px] font-bold hover:border-ink-3">{t('msg.myAdInbox')}</Link>
+                </>
               ) : (
                 <>
                   <textarea rows={3} className="w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-ink" placeholder={t('ads.detail.messagePlaceholder')} value={msg} onChange={(e) => setMsg(e.target.value)} />

@@ -51,6 +51,7 @@ export default function MyListings() {
                 <div className="grid gap-1.5 border-t border-line p-3">
                   <p className="text-xs text-ink-3">{t('ads.detail.views', { n: l.views })} · {t('ads.mine.expires', { n: Math.max(1, 30 - Math.floor((Date.now() - +new Date(l.created_at)) / 86_400_000)) })}</p>
                   <div className="flex flex-wrap gap-1.5">
+                    <Link to={`/oglasi/${l.id}/izmeni`} className={buttonClasses('outline', 'sm')}>{t('ads.edit.link')}</Link>
                     <PriceEditor l={l} />
                     <Button size="sm" variant="outline" onClick={() => updateListing(l.id, { status: l.status === 'paused' ? 'active' : 'paused' })}>{l.status === 'paused' ? t('ads.mine.resume') : t('ads.mine.pause')}</Button>
                     <Button size="sm" variant="outline" onClick={() => updateListing(l.id, { status: 'sold' })}>{t('ads.mine.sold')}</Button>

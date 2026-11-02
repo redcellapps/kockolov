@@ -72,6 +72,7 @@ export default function App() {
         <Route path="/oglasi/:id" element={<Gate><ListingDetail /></Gate>} />
         <Route path="/poruke" element={<Gate needUser><MessagesPage /></Gate>} />
         <Route path="/poruke/:id" element={<Gate needUser><MessagesPage /></Gate>} />
+        <Route path="/oglasi/:id/izmeni" element={<Gate needUser><NewListing /></Gate>} />
         <Route path="/moji-oglasi" element={<Gate needUser><MyListings /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />
