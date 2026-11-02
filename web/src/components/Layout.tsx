@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
-import { useUnread } from '../ads/messages';
+import { useAdsStatus } from '../ads/store';
 import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -15,7 +15,7 @@ import { SearchBox } from './SearchBox';
 import { buttonClasses, cx } from './ui';
 
 function UserMenu() {
-  const { user, logout, registrationOpen } = useAuth();
+  const { user, logout, registrationOpen, listings } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -59,8 +59,7 @@ function UserMenu() {
           <div className="my-1 h-px bg-line" />
           {[
             ['/pracenje', t('nav.watchlist')],
-            ['/poruke', t('nav.messages')],
-            ['/moji-oglasi', t('nav.myAds')],
+            ...(listings ? [['/poruke', t('nav.messages')], ['/moji-oglasi', t('nav.myAds')]] : []),
             ['/nalog', t('nav.account')],
             ...(user.role === 'admin' ? [['/admin', t('nav.admin')]] : []),
           ].map(([to, label]) => (
@@ -85,7 +84,7 @@ function UserMenu() {
 
 function Header() {
   const { pathname } = useLocation();
-  const { user } = useAuth();
+  const { user, listings } = useAuth();
   const isHome = pathname === '/';
   const link = ({ isActive }: { isActive: boolean }) =>
     cx('rounded-xl px-3 py-2 text-sm font-bold transition', isActive ? 'bg-surface-2 text-ink' : 'text-ink-2 hover:text-ink');
@@ -105,9 +104,11 @@ function Header() {
           <NavLink to="/teme" className={link}>
             {t('nav.themes')}
           </NavLink>
-          <NavLink to="/oglasi" className={link}>
-            {t('nav.ads')}
-          </NavLink>
+          {listings && (
+            <NavLink to="/oglasi" className={link}>
+              {t('nav.ads')}
+            </NavLink>
+          )}
           <NavLink to="/blog" className={link}>
             {t('nav.blog')}
           </NavLink>
@@ -118,7 +119,7 @@ function Header() {
             <HeartIcon size={18} /> {t('nav.watchlist')}
           </NavLink>
         )}
-        {user && <MessagesLink />}
+        {user && listings && <MessagesLink />}
         <ScanButton className="hidden md:grid" />
         <UserMenu />
       </div>
@@ -135,9 +136,11 @@ function Header() {
             <NavLink to="/teme" className={link}>
               {t('nav.themes')}
             </NavLink>
-            <NavLink to="/oglasi" className={link}>
-              {t('nav.ads')}
-            </NavLink>
+            {listings && (
+              <NavLink to="/oglasi" className={link}>
+                {t('nav.ads')}
+              </NavLink>
+            )}
             <NavLink to="/blog" className={link}>
               {t('nav.blog')}
             </NavLink>
@@ -244,7 +247,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
 /** Envelope with the number of unread messages (classifieds prototype) */
 function MessagesLink() {
-  const unread = useUnread();
+  const unread = useAdsStatus().unread;
   return (
     <NavLink to="/poruke" aria-label={t('nav.messages')} className="relative grid h-10 w-10 place-items-center rounded-xl text-ink-2 hover:bg-surface-2 hover:text-ink">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

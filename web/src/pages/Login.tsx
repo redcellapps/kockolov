@@ -7,7 +7,6 @@ import { t } from '../i18n';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { usePageTitle } from '../lib/title';
-import { setPhone } from '../ads/store';
 
 export function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   const { label, ...rest } = props;
@@ -112,9 +111,8 @@ export default function LoginPage() {
         await api('/api/auth/login', { method: 'POST', json: { email, password } });
         await refresh(); // LoginRoute then redirects to where the user was going
       } else if (mode === 'register') {
-        await api('/api/auth/register', { method: 'POST', json: { email, password, name } });
+        await api('/api/auth/register', { method: 'POST', json: { email, password, name, ...(phone.trim() ? { phone: phone.trim() } : {}) } });
         trackEvent('registracija');
-        if (phone.trim()) setPhone(phone.trim()); // prototype: kept in this browser only; the real version sends it with the sign-up
         setSent({ kind: 'signup', email: email.trim() });
       } else {
         await api('/api/auth/forgot', { method: 'POST', json: { email } });

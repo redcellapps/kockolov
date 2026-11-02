@@ -1,7 +1,6 @@
-// PROTOTYPE (phase 0): classifieds data lives in this browser's localStorage only — no server, nothing is shared.
-// The real version replaces this file with API calls (/api/oglasi/*); pages and components stay as they are.
-import { resetMessages } from './messages';
-import { useSyncExternalStore } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '../lib/api';
+import { useAuth } from '../lib/auth';
 
 /** Private persons sell used items only (no fiscal receipts), so there is no "new" condition */
 export type Condition = 'like_new' | 'used_complete' | 'used_incomplete' | 'parts';
@@ -27,163 +26,147 @@ export interface Listing {
   pieces: number | null;
   minifigs: number | null;
   images: string[];
+  /** ids of the pictures, same order as images (needed to edit the ad) */
+  image_ids: number[];
   seller: string;
   seller_since: string;
-  seller_phone: string | null;
+  /** the number itself is only given on request (GET /api/oglasi/:id/telefon) */
+  has_phone: boolean;
   mine: boolean;
-  status: 'active' | 'paused' | 'sold';
+  watched: boolean;
+  status: 'active' | 'paused' | 'sold' | 'expired' | 'removed';
   created_at: string;
   views: number;
+  /** only for the owner */
+  expires_at?: string;
+  removed_reason?: string | null;
 }
 
-const KEY = 'kockolov.proto.listings.v7';
-const PHONE_KEY = 'kockolov.proto.phone';
-const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+/** An ad somebody follows, with what changed since they last looked */
+export type WatchedListing = Listing & { seen_price: number; notice: 'drop' | 'rise' | 'sold' | null };
 
-/** Colored brick placeholder photo (4:3, with the Kockolov mark), so seed listings have a picture without any file */
-function brick(c1: string, c2: string, label: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="${c2}"/><g fill="${c1}"><rect x="90" y="110" width="220" height="110" rx="12"/><rect x="115" y="80" width="46" height="32" rx="9"/><rect x="177" y="80" width="46" height="32" rx="9"/><rect x="239" y="80" width="46" height="32" rx="9"/></g><rect x="90" y="190" width="220" height="30" rx="12" fill="rgba(0,0,0,.12)"/><text x="200" y="252" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="22" fill="rgba(0,0,0,.45)">${label}</text><rect x="288" y="262" width="104" height="28" rx="14" fill="rgba(22,21,15,.72)"/><rect x="298" y="270" width="16" height="12" rx="3" fill="#ffcf00"/><text x="320" y="281" font-family="sans-serif" font-weight="800" font-size="13" fill="#fff">Kockolov</text></svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+export interface AdsStatus {
+  unread: number;
+  notices: number;
+  mine: number;
 }
 
-const SEED_RAW = [
-  { id: 'a1', title: 'Millennium Falcon UCS, kompletan sa kutijom', description: 'Sklopljen jednom, stajao u vitrini. Sve kesice su unutra, uputstvo i kutija u odličnom stanju. Lično preuzimanje u Beogradu, može provera pred kupovinu.', set_num: '75192', theme_slug: 'star-wars', theme_name: 'Star Wars', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 58000, negotiable: true, city: 'Beograd', images: [brick('#6b7280', '#e5e7eb', '75192')], seller: 'Nikola M.', seller_since: '2026-09-02', seller_phone: '+381 64 111 2233', mine: false, status: 'active', created_at: day(1), views: 142 },
-  { id: 'a2', title: 'Buket ruža 10328, kao nov, sa kutijom', description: 'Sklopljen jednom i stajao u vitrini, izgleda kao nov. Kutija i uputstvo su sačuvani.', set_num: '10328', theme_slug: 'botanicals', theme_name: 'Botanicals', condition: 'like_new', has_box: true, has_manual: true, price_rsd: 4900, negotiable: false, city: 'Novi Sad', images: [brick('#e11d48', '#ffe4e6', '10328')], seller: 'Jelena P.', seller_since: '2026-10-11', seller_phone: '+381 63 222 3344', mine: false, status: 'active', created_at: day(0), views: 57 },
-  { id: 'a3', title: 'Lot: 12 Technic setova, bez kutija', description: 'Prodaje se zajedno ili pojedinačno (pitajte). Sve proverene po delovima, nedostaje nekoliko stikera.', set_num: null, theme_slug: 'technic', theme_name: 'Technic', condition: 'used_incomplete', has_box: false, has_manual: false, price_rsd: 24000, negotiable: true, city: 'Niš', images: [brick('#cf1419', '#fee2e2', 'TECHNIC')], seller: 'Marko D.', seller_since: '2026-08-20', seller_phone: null, mine: false, status: 'active', created_at: day(3), views: 211 },
-  { id: 'a4', title: 'Hogwarts dvorac 71043 – kompletan, sa kutijom', description: 'Sklopljen jednom, sve kesice na broju. Kutija ima malo istrošenih ivica.', set_num: '71043', theme_slug: 'harry-potter', theme_name: 'Harry Potter', condition: 'used_complete', has_box: true, has_manual: true, price_rsd: 47000, negotiable: true, city: 'Beograd', images: [brick('#7c3aed', '#ede9fe', '71043')], seller: 'Ana S.', seller_since: '2026-07-14', seller_phone: '+381 65 333 4455', mine: false, status: 'active', created_at: day(5), views: 98 },
-  { id: 'a5', title: 'Kesa figurica: 40 komada, Ninjago i City', description: 'Čiste, bez oštećenja štampe. Šaljem Postexpressom uz plaćanje pouzećem.', set_num: null, theme_slug: 'ninjago', theme_name: 'Ninjago', condition: 'parts', has_box: false, has_manual: false, price_rsd: 6500, negotiable: false, city: 'Kragujevac', images: [brick('#16a34a', '#dcfce7', 'FIGURICE')], seller: 'Stefan R.', seller_since: '2026-10-02', seller_phone: '+381 60 444 5566', mine: false, status: 'active', created_at: day(8), views: 33 },
-  { id: 'a6', title: 'Monster Jam DIGatron 42199, sklopljen', description: 'Sve radi, povlačenje na nazad. Nedostaje kutija.', set_num: '42199', theme_slug: 'technic', theme_name: 'Technic', condition: 'used_complete', has_box: false, has_manual: true, price_rsd: 2700, negotiable: true, city: 'Subotica', images: [brick('#0ea5e9', '#e0f2fe', '42199')], seller: 'Dejan K.', seller_since: '2026-06-30', seller_phone: '+381 64 555 6677', mine: false, status: 'active', created_at: day(11), views: 120 },
-  { id: 'a7', title: 'LEGO Friends 41700 kućica, kompletna', description: 'Kompletna kućica sa svim figuricama. Čuvana u kutiji, bez oštećenja.', set_num: '41700', theme_slug: 'friends', theme_name: 'Friends', condition: 'like_new', has_box: true, has_manual: true, price_rsd: 3200, negotiable: true, city: 'Niš', images: [brick('#ec4899', '#fce7f3', '41700')], seller: 'Ja', seller_since: '2026-11-01', seller_phone: null, mine: true, status: 'active', created_at: day(0), views: 12 },
-] as unknown as Omit<Listing, 'price_history' | 'shipping' | 'year' | 'pieces' | 'minifigs'>[];
-
-const EXTRA: Record<string, Partial<Listing>> = {
-  a1: { year: 2017, pieces: 7541, minifigs: 8, shipping: 'pickup' },
-  a2: { year: 2025, pieces: 822, shipping: 'ships' },
-  a3: { shipping: 'ships', price_history: [{ price: 28000, at: day(6) }] },
-  a4: { year: 2018, pieces: 6020, minifigs: 27, shipping: 'pickup' },
-  a5: { minifigs: 40, shipping: 'ships' },
-  a6: { year: 2022, pieces: 220, shipping: 'ships' },
-};
-const SEED: Listing[] = SEED_RAW.map((l) => ({ price_history: [], shipping: 'pickup', year: null, pieces: null, minifigs: null, ...l, ...EXTRA[l.id] }) as Listing);
-
-let cache: Listing[] | null = null;
-const subs = new Set<() => void>();
-const emit = () => subs.forEach((f) => f());
-
-function load(): Listing[] {
-  if (cache) return cache;
-  try {
-    const raw = localStorage.getItem(KEY);
-    cache = raw ? (JSON.parse(raw) as Listing[]) : [...SEED];
-  } catch {
-    cache = [...SEED];
-  }
-  return cache;
+export interface Conversation {
+  id: number;
+  listing_id: number;
+  listing_title: string;
+  listing_price: number;
+  listing_status: Listing['status'];
+  listing_image: string | null;
+  my_ad: boolean;
+  other: string;
+  last: { text: string; at: string; mine: boolean } | null;
+  unread: number;
 }
-function save(next: Listing[]) {
-  cache = next;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    /* private mode or full: the prototype keeps working for this visit */
-  }
-  emit();
+export interface Thread {
+  id: number;
+  listing_id: number;
+  messages: { id: number; mine: boolean; text: string; at: string }[];
 }
-
-const snapshot = () => load();
-const subscribe = (f: () => void) => (subs.add(f), () => void subs.delete(f));
-export const useListings = () => useSyncExternalStore(subscribe, snapshot);
-
-export function addListing(l: Omit<Listing, 'id' | 'created_at' | 'views' | 'mine' | 'status'>): string {
-  const id = `u${Date.now().toString(36)}`;
-  save([{ ...l, id, created_at: new Date().toISOString(), views: 0, mine: true, status: 'active' }, ...load()]);
-  return id;
-}
-export const updateListing = (id: string, patch: Partial<Listing>) => save(load().map((l) => (l.id === id ? { ...l, ...patch } : l)));
-export const removeListing = (id: string) => save(load().filter((l) => l.id !== id));
-export const resetPrototype = () => {
-  save([...SEED]);
-  resetMessages();
-};
-
-export const getPhone = () => {
-  try {
-    return localStorage.getItem(PHONE_KEY) ?? '';
-  } catch {
-    return '';
-  }
-};
-export const setPhone = (v: string) => {
-  try {
-    localStorage.setItem(PHONE_KEY, v);
-  } catch {
-    /* ignore */
-  }
-  emit();
-};
-export const usePhone = () => useSyncExternalStore(subscribe, getPhone);
 
 export const priceChange = (l: Listing) => {
   const prev = l.price_history.at(-1)?.price;
   return prev && prev > l.price_rsd ? prev : null;
 };
 
-export function changePrice(id: string, price: number) {
-  const l = load().find((x) => x.id === id);
-  if (!l || price === l.price_rsd) return;
-  updateListing(id, { price_rsd: price, price_history: [...l.price_history, { price: l.price_rsd, at: new Date().toISOString() }] });
+const items = <T,>(r: { items: T[] }) => r.items;
+
+/** All active ads (the page filters them itself; the server caps the list at 2000, newest first) */
+export const useAds = () => useQuery({ queryKey: ['ads'], queryFn: () => api<{ items: Listing[] }>('/api/oglasi').then(items), staleTime: 30_000 });
+export const useAd = (id: string | undefined) => useQuery({ queryKey: ['ad', id], queryFn: () => api<Listing>(`/api/oglasi/${id}`), enabled: !!id, staleTime: 15_000, retry: false });
+export const useMyAds = () => useQuery({ queryKey: ['my-ads'], queryFn: () => api<{ items: Listing[] }>('/api/me/oglasi').then(items), staleTime: 15_000 });
+export const useWatchedAds = () => useQuery({ queryKey: ['watched-ads'], queryFn: () => api<{ items: WatchedListing[] }>('/api/me/oglasi/pracenje').then(items), staleTime: 15_000 });
+export const useConversations = () =>
+  useQuery({ queryKey: ['conversations'], queryFn: () => api<{ items: Conversation[] }>('/api/poruke').then(items), staleTime: 5_000, refetchInterval: 20_000 });
+export const useThread = (id: string | undefined) =>
+  useQuery({ queryKey: ['thread', id], queryFn: () => api<Thread>(`/api/poruke/${id}`), enabled: !!id, staleTime: 0, refetchInterval: 8_000, retry: false });
+
+/** Badges in the header: unread messages and followed ads with news. A light call every 45 s while the tab is open. */
+export function useAdsStatus(): AdsStatus {
+  const { user, listings } = useAuth();
+  const q = useQuery({
+    queryKey: ['ads-status'],
+    queryFn: () => api<AdsStatus>('/api/oglasi/status'),
+    enabled: !!user && listings,
+    staleTime: 20_000,
+    refetchInterval: 45_000,
+  });
+  return q.data ?? { unread: 0, notices: 0, mine: 0 };
 }
 
-// ---- followed listings (the real version stores this on the server and sends push + e-mail)
-const WATCH_KEY = 'kockolov.proto.watches.v1';
-type Watches = Record<string, { price: number; at: string }>;
-let watchRaw = '';
-let watchVal: Watches = {};
-function getWatches(): Watches {
-  try {
-    const raw = localStorage.getItem(WATCH_KEY) ?? '';
-    if (raw !== watchRaw) {
-      watchRaw = raw;
-      watchVal = raw ? (JSON.parse(raw) as Watches) : {};
-    }
-  } catch {
-    /* keep the last value */
-  }
-  return watchVal;
+export interface AdForm {
+  title: string;
+  description: string;
+  set_num: string | null;
+  theme_slug: string | null;
+  theme_name: string | null;
+  year: number | null;
+  pieces: number | null;
+  minifigs: number | null;
+  condition: Condition;
+  has_box: boolean;
+  has_manual: boolean;
+  price_rsd: number;
+  negotiable: boolean;
+  city: string;
+  shipping: 'pickup' | 'ships';
+  images: number[];
 }
-function saveWatches(w: Watches) {
-  try {
-    localStorage.setItem(WATCH_KEY, JSON.stringify(w));
-  } catch {
-    /* ignore */
-  }
-  emit();
+
+const DATA_KEYS = ['ads', 'ad', 'my-ads', 'watched-ads', 'ads-status', 'conversations', 'thread'];
+
+/** Everything that changes data: each call refreshes the lists that may show it */
+export function useAdActions() {
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ predicate: (q) => DATA_KEYS.includes(String(q.queryKey[0])) });
+  const run = <T,>(p: Promise<T>) => p.finally(() => void refresh());
+  const post = (path: string, json?: unknown) => run(api<{ ok: boolean }>(path, { method: 'POST', json: json ?? {} }));
+  return {
+    refresh,
+    create: (f: AdForm) => run(api<{ id: string }>('/api/oglasi', { method: 'POST', json: f })),
+    update: (id: string, f: AdForm) => run(api<{ id: string }>(`/api/oglasi/${id}`, { method: 'PUT', json: f })),
+    setStatus: (id: string, status: 'active' | 'paused' | 'sold') => run(api(`/api/oglasi/${id}/status`, { method: 'PATCH', json: { status } })),
+    setPrice: (id: string, price_rsd: number) => run(api(`/api/oglasi/${id}/cena`, { method: 'PATCH', json: { price_rsd } })),
+    renew: (id: string) => post(`/api/oglasi/${id}/obnovi`),
+    remove: (id: string) => run(api(`/api/oglasi/${id}`, { method: 'DELETE' })),
+    watch: (id: string, on: boolean) => run(api(`/api/oglasi/${id}/prati`, { method: on ? 'PUT' : 'DELETE' })),
+    seen: (id: string) => post(`/api/oglasi/${id}/prati/vidjeno`),
+    phone: (id: string) => api<{ phone: string }>(`/api/oglasi/${id}/telefon`).then((r) => r.phone),
+    report: (id: string, reason: string) => post(`/api/oglasi/${id}/prijava`, { reason }),
+    /** First or further message about an ad; returns the conversation to open */
+    message: (adId: string, text: string) => run(api<{ conversation_id: number }>(`/api/oglasi/${adId}/poruke`, { method: 'POST', json: { text } })).then((r) => r.conversation_id),
+    reply: (convId: number | string, text: string) => run(api(`/api/poruke/${convId}`, { method: 'POST', json: { text } })),
+    reportConversation: (convId: number | string) => post(`/api/poruke/${convId}/prijava`),
+    uploadPhoto: async (file: File) => api<{ id: number; url: string }>('/api/oglasi/slike', { method: 'POST', body: await shrink(file), headers: { 'Content-Type': 'image/jpeg' } }),
+  };
 }
-export const useWatches = () => useSyncExternalStore(subscribe, getWatches);
-export function toggleWatch(l: Listing) {
-  const w = { ...getWatches() };
-  if (w[l.id]) delete w[l.id];
-  else w[l.id] = { price: l.price_rsd, at: new Date().toISOString() };
-  saveWatches(w);
+
+/** Saves phone and the e-mail switch on the account */
+export function useProfileMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: { phone?: string; msgEmailEnabled?: boolean }) => api('/api/me', { method: 'PATCH', json: patch }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['me'] }),
+  });
 }
-/** The price the follower was last told about; after "U redu" it moves to the current price */
-export function ackWatch(l: Listing) {
-  const w = getWatches();
-  if (w[l.id]) saveWatches({ ...w, [l.id]: { price: l.price_rsd, at: new Date().toISOString() } });
+
+/** Phones take 8–12 MB photos: shrink to 2000 px on the long side before sending (the server makes the final 1200×900 frame) */
+async function shrink(file: File): Promise<Blob> {
+  const bmp = await createImageBitmap(file).catch(() => null);
+  if (!bmp) throw new Error('image');
+  const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close();
+  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('image'))), 'image/jpeg', 0.88));
 }
-export type WatchNotice = { listing: Listing; kind: 'drop' | 'sold' | 'rise'; from: number };
-export function noticesFor(all: Listing[], w: Watches): WatchNotice[] {
-  const out: WatchNotice[] = [];
-  for (const l of all) {
-    const f = w[l.id];
-    if (!f) continue;
-    if (l.status === 'sold') out.push({ listing: l, kind: 'sold', from: f.price });
-    else if (l.price_rsd < f.price) out.push({ listing: l, kind: 'drop', from: f.price });
-    else if (l.price_rsd > f.price) out.push({ listing: l, kind: 'rise', from: f.price });
-  }
-  return out;
-}
-export const useWatchCount = () => Object.keys(useWatches()).length;
 
 // ---- catalog of every LEGO set ever made (optional file made by web/scripts/build-catalog.mjs from Rebrickable's free CSVs)
 export type CatalogEntry = [name: string, year: number, pieces: number, theme: string, subtheme: string | null];
@@ -197,82 +180,3 @@ export function loadCatalog() {
 
 export const PHOTO_W = 1200;
 export const PHOTO_H = 900;
-
-/** Fits the whole photo into a 1200×900 (4:3) frame over a blurred copy of itself and stamps the Kockolov mark in the bottom right corner */
-export function processPhoto(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const c = document.createElement('canvas');
-      c.width = PHOTO_W;
-      c.height = PHOTO_H;
-      const g = c.getContext('2d')!;
-      // blurred "cover" backdrop made of the same photo (a tiny copy scaled up, so it works in every browser)
-      const tiny = document.createElement('canvas');
-      tiny.width = 32;
-      tiny.height = 24;
-      const tg = tiny.getContext('2d')!;
-      const kc = Math.max(32 / img.width, 24 / img.height);
-      tg.drawImage(img, (32 - img.width * kc) / 2, (24 - img.height * kc) / 2, img.width * kc, img.height * kc);
-      g.imageSmoothingQuality = 'high';
-      g.drawImage(tiny, 0, 0, PHOTO_W, PHOTO_H);
-      g.fillStyle = 'rgba(255,255,255,0.28)';
-      g.fillRect(0, 0, PHOTO_W, PHOTO_H);
-      // the whole photo, fitted inside the frame, nothing is cut off
-      const k = Math.min(PHOTO_W / img.width, PHOTO_H / img.height);
-      const w = img.width * k;
-      const h = img.height * k;
-      g.drawImage(img, (PHOTO_W - w) / 2, (PHOTO_H - h) / 2, w, h);
-      stampMark(g);
-      resolve(c.toDataURL('image/jpeg', 0.8));
-    };
-    img.onerror = () => (URL.revokeObjectURL(url), reject(new Error('image')));
-    img.src = url;
-  });
-}
-
-function stampMark(g: CanvasRenderingContext2D) {
-  const pad = 24;
-  const hgt = 56;
-  g.font = '800 28px "Plus Jakarta Sans Variable", system-ui, sans-serif';
-  const text = 'Kockolov';
-  const tw = g.measureText(text).width;
-  const iw = 40;
-  const w = pad * 0.8 + iw + 10 + tw + pad * 0.8;
-  const x = PHOTO_W - w - pad;
-  const y = PHOTO_H - hgt - pad;
-  g.save();
-  g.fillStyle = 'rgba(22,21,15,0.72)';
-  g.beginPath();
-  g.roundRect(x, y, w, hgt, hgt / 2);
-  g.fill();
-  // the logo brick with its lens, drawn from the same shapes as the site's logo (40×40 grid)
-  const s = iw / 40;
-  const ox = x + pad * 0.8;
-  const oy = y + (hgt - iw) / 2;
-  g.fillStyle = '#ffcf00';
-  for (const [rx, ry, rw, rh, rr] of [[2, 11, 30, 23, 5], [7, 5, 8, 7, 2.2], [19, 5, 8, 7, 2.2]]) {
-    g.beginPath();
-    g.roundRect(ox + rx * s, oy + ry * s, rw * s, rh * s, rr * s);
-    g.fill();
-  }
-  g.fillStyle = '#fff';
-  g.strokeStyle = '#16150f';
-  g.lineWidth = 3 * s;
-  g.beginPath();
-  g.arc(ox + 28 * s, oy + 27 * s, 7.2 * s, 0, Math.PI * 2);
-  g.fill();
-  g.stroke();
-  g.lineCap = 'round';
-  g.lineWidth = 3.6 * s;
-  g.beginPath();
-  g.moveTo(ox + 33.2 * s, oy + 32.2 * s);
-  g.lineTo(ox + 38 * s, oy + 37 * s);
-  g.stroke();
-  g.fillStyle = '#fff';
-  g.textBaseline = 'middle';
-  g.fillText(text, ox + iw + 10, y + hgt / 2 + 1);
-  g.restore();
-}

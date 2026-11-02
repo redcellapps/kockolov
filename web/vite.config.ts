@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) =>
         plugins: [react(), tailwindcss()],
         server: {
           port: 5173,
-          proxy: { '/api': process.env.API_URL ?? 'http://localhost:8080' },
+          proxy: { '/api': process.env.API_URL ?? 'http://localhost:8080', '/media': process.env.API_URL ?? 'http://localhost:8080' },
         },
         build: { outDir: 'dist', sourcemap: false },
       },

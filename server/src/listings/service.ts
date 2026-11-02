@@ -57,6 +57,7 @@ export interface ListingRow {
   seller_since: string;
   has_phone: boolean;
   images: string[];
+  image_ids: number[];
   price_history: { price: number; at: string }[];
   watched: boolean;
 }
@@ -65,6 +66,7 @@ export interface ListingRow {
 export const LISTING_SELECT = `
   SELECT l.*, u.name AS seller_name, u.created_at AS seller_since, coalesce(u.phone <> '', false) AS has_phone,
          coalesce((SELECT json_agg('/media/oglasi/' || i.file ORDER BY i.position, i.id) FROM listing_images i WHERE i.listing_id = l.id), '[]'::json) AS images,
+         coalesce((SELECT json_agg(i.id ORDER BY i.position, i.id) FROM listing_images i WHERE i.listing_id = l.id), '[]'::json) AS image_ids,
          coalesce((SELECT json_agg(json_build_object('price', p.price_rsd, 'at', p.changed_at) ORDER BY p.changed_at, p.id) FROM listing_prices p WHERE p.listing_id = l.id), '[]'::json) AS price_history,
          EXISTS (SELECT 1 FROM listing_watches w WHERE w.listing_id = l.id AND w.user_id = $1::bigint) AS watched
     FROM listings l JOIN users u ON u.id = l.user_id`;

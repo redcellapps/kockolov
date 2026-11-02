@@ -4,26 +4,29 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { Button, cx, Spinner } from '../components/ui';
 import { Field } from '../pages/Login';
 import { t } from '../i18n';
-import { api, type SearchResponse, type SetDetail, type Theme } from '../lib/api';
+import { ApiError, api, type SearchResponse, type SetDetail, type Theme } from '../lib/api';
 import { usePageTitle } from '../lib/title';
-import { ProtoBanner } from './ListingsPage';
 import { useAuth } from '../lib/auth';
-import { addListing, changePrice, CONDITIONS, loadCatalog, PHOTO_H, PHOTO_W, processPhoto, setPhone, updateListing, useListings, usePhone, type Condition, type Listing } from './store';
+import { CONDITIONS, loadCatalog, PHOTO_H, PHOTO_W, useAd, useAdActions, useProfileMutation, type AdForm, type Condition, type Listing } from './store';
 
 const area = 'w-full rounded-xl border border-line bg-surface p-3 text-[15px] outline-none transition focus:border-ink';
 
 export default function NewListing() {
   const { id } = useParams();
-  const l = useListings().find((x) => x.id === id);
-  if (id && (!l || !l.mine)) return <div className="mx-auto max-w-2xl px-4 py-16 text-center font-bold">{t('ads.detail.notFound')}</div>;
-  return <ListingForm key={id ?? 'new'} edit={l} />;
+  const q = useAd(id);
+  if (id && q.isLoading) return <div className="grid min-h-[40vh] place-items-center"><Spinner className="h-8 w-8" /></div>;
+  if (id && (!q.data || !q.data.mine || q.data.status === 'removed')) return <div className="mx-auto max-w-2xl px-4 py-16 text-center font-bold">{t('ads.detail.notFound')}</div>;
+  return <ListingForm key={id ?? 'new'} edit={q.data} />;
 }
 
 function ListingForm({ edit }: { edit?: Listing }) {
   usePageTitle(edit ? t('title.adEdit') : t('title.adNew'));
   const nav = useNavigate();
   const { user } = useAuth();
-  const savedPhone = usePhone();
+  const actions = useAdActions();
+  const profile = useProfileMutation();
+  const [saving, setSaving] = useState(false);
+  const savedPhone = user?.phone ?? '';
   const [step, setStep] = useState(0);
   const [setNum, setSetNum] = useState(edit?.set_num ?? '');
   const [found, setFound] = useState<SetDetail['set'] | null>(null);
@@ -41,11 +44,11 @@ function ListingForm({ edit }: { edit?: Listing }) {
   const [cond, setCond] = useState<Condition>(edit?.condition ?? 'used_complete');
   const [box, setBox] = useState(edit?.has_box ?? true);
   const [manual, setManual] = useState(edit?.has_manual ?? true);
-  const [images, setImages] = useState<string[]>(edit?.images ?? []);
+  const [images, setImages] = useState<{ id: number; url: string }[]>(edit ? edit.image_ids.map((id, i) => ({ id, url: edit.images[i] })) : []);
   const [price, setPrice] = useState(edit ? String(edit.price_rsd) : '');
   const [negotiable, setNegotiable] = useState(edit?.negotiable ?? true);
   const [city, setCity] = useState(edit?.city ?? '');
-  const [phone, setPh] = useState(edit?.seller_phone || savedPhone);
+  const [phone, setPh] = useState(savedPhone);
   const [err, setErr] = useState<string | null>(null);
 
   const [sugg, setSugg] = useState<{ num: string; name: string; theme: string }[]>([]);
@@ -109,15 +112,20 @@ function ListingForm({ edit }: { edit?: Listing }) {
 
   const [pending, setPending] = useState(0); // photos still being processed (loader tiles)
   async function addPhotos(input: HTMLInputElement) {
-    const files = Array.from(input.files ?? []).slice(0, Math.max(0, 8 - images.length));
+    const files = Array.from(input.files ?? []).slice(0, Math.max(0, 8 - images.length - pending));
     input.value = ''; // the same file can be picked again
     if (!files.length) return;
+    setErr(null);
     setPending((n) => n + files.length);
     for (const f of files) {
-      const src = await processPhoto(f).catch(() => '');
-      setPending((n) => n - 1);
-      if (src) setImages((prev) => (prev.length < 8 ? [...prev, src] : prev));
-      else setErr(t('ads.new.errPhotoRead'));
+      try {
+        const up = await actions.uploadPhoto(f);
+        setImages((prev) => (prev.length < 8 ? [...prev, up] : prev));
+      } catch (e) {
+        setErr(e instanceof ApiError ? e.message : t('ads.new.errPhotoRead'));
+      } finally {
+        setPending((n) => n - 1);
+      }
     }
   }
 
@@ -132,50 +140,45 @@ function ListingForm({ edit }: { edit?: Listing }) {
     if (!e) setStep(n);
   };
 
-  function publish() {
+  async function publish() {
     const p = Number(price);
     const e = !(p > 0) ? t('ads.new.errPrice') : !city.trim() ? t('ads.new.errCity') : phone.replace(/\D/g, '').length < 8 ? t('ads.new.errPhone') : null;
     setErr(e);
-    if (e) return;
-    setPhone(phone.trim());
-    const fields = {
-      title: title.trim(),
-      description: desc.trim(),
-      set_num: found?.set_num ?? (setNum.trim() || null),
-      theme_slug: found?.theme_slug ?? themes.data?.find((x) => x.name === theme)?.slug ?? edit?.theme_slug ?? null,
-      theme_name: theme || null,
-      year: Number(year) || null,
-      pieces: Number(pieces) || null,
-      minifigs: minifigs === '' ? null : Number(minifigs),
-      shipping,
-      condition: cond,
-      has_box: box,
-      has_manual: manual,
-      negotiable,
-      city: city.trim(),
-      images,
-      seller_phone: phone.trim(),
-    };
-    if (edit) {
-      updateListing(edit.id, fields);
-      changePrice(edit.id, p); // keeps the old price in the history, so followers get the "price dropped" notice
-      nav(`/oglasi/${edit.id}`);
-      return;
+    if (e || saving) return;
+    setSaving(true);
+    try {
+      // the phone lives on the account, so it is saved first when it changed
+      if (phone.trim() !== savedPhone) await profile.mutateAsync({ phone: phone.trim() });
+      const form: AdForm = {
+        title: title.trim(),
+        description: desc.trim(),
+        set_num: found?.set_num ?? (setNum.trim() || null),
+        theme_slug: found?.theme_slug ?? themes.data?.find((x) => x.name === theme)?.slug ?? edit?.theme_slug ?? null,
+        theme_name: theme || null,
+        year: Number(year) || null,
+        pieces: Number(pieces) || null,
+        minifigs: minifigs === '' ? null : Number(minifigs),
+        shipping,
+        condition: cond,
+        has_box: box,
+        has_manual: manual,
+        price_rsd: p,
+        negotiable,
+        city: city.trim(),
+        images: images.map((i) => i.id),
+      };
+      const id = edit ? (await actions.update(edit.id, form)).id : (await actions.create(form)).id;
+      nav(`/oglasi/${id}`);
+    } catch (x) {
+      setErr(x instanceof ApiError ? x.message : t('ads.detail.errorGeneric'));
+    } finally {
+      setSaving(false);
     }
-    const newId = addListing({
-      ...fields,
-      price_rsd: p,
-      price_history: [],
-      seller: user?.name || user?.email.split('@')[0] || 'Ja',
-      seller_since: new Date().toISOString(),
-    });
-    nav(`/oglasi/${newId}`);
   }
 
   const steps = [t('ads.new.step1'), t('ads.new.step2'), t('ads.new.step3'), t('ads.new.step4')];
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-      <ProtoBanner />
       <h1 className="text-3xl font-extrabold tracking-tight">{edit ? t('ads.edit.title') : t('ads.new.title')}</h1>
       <ol className="mt-5 flex gap-2">
         {steps.map((s, i) => (
@@ -286,9 +289,9 @@ function ListingForm({ edit }: { edit?: Listing }) {
               </ul>
             </div>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {images.map((src, i) => (
-                <div key={i} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-line">
-                  <img src={src} alt="" className="h-full w-full object-cover" />
+              {images.map((im, i) => (
+                <div key={im.id} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-line">
+                  <img src={im.url} alt="" className="h-full w-full object-cover" />
                   {i === 0 && <span className="absolute left-1 top-1 rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-extrabold text-bg">1</span>}
                   <button aria-label={t('ads.new.removePhoto')} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-ink/80 text-xs text-bg" onClick={() => setImages(images.filter((_, j) => j !== i))}>✕</button>
                 </div>
@@ -334,7 +337,7 @@ function ListingForm({ edit }: { edit?: Listing }) {
         {err && <p role="alert" className="rounded-xl bg-deal-soft px-3 py-2 text-sm font-semibold text-deal">{err}</p>}
         <div className="flex justify-between gap-3 pt-1">
           {step > 0 ? <Button variant="ghost" onClick={() => go(step - 1)}>{t('ads.new.back')}</Button> : <Link to={edit ? `/oglasi/${edit.id}` : '/oglasi'} className="inline-flex h-11 items-center px-4 text-sm font-bold text-ink-2">{t('ads.detail.back')}</Link>}
-          {step < 3 ? <Button onClick={() => go(step + 1)} disabled={step === 2 && pending > 0}>{t('ads.new.next')}</Button> : <Button onClick={publish}>{edit ? t('ads.edit.save') : t('ads.new.publish')}</Button>}
+          {step < 3 ? <Button onClick={() => go(step + 1)} disabled={step === 2 && pending > 0}>{t('ads.new.next')}</Button> : <Button onClick={() => void publish()} disabled={saving || pending > 0}>{saving ? <Spinner className="h-4 w-4" /> : edit ? t('ads.edit.save') : t('ads.new.publish')}</Button>}
         </div>
       </div>
     </div>

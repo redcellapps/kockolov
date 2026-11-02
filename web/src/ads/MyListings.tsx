@@ -1,15 +1,15 @@
 import { Link } from 'react-router';
-import { Button, EmptyState, buttonClasses } from '../components/ui';
+import { Button, EmptyState, Spinner, buttonClasses } from '../components/ui';
 import { t } from '../i18n';
 import { usePageTitle } from '../lib/title';
 import { AdCard } from './AdCard';
-import { ProtoBanner } from './ListingsPage';
 import { useState } from 'react';
-import { changePrice, removeListing, updateListing, useListings, type Listing } from './store';
+import { useAdActions, useMyAds, type Listing } from './store';
 
 function PriceEditor({ l }: { l: Listing }) {
   const [open, setOpen] = useState(false);
   const [v, setV] = useState(String(l.price_rsd));
+  const actions = useAdActions();
   if (!open)
     return (
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -21,7 +21,7 @@ function PriceEditor({ l }: { l: Listing }) {
       className="flex w-full gap-1.5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (Number(v) > 0) changePrice(l.id, Number(v));
+        if (Number(v) > 0) void actions.setPrice(l.id, Number(v));
         setOpen(false);
       }}
     >
@@ -33,15 +33,19 @@ function PriceEditor({ l }: { l: Listing }) {
 
 export default function MyListings() {
   usePageTitle(t('title.myAds'));
-  const mine = useListings().filter((l) => l.mine);
+  const q = useMyAds();
+  const mine = q.data ?? [];
+  const actions = useAdActions();
+  const left = (l: Listing) => (l.expires_at ? Math.max(0, Math.ceil((+new Date(l.expires_at) - Date.now()) / 86_400_000)) : 30);
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <ProtoBanner />
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-3xl font-extrabold tracking-tight">{t('ads.mine.title')} <span className="text-ink-3">· {mine.length}</span></h1>
         <Link to="/oglasi/novi" className={buttonClasses('primary')}>+ {t('ads.post')}</Link>
       </div>
-      {mine.length ? (
+      {q.isLoading ? (
+        <div className="grid min-h-[30vh] place-items-center"><Spinner className="h-8 w-8" /></div>
+      ) : mine.length ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
           {mine.map((l) => (
             <AdCard
@@ -49,13 +53,14 @@ export default function MyListings() {
               l={l}
               footer={
                 <div className="grid gap-1.5 border-t border-line p-3">
-                  <p className="text-xs text-ink-3">{t('ads.detail.views', { n: l.views })} · {t('ads.mine.expires', { n: Math.max(1, 30 - Math.floor((Date.now() - +new Date(l.created_at)) / 86_400_000)) })}</p>
+                  <p className="text-xs text-ink-3">{t('ads.detail.views', { n: l.views })} · {l.status === 'expired' ? t('ads.mine.expired') : l.status === 'sold' ? t('ads.mine.soldLabel') : l.status === 'paused' ? t('ads.mine.pausedLabel') : t('ads.mine.expires', { n: Math.max(1, left(l)) })}</p>
                   <div className="flex flex-wrap gap-1.5">
                     <Link to={`/oglasi/${l.id}/izmeni`} className={buttonClasses('outline', 'sm')}>{t('ads.edit.link')}</Link>
                     <PriceEditor l={l} />
-                    <Button size="sm" variant="outline" onClick={() => updateListing(l.id, { status: l.status === 'paused' ? 'active' : 'paused' })}>{l.status === 'paused' ? t('ads.mine.resume') : t('ads.mine.pause')}</Button>
-                    <Button size="sm" variant="outline" onClick={() => updateListing(l.id, { status: 'sold' })}>{t('ads.mine.sold')}</Button>
-                    <Button size="sm" variant="ghost" onClick={() => removeListing(l.id)}>{t('ads.mine.delete')}</Button>
+                    <Button size="sm" variant="outline" onClick={() => void actions.setStatus(l.id, l.status === 'paused' ? 'active' : 'paused')} disabled={l.status === 'sold' || l.status === 'expired'}>{l.status === 'paused' ? t('ads.mine.resume') : t('ads.mine.pause')}</Button>
+                    {(l.status === 'active' || l.status === 'expired') && <Button size="sm" variant="outline" onClick={() => void actions.renew(l.id)}>{t('ads.mine.renew')}</Button>}
+                    {l.status !== 'sold' && <Button size="sm" variant="outline" onClick={() => void actions.setStatus(l.id, 'sold')}>{t('ads.mine.sold')}</Button>}
+                    <Button size="sm" variant="ghost" onClick={() => { if (window.confirm(t('ads.mine.confirmDelete'))) void actions.remove(l.id); }}>{t('ads.mine.delete')}</Button>
                   </div>
                 </div>
               }

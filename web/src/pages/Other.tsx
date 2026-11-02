@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
 import WatchedAds from '../ads/WatchedAds';
-import { noticesFor, useListings, useWatches } from '../ads/store';
+import { useAdsStatus } from '../ads/store';
+import { useAuth } from '../lib/auth';
 import { cx } from '../components/ui';
 import { DealCard, SetCard } from '../components/SetCard';
 import { CardSkeleton, EmptyState, ErrorState } from '../components/ui';
@@ -92,9 +93,9 @@ export function WatchlistPage() {
   const q = useWatchlist();
   usePageTitle(t('title.watchlist'));
   const [sp, setSp] = useSearchParams();
-  const tab = sp.get('tab') === 'oglasi' ? 'oglasi' : 'setovi';
-  const adWatch = useWatches();
-  const adNotices = noticesFor(useListings(), adWatch).length;
+  const { listings } = useAuth(); // Oglasi are shown only while the server allows them
+  const tab = listings && sp.get('tab') === 'oglasi' ? 'oglasi' : 'setovi';
+  const adNotices = useAdsStatus().notices;
   const tabBtn = (k: 'setovi' | 'oglasi', label: string, badge?: string) => (
     <button
       type="button"
@@ -108,10 +109,12 @@ export function WatchlistPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <PageHead title={t('watch.title')} subtitle={t('watch.subtitle')} />
-      <div className="mb-6 inline-flex gap-1 rounded-full border border-line bg-surface p-1">
-        {tabBtn('setovi', t('ads.watch.setsTab'))}
-        {tabBtn('oglasi', t('ads.watch.tab'), adNotices ? String(adNotices) : undefined)}
-      </div>
+      {listings && (
+        <div className="mb-6 inline-flex gap-1 rounded-full border border-line bg-surface p-1">
+          {tabBtn('setovi', t('ads.watch.setsTab'))}
+          {tabBtn('oglasi', t('ads.watch.tab'), adNotices ? String(adNotices) : undefined)}
+        </div>
+      )}
       {tab === 'oglasi' ? (
         <WatchedAds />
       ) : (

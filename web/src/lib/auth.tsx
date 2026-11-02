@@ -6,7 +6,9 @@ import { setDisplayCurrency } from './format';
 import { setAppToken } from './platform';
 import { forgetPushOnSignOut, syncPush } from './pwa';
 
-interface AuthState extends MeResponse {
+interface AuthState extends Omit<MeResponse, 'listings'> {
+  /** Oglasi (classifieds) are on for this user */
+  listings: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: q.data?.user ?? null,
     publicMode: q.data?.publicMode ?? false,
     registrationOpen: q.data?.registrationOpen ?? false,
+    listings: q.data?.listings ?? false,
     fx: q.data?.fx,
     loading: q.isLoading,
     refresh: async () => {

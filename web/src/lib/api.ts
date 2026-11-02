@@ -194,12 +194,16 @@ export interface User {
   digest_enabled: boolean;
   news_enabled?: boolean;
   currency?: 'RSD' | 'EUR';
+  phone?: string | null;
+  msg_email_enabled?: boolean;
 }
 
 export interface MeResponse {
   user: User | null;
   publicMode: boolean;
   registrationOpen: boolean;
+  /** Oglasi (classifieds) are on for this user */
+  listings?: boolean;
   /** NBS middle rate: RSD for 1 EUR (day is null while only the fallback is known) */
   fx?: { eur: { rate: number; day: string | null } };
   /** Umami address and website id; null while statistics are off */

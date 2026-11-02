@@ -1,33 +1,40 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
-import { Button, EmptyState } from '../components/ui';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { Button, EmptyState, Spinner } from '../components/ui';
 import { t } from '../i18n';
-import { api, type SetDetail } from '../lib/api';
+import { ApiError, api, type SetDetail } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { dateLong, money } from '../lib/format';
 import { usePageTitle } from '../lib/title';
 import { AdCard, CondBadge, adAgo } from './AdCard';
-import { ProtoBanner } from './ListingsPage';
-import { conversationFor, sendMessage } from './messages';
-import { priceChange, toggleWatch, updateListing, useListings, useWatches } from './store';
+import { priceChange, useAd, useAdActions, useAds } from './store';
 
 export default function ListingDetail() {
   const { id } = useParams();
-  const all = useListings();
-  const l = all.find((x) => x.id === id);
+  const ad = useAd(id);
+  const l = ad.data;
+  const all = useAds().data ?? [];
+  const { user } = useAuth();
+  const actions = useAdActions();
+  const nav = useNavigate();
+  const loc = useLocation();
   usePageTitle(l?.title ?? t('ads.detail.notFound'));
   const [img, setImg] = useState(0);
-  const [phone, setPhone] = useState(false);
+  const [phone, setPhone] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
-  const nav = useNavigate();
-  const [reported, setReported] = useState(false);
-  const following = !!useWatches()[id ?? ''];
-
-  useEffect(() => {
-    if (id) updateListing(id, { views: (all.find((x) => x.id === id)?.views ?? 0) + 1 });
-    // count one view per opened page
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<'closed' | 'open' | 'done'>('closed');
+  const [reason, setReason] = useState('');
+  const following = !!l?.watched;
+  const fail = (e: unknown) => setErr(e instanceof ApiError ? e.message : t('ads.detail.errorGeneric'));
+  /** contacting and following need an account */
+  const needLogin = () => {
+    if (user) return false;
+    nav('/prijava', { state: { from: loc.pathname } });
+    return true;
+  };
 
   const set = useQuery({
     queryKey: ['set', l?.set_num],
@@ -37,6 +44,7 @@ export default function ListingDetail() {
   });
   const shopMin = set.data?.offers.filter((o) => o.in_stock).reduce<number | null>((m, o) => (m === null || o.price_rsd < m ? o.price_rsd : m), null) ?? null;
 
+  if (ad.isLoading) return <div className="grid min-h-[40vh] place-items-center"><Spinner className="h-8 w-8" /></div>;
   if (!l) return <div className="mx-auto max-w-3xl px-4 py-12"><EmptyState title={t('ads.detail.notFound')} action={<Link to="/oglasi" className="font-bold underline">{t('ads.detail.back')}</Link>} /></div>;
 
   const cmp = shopMin ? Math.round((1 - l.price_rsd / shopMin) * 100) : null;
@@ -50,7 +58,14 @@ export default function ListingDetail() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <ProtoBanner />
+      {l.mine && l.status === 'removed' && <p className="mb-4 rounded-2xl bg-deal-soft px-4 py-3 text-sm font-semibold text-deal">{t('ads.detail.removed', { reason: l.removed_reason ?? '' })}</p>}
+      {l.mine && l.status === 'expired' && (
+        <p className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-surface-2 px-4 py-3 text-sm font-semibold">
+          {t('ads.detail.expired')}
+          <Button size="sm" onClick={() => void actions.renew(l.id)}>{t('ads.mine.renew')}</Button>
+        </p>
+      )}
+      {l.status === 'sold' && <p className="mb-4 rounded-2xl bg-surface-2 px-4 py-3 text-sm font-semibold">{t('ads.detail.soldNote')}</p>}
       <Link to="/oglasi" className="text-sm font-bold text-ink-2 hover:text-ink">← {t('ads.detail.back')}</Link>
       <div className="mt-4 grid gap-8 lg:grid-cols-[1.15fr_1fr]">
         <div>
@@ -81,7 +96,7 @@ export default function ListingDetail() {
             </div>
             <p className="text-sm font-semibold text-ink-3">{l.negotiable ? t('ads.negotiable') : t('ads.fixed')}</p>
             {priceChange(l) && <p className="mt-2 inline-block rounded-lg bg-save-soft px-2.5 py-1 text-xs font-extrabold text-save">{t('ads.detail.priceDrop', { price: money(priceChange(l)) })}</p>}
-            <Button variant={following ? 'dark' : 'outline'} size="sm" className="mt-3 w-full" onClick={() => toggleWatch(l)}>
+            <Button variant={following ? 'dark' : 'outline'} size="sm" className="mt-3 w-full" disabled={l.mine || l.status !== 'active' && !following} onClick={() => { if (!needLogin()) void actions.watch(l.id, !following).catch(fail); }}>
               {following ? '♥ ' + t('ads.detail.following') : '♡ ' + t('ads.detail.follow')}
             </Button>
             {cmp !== null && shopMin && (
@@ -112,40 +127,52 @@ export default function ListingDetail() {
               </div>
             </div>
             <div className="mt-4 grid gap-2">
-              {l.seller_phone ? (
+              {l.has_phone && l.status === 'active' ? (
                 phone ? (
-                  <a href={`tel:${l.seller_phone.replace(/\s/g, '')}`} className="flex h-11 items-center justify-center rounded-xl bg-ink text-[15px] font-bold text-bg">📞 {l.seller_phone}</a>
+                  <a href={`tel:${phone.replace(/\s/g, '')}`} className="flex h-11 items-center justify-center rounded-xl bg-ink text-[15px] font-bold text-bg">📞 {phone}</a>
                 ) : (
-                  <Button variant="dark" onClick={() => setPhone(true)}>📞 {t('ads.detail.showPhone')}</Button>
+                  <Button variant="dark" onClick={() => { if (!needLogin()) void actions.phone(l.id).then(setPhone).catch(fail); }}>📞 {t('ads.detail.showPhone')}</Button>
                 )
-              ) : (
+              ) : l.has_phone ? null : (
                 <p className="text-sm text-ink-3">{t('ads.detail.noPhone')}</p>
               )}
               {l.mine ? (
                 <>
-                <Link to={`/oglasi/${l.id}/izmeni`} className="flex h-11 items-center justify-center rounded-xl bg-brand text-[15px] font-extrabold hover:brightness-95">{t('ads.edit.link')}</Link>
-                <Link to="/poruke" className="flex h-11 items-center justify-center rounded-xl border border-line text-[15px] font-bold hover:border-ink-3">{t('msg.myAdInbox')}</Link>
+                  <Link to={`/oglasi/${l.id}/izmeni`} className="flex h-11 items-center justify-center rounded-xl bg-brand text-[15px] font-extrabold hover:brightness-95">{t('ads.edit.link')}</Link>
+                  <Link to="/poruke" className="flex h-11 items-center justify-center rounded-xl border border-line text-[15px] font-bold hover:border-ink-3">{t('msg.myAdInbox')}</Link>
                 </>
-              ) : (
+              ) : l.status === 'active' ? (
                 <>
-                  <textarea rows={3} className="w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-ink" placeholder={t('ads.detail.messagePlaceholder')} value={msg} onChange={(e) => setMsg(e.target.value)} />
+                  <textarea rows={3} maxLength={1000} className="w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-ink" placeholder={t('ads.detail.messagePlaceholder')} value={msg} onChange={(e) => setMsg(e.target.value)} />
                   <Button
-                    disabled={!msg.trim()}
+                    disabled={!msg.trim() || busy}
                     onClick={() => {
-                      const cid = conversationFor(l);
-                      sendMessage(cid, msg);
-                      nav(`/poruke/${cid}`);
+                      if (needLogin()) return;
+                      setBusy(true);
+                      setErr(null);
+                      actions.message(l.id, msg.trim()).then((cid) => nav(`/poruke/${cid}`)).catch(fail).finally(() => setBusy(false));
                     }}
                   >
-                    {t('ads.detail.message')}
+                    {busy ? <Spinner className="h-4 w-4" /> : t('ads.detail.message')}
                   </Button>
                 </>
-              )}
+              ) : null}
+              {err && <p role="alert" className="rounded-xl bg-deal-soft px-3 py-2 text-sm font-semibold text-deal">{err}</p>}
             </div>
             <p className="mt-4 text-xs leading-relaxed text-ink-3">{t('ads.detail.safety')}</p>
             <div className="mt-3 flex gap-4 text-xs font-bold">
-              <button className="text-ink-2 underline" onClick={() => setReported(true)}>{reported ? t('ads.detail.reported') : t('ads.detail.report')}</button>
+              {!l.mine && (
+                <button className="text-ink-2 underline" disabled={reporting === 'done'} onClick={() => !needLogin() && setReporting('open')}>
+                  {reporting === 'done' ? t('ads.detail.reported') : t('ads.detail.report')}
+                </button>
+              )}
             </div>
+            {reporting === 'open' && (
+              <div className="mt-3 grid gap-2">
+                <textarea rows={2} maxLength={500} className="w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-ink" placeholder={t('ads.detail.reportReason')} value={reason} onChange={(e) => setReason(e.target.value)} />
+                <Button size="sm" variant="outline" disabled={reason.trim().length < 3} onClick={() => void actions.report(l.id, reason.trim()).then(() => setReporting('done')).catch(fail)}>{t('ads.detail.reportSend')}</Button>
+              </div>
+            )}
           </div>
 
           {l.set_num && shopMin && (

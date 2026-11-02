@@ -1,21 +1,10 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { EmptyState, Button, buttonClasses, Chip } from '../components/ui';
+import { EmptyState, Button, buttonClasses, Chip, Spinner } from '../components/ui';
 import { t, tn } from '../i18n';
 import { usePageTitle } from '../lib/title';
 import { AdCard } from './AdCard';
-import { CONDITIONS, resetPrototype, useListings, type Listing } from './store';
-
-export function ProtoBanner() {
-  return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-ink-3 bg-surface-2 px-4 py-2.5 text-sm text-ink-2">
-      <span>🧪 {t('ads.proto')}</span>
-      <button className="font-bold underline underline-offset-2" onClick={resetPrototype}>
-        {t('ads.resetProto')}
-      </button>
-    </div>
-  );
-}
+import { CONDITIONS, useAds, type Listing } from './store';
 
 const inp = 'h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-ink';
 const sel = 'h-10 rounded-xl border border-line bg-surface px-3 text-sm font-semibold outline-none focus:border-ink';
@@ -132,7 +121,8 @@ const QUICK: [string, string, string][] = [
 
 export default function ListingsPage() {
   usePageTitle(t('title.ads'));
-  const all = useListings().filter((l) => l.status === 'active');
+  const ads = useAds();
+  const all = (ads.data ?? []).filter((l) => l.status === 'active');
   const [sp, setSp] = useSearchParams();
   const f = readF(sp);
   const sort = sp.get('sort') ?? 'new';
@@ -172,7 +162,6 @@ export default function ListingsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <ProtoBanner />
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t('ads.title')}</h1>
@@ -258,7 +247,11 @@ export default function ListingsPage() {
               </select>
             </label>
           </div>
-          {items.length ? (
+          {ads.isLoading ? (
+            <div className="grid min-h-[30vh] place-items-center"><Spinner className="h-8 w-8" /></div>
+          ) : ads.isError ? (
+            <EmptyState title={t('ads.error.title')} text={t('ads.error.text')} />
+          ) : items.length ? (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
               {items.map((l) => (
                 <AdCard key={l.id} l={l} />
