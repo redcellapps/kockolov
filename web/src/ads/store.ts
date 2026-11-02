@@ -198,7 +198,7 @@ export function loadCatalog() {
 export const PHOTO_W = 1200;
 export const PHOTO_H = 900;
 
-/** Center-crops a photo to 4:3, scales it to 1200×900 and stamps the Kockolov mark in the bottom right corner */
+/** Fits the whole photo into a 1200×900 (4:3) frame over a blurred copy of itself and stamps the Kockolov mark in the bottom right corner */
 export function processPhoto(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -209,8 +209,19 @@ export function processPhoto(file: File): Promise<string> {
       c.width = PHOTO_W;
       c.height = PHOTO_H;
       const g = c.getContext('2d')!;
-      // "cover" crop around the middle of the picture
-      const k = Math.max(PHOTO_W / img.width, PHOTO_H / img.height);
+      // blurred "cover" backdrop made of the same photo (a tiny copy scaled up, so it works in every browser)
+      const tiny = document.createElement('canvas');
+      tiny.width = 32;
+      tiny.height = 24;
+      const tg = tiny.getContext('2d')!;
+      const kc = Math.max(32 / img.width, 24 / img.height);
+      tg.drawImage(img, (32 - img.width * kc) / 2, (24 - img.height * kc) / 2, img.width * kc, img.height * kc);
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(tiny, 0, 0, PHOTO_W, PHOTO_H);
+      g.fillStyle = 'rgba(255,255,255,0.28)';
+      g.fillRect(0, 0, PHOTO_W, PHOTO_H);
+      // the whole photo, fitted inside the frame, nothing is cut off
+      const k = Math.min(PHOTO_W / img.width, PHOTO_H / img.height);
       const w = img.width * k;
       const h = img.height * k;
       g.drawImage(img, (PHOTO_W - w) / 2, (PHOTO_H - h) / 2, w, h);
