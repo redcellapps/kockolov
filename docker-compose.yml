@@ -36,6 +36,7 @@ services:
     # link-preview images, kept across deploys so shared links show their picture at once
     volumes:
       - ogcache:/app/cache
+      - listings:/app/data/listings   # pictures of the classifieds (Oglasi): must survive deploys and be backed up
 
   # Scheduler: crawl at 05:30, morning e-mail at 07:00 (Europe/Belgrade)
   worker:
@@ -48,6 +49,9 @@ services:
     # the image's health check calls the web API, which the worker doesn't serve
     healthcheck:
       disable: true
+    # the worker deletes pictures of expired and orphaned ads
+    volumes:
+      - listings:/app/data/listings
     depends_on:
       db:
         condition: service_healthy
@@ -55,3 +59,4 @@ services:
 volumes:
   pgdata:
   ogcache:
+  listings:

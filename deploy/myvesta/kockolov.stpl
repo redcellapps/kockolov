@@ -8,7 +8,7 @@ server {
     ssl_certificate_key  %ssl_key%;
     error_log  /var/log/%web_system%/domains/%domain%.error.log error;
 
-    client_max_body_size 2m;
+    client_max_body_size 14m;   # photos for Oglasi (the app itself limits an upload to 12 MB)
     add_header Strict-Transport-Security "max-age=31536000" always;
 
     location /.well-known/acme-challenge/ {

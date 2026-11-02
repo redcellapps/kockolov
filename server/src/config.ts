@@ -106,6 +106,9 @@ const schema = z.object({
 
   // Link-preview images (and the product photos in them) kept on disk — a Docker volume in
   // production — so a shared link shows its picture at once, also right after a deploy
+  // Oglasi (classifieds): off = hidden, admins = only administrators (testing on the live site), on = every signed-in user
+  LISTINGS_MODE: z.enum(['off', 'admins', 'on']).default('off'),
+  LISTINGS_DIR: z.string().default(fileURLToPath(new URL('../../data/listings', import.meta.url))),
   OG_CACHE_DIR: z.string().default(fileURLToPath(new URL('../../cache/og', import.meta.url))),
   // minutes between rounds that prepare every public set's preview image ahead of time; 0 = off
   OG_WARM_MINUTES: z.coerce.number().default(20),

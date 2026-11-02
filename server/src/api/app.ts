@@ -12,6 +12,9 @@ import { adminRoutes } from './routes/admin.js';
 import { blogRoutes } from './routes/blog.js';
 import { publicRoutes } from './routes/public.js';
 import { tvRoutes } from './routes/tv.js';
+import { listingRoutes } from './routes/listings.js';
+import { messageRoutes } from './routes/messages.js';
+import { listingAdminRoutes } from './routes/listings-admin.js';
 import { pushRoutes } from './routes/push.js';
 import { injectHead, pageMeta } from '../seo/pages.js';
 import { authRoutes } from './routes/auth.js';
@@ -25,6 +28,8 @@ declare module 'fastify' {
 }
 
 const OPEN_PATHS = ['/api/auth/', '/api/health', '/api/unsubscribe/', '/api/tv/pair'];
+// ad pictures are <img> tags: they carry the session cookie, but must also load for the app's webview
+
 
 export function webDistDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -90,6 +95,9 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(blogRoutes);
   await app.register(pushRoutes);
   await app.register(tvRoutes);
+  await app.register(listingRoutes);
+  await app.register(messageRoutes);
+  await app.register(listingAdminRoutes);
 
   const dist = webDistDir();
   if (existsSync(dist)) {

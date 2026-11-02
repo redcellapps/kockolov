@@ -264,6 +264,16 @@ cat > /etc/cron.d/kockolov-backup <<'EOF'
 EOF
 ```
 
+The pictures of Oglasi live in the `listings` Docker volume (`/app/data/listings`). Back them up too, e.g. a nightly copy
+next to the database dump (`docker run --rm -v kockolov_listings:/d -v /backup/kockolov:/b alpine tar czf /b/listings-$(date +%F).tgz -C /d .`
+and delete old ones the same way). The volume name starts with the compose project name (`docker volume ls | grep listings`).
+
+## Oglasi (classifieds)
+
+Off until you switch it on. In `/opt/kockolov/.env`: `LISTINGS_MODE=admins` shows it to administrators only (test it on the live
+site first), `LISTINGS_MODE=on` to every signed-in user, then `docker compose up -d`. nginx must allow photo uploads
+(`client_max_body_size 14m` in `kockolov.stpl`; re-apply the template after updating it). Reports and removals: Administracija → Oglasi.
+
 ## If something is off
 
 - **Logs:** `docker compose logs -f app` / `docker compose logs -f worker`.

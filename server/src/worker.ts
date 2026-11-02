@@ -8,6 +8,7 @@ import { refreshEurRate } from './fx.js';
 import { sendDigests } from './mail/digest.js';
 import { sendWatchAlerts } from './push/alerts.js';
 import { instagramJob } from './social/instagram.js';
+import { expireListings, sweepOrphanImages } from './listings/service.js';
 
 const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
 
@@ -18,6 +19,8 @@ async function crawlJob() {
     const res = await runCrawl({ log });
     await alertOnCrawlProblems(res, log);
     await query('DELETE FROM sessions WHERE expires_at < now()');
+    // classifieds: ads whose 30 days are over, and pictures that never got an ad
+    log(`oglasi: isteklo ${await expireListings()}, obrisano neiskorišćenih fotografija ${await sweepOrphanImages()}`);
     // sign-ups nobody confirmed within 30 days, and old one-time links
     await query("DELETE FROM users WHERE self_signup AND accepted_at IS NULL AND created_at < now() - interval '30 days'");
     await query("DELETE FROM user_tokens WHERE expires_at < now() - interval '30 days'");

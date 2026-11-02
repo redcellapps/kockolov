@@ -3,26 +3,38 @@ import { z } from 'zod';
 import { one, query } from '../../db.js';
 import { destroySession, hashPassword, verifyPassword } from '../auth.js';
 import { buildSearch } from '../search.js';
+import { cleanPhone, dropFiles, filesOfUser, PhoneError } from '../../listings/service.js';
 
 export async function requireUser(req: FastifyRequest, reply: FastifyReply) {
   if (!req.user) return reply.code(401).send({ error: 'Potrebna je prijava.' });
 }
 
 export async function meRoutes(app: FastifyInstance) {
-  app.patch('/api/me', { preHandler: requireUser }, async (req) => {
+  app.patch('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = z
       .object({
         name: z.string().max(80).optional(),
         digestEnabled: z.boolean().optional(),
         newsEnabled: z.boolean().optional(),
         currency: z.enum(['RSD', 'EUR']).optional(),
+        phone: z.string().max(40).optional(), // '' removes it
+        msgEmailEnabled: z.boolean().optional(),
       })
       .parse(req.body);
+    let phone: string | null | undefined;
+    try {
+      phone = body.phone === undefined ? undefined : cleanPhone(body.phone);
+    } catch (e) {
+      if (e instanceof PhoneError) return reply.code(400).send({ error: e.message });
+      throw e;
+    }
     await query(
       `UPDATE users SET name = coalesce($2, name), digest_enabled = coalesce($3, digest_enabled), currency = coalesce($4, currency),
-                        news_enabled = coalesce($5, news_enabled)
+                        news_enabled = coalesce($5, news_enabled),
+                        phone = CASE WHEN $6::boolean THEN $7 ELSE phone END,
+                        msg_email_enabled = coalesce($8, msg_email_enabled)
         WHERE id = $1`,
-      [req.user!.id, body.name ?? null, body.digestEnabled ?? null, body.currency ?? null, body.newsEnabled ?? null],
+      [req.user!.id, body.name ?? null, body.digestEnabled ?? null, body.currency ?? null, body.newsEnabled ?? null, phone !== undefined, phone ?? null, body.msgEmailEnabled ?? null],
     );
     return { ok: true };
   });
@@ -49,7 +61,9 @@ export async function meRoutes(app: FastifyInstance) {
       const admins = await one<{ n: number }>("SELECT count(*)::int AS n FROM users WHERE role = 'admin'");
       if ((admins?.n ?? 0) <= 1) return reply.code(400).send({ error: 'Ovo je jedini administratorski nalog, pa ne može da se obriše.' });
     }
+    const files = await filesOfUser(req.user!.id); // the ads' pictures go with the account
     await query('DELETE FROM users WHERE id = $1', [req.user!.id]);
+    await dropFiles(files);
     await destroySession(req, reply);
     return { ok: true };
   });

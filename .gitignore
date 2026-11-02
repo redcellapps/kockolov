@@ -10,3 +10,6 @@ web/src/demo/snapshot.json
 cache/
 web/dist-app/
 web/public/lego-catalog.json
+
+# classifieds pictures made during local development
+data/
