@@ -1,5 +1,6 @@
 // PROTOTYPE (phase 0): classifieds data lives in this browser's localStorage only — no server, nothing is shared.
 // The real version replaces this file with API calls (/api/oglasi/*); pages and components stay as they are.
+import { resetMessages } from './messages';
 import { useSyncExternalStore } from 'react';
 
 /** Private persons sell used items only (no fiscal receipts), so there is no "new" condition */
@@ -100,7 +101,10 @@ export function addListing(l: Omit<Listing, 'id' | 'created_at' | 'views' | 'min
 }
 export const updateListing = (id: string, patch: Partial<Listing>) => save(load().map((l) => (l.id === id ? { ...l, ...patch } : l)));
 export const removeListing = (id: string) => save(load().filter((l) => l.id !== id));
-export const resetPrototype = () => save([...SEED]);
+export const resetPrototype = () => {
+  save([...SEED]);
+  resetMessages();
+};
 
 export const getPhone = () => {
   try {

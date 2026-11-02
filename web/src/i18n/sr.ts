@@ -794,7 +794,7 @@ export const sr = {
   'ads.new.step2': "Stanje",
   'ads.new.step3': "Fotografije",
   'ads.new.step4': "Cena i kontakt",
-  'ads.new.setLabel': "Broj seta (ako ga znaš)",
+  'ads.new.setLabel': "Broj ili naziv seta",
   'ads.new.setHint': "Upiši npr. 75192 – naziv i temu povlačimo iz naše baze.",
   'ads.new.lookup': "Nađi",
   'ads.new.setFound': "Nađeno: {name}",

@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Button, cx } from '../components/ui';
 import { Field } from '../pages/Login';
 import { t } from '../i18n';
-import { api, type SetDetail, type Theme } from '../lib/api';
+import { api, type SearchResponse, type SetDetail, type Theme } from '../lib/api';
 import { usePageTitle } from '../lib/title';
 import { ProtoBanner } from './ListingsPage';
 import { useAuth } from '../lib/auth';
@@ -41,8 +41,35 @@ export default function NewListing() {
   const [phone, setPh] = useState(savedPhone);
   const [err, setErr] = useState<string | null>(null);
 
-  async function find() {
-    const n = setNum.trim();
+  const [sugg, setSugg] = useState<{ num: string; name: string; theme: string }[]>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const q = setNum.trim();
+    if (q.length < 2 || found) return setSugg([]);
+    const h = setTimeout(async () => {
+      const out: { num: string; name: string; theme: string }[] = [];
+      try {
+        const r = await api<SearchResponse>(`/api/sets?q=${encodeURIComponent(q)}&size=6`);
+        for (const x of r.items) out.push({ num: x.set_num, name: x.name, theme: x.theme_name ?? '' });
+      } catch {
+        /* the catalog below may still match */
+      }
+      const cat = await loadCatalog();
+      if (cat) {
+        const ql = q.toLowerCase();
+        for (const [num, e] of Object.entries(cat)) {
+          if (out.length >= 8) break;
+          if (out.some((o) => o.num === num)) continue;
+          if (num.startsWith(ql) || e[0].toLowerCase().includes(ql)) out.push({ num, name: e[0], theme: e[3] });
+        }
+      }
+      setSugg(out);
+    }, 250);
+    return () => clearTimeout(h);
+  }, [setNum, found]);
+
+  async function find(override?: string) {
+    const n = (override ?? setNum).trim();
     if (!n) return;
     setLookup('busy');
     setFromCatalog(false);
@@ -140,9 +167,24 @@ export default function NewListing() {
         {step === 0 && (
           <>
             <div>
-              <Field label={t('ads.new.setLabel')} value={setNum} onChange={(e) => (setSetNum(e.target.value), setLookup('idle'))} inputMode="numeric" placeholder="75192" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), void find())} />
+              <div className="relative">
+                <Field label={t('ads.new.setLabel')} value={setNum} autoComplete="off" onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} onChange={(e) => (setSetNum(e.target.value), setFound(null), setLookup('idle'), setOpen(true))} placeholder="75192" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), void find())} />
+                {open && sugg.length > 0 && (
+                  <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-2xl border border-line bg-surface p-1 shadow-lg">
+                    {sugg.map((x) => (
+                      <li key={x.num}>
+                        <button type="button" className="flex w-full items-baseline gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-2" onMouseDown={(e) => e.preventDefault()} onClick={() => { setSetNum(x.num); setOpen(false); setSugg([]); void find(x.num); }}>
+                          <span className="tabular font-extrabold">{x.num}</span>
+                          <span className="min-w-0 flex-1 truncate">{x.name}</span>
+                          <span className="shrink-0 text-xs text-ink-3">{x.theme}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <p className="mt-1.5 text-xs text-ink-3">{t('ads.new.setHint')}</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={find} disabled={lookup === 'busy'}>{t('ads.new.lookup')}</Button>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => void find()} disabled={lookup === 'busy'}>{t('ads.new.lookup')}</Button>
             </div>
             {found && (
               <div className="flex items-center gap-4 rounded-2xl bg-save-soft p-3">

@@ -51,6 +51,16 @@ const SEED: Conversation[] = [
   },
 ];
 
+const SEED_MAILS: Email[] = [
+  {
+    id: 'e1',
+    conv_id: 'c1',
+    subject: 'Petar T. ti je poslao poruku za oglas „LEGO Friends 41700 kućica, kompletna”',
+    body: 'Zdravo, da li je set još dostupan? Mogu da ga preuzmem u subotu u Nišu.\n\nOdgovori na Kockolovu: kockolov.rs/poruke/c1\n\nNe odgovaraj na ovaj mejl, odgovor se piše na sajtu. Ne želiš ove mejlove? Isključi ih u podešavanjima naloga.',
+    at: ago(25),
+  },
+];
+
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 const subscribe = (f: () => void) => (subs.add(f), () => void subs.delete(f));
@@ -90,7 +100,7 @@ function cached<T>(key: string, fallback: T) {
   };
 }
 const getConvs = cached<Conversation[]>(KEY, SEED);
-const getMails = cached<Email[]>(MAIL_KEY, []);
+const getMails = cached<Email[]>(MAIL_KEY, SEED_MAILS);
 const getPrefs = cached<{ emailOnMessage: boolean }>(PREF_KEY, { emailOnMessage: true });
 
 export const useConversations = () => useSyncExternalStore(subscribe, getConvs);
@@ -105,7 +115,7 @@ export function setEmailOnMessage(v: boolean) {
 }
 export const resetMessages = () => {
   write(KEY, SEED);
-  write(MAIL_KEY, []);
+  write(MAIL_KEY, SEED_MAILS);
   emit();
 };
 
