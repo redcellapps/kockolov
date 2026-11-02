@@ -822,6 +822,8 @@ export const sr = {
   'ads.new.phoneNeeded': "Da bi postavio oglas, dodaj telefon u profilu.",
   'ads.new.next': "Dalje",
   'ads.new.back': "Nazad",
+  'ads.new.photoBusy': "Obrađujem…",
+  'ads.new.errPhotoRead': "Fotografiju nije moguće učitati. Probaj JPG ili PNG.",
   'ads.new.publish': "Objavi oglas",
   'ads.new.published': "Oglas je objavljen",
   'ads.new.usedOnly': "Na Kockolovu fizička lica prodaju samo korišćene proizvode.",

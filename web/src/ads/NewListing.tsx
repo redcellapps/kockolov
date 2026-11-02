@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { Button, cx } from '../components/ui';
+import { Button, cx, Spinner } from '../components/ui';
 import { Field } from '../pages/Login';
 import { t } from '../i18n';
 import { api, type SearchResponse, type SetDetail, type Theme } from '../lib/api';
@@ -107,11 +107,18 @@ function ListingForm({ edit }: { edit?: Listing }) {
     } else setLookup('none');
   }
 
-  async function addPhotos(files: FileList | null) {
-    if (!files) return;
-    const next = [...images];
-    for (const f of Array.from(files)) if (next.length < 8) next.push(await processPhoto(f).catch(() => ''));
-    setImages(next.filter(Boolean));
+  const [pending, setPending] = useState(0); // photos still being processed (loader tiles)
+  async function addPhotos(input: HTMLInputElement) {
+    const files = Array.from(input.files ?? []).slice(0, Math.max(0, 8 - images.length));
+    input.value = ''; // the same file can be picked again
+    if (!files.length) return;
+    setPending((n) => n + files.length);
+    for (const f of files) {
+      const src = await processPhoto(f).catch(() => '');
+      setPending((n) => n - 1);
+      if (src) setImages((prev) => (prev.length < 8 ? [...prev, src] : prev));
+      else setErr(t('ads.new.errPhotoRead'));
+    }
   }
 
   function check(): string | null {
@@ -286,10 +293,15 @@ function ListingForm({ edit }: { edit?: Listing }) {
                   <button aria-label={t('ads.new.removePhoto')} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-ink/80 text-xs text-bg" onClick={() => setImages(images.filter((_, j) => j !== i))}>✕</button>
                 </div>
               ))}
-              {images.length < 8 && (
+              {Array.from({ length: pending }, (_, i) => (
+                <div key={`p${i}`} className="grid aspect-[4/3] place-items-center rounded-xl border border-line bg-surface-2 text-center text-xs font-bold text-ink-3" role="status" aria-live="polite">
+                  <span className="grid justify-items-center gap-2"><Spinner />{t('ads.new.photoBusy')}</span>
+                </div>
+              ))}
+              {images.length + pending < 8 && (
                 <label className="grid aspect-[4/3] cursor-pointer place-items-center rounded-xl border-2 border-dashed border-line text-center text-xs font-bold text-ink-2 hover:border-ink-3">
                   <span>＋<br />{t('ads.new.addPhoto')}</span>
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => void addPhotos(e.target.files)} />
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => void addPhotos(e.target)} />
                 </label>
               )}
             </div>
@@ -322,7 +334,7 @@ function ListingForm({ edit }: { edit?: Listing }) {
         {err && <p role="alert" className="rounded-xl bg-deal-soft px-3 py-2 text-sm font-semibold text-deal">{err}</p>}
         <div className="flex justify-between gap-3 pt-1">
           {step > 0 ? <Button variant="ghost" onClick={() => go(step - 1)}>{t('ads.new.back')}</Button> : <Link to={edit ? `/oglasi/${edit.id}` : '/oglasi'} className="inline-flex h-11 items-center px-4 text-sm font-bold text-ink-2">{t('ads.detail.back')}</Link>}
-          {step < 3 ? <Button onClick={() => go(step + 1)}>{t('ads.new.next')}</Button> : <Button onClick={publish}>{edit ? t('ads.edit.save') : t('ads.new.publish')}</Button>}
+          {step < 3 ? <Button onClick={() => go(step + 1)} disabled={step === 2 && pending > 0}>{t('ads.new.next')}</Button> : <Button onClick={publish}>{edit ? t('ads.edit.save') : t('ads.new.publish')}</Button>}
         </div>
       </div>
     </div>
