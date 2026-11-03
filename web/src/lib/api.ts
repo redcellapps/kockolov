@@ -66,11 +66,8 @@ export interface SetSummary {
   deal_rank: number | null;
 }
 
+/** Only the picture of a set that is sold by members-only shops only */
 export interface LockedSet {
-  set_num: string;
-  name: string;
-  theme_slug: string | null;
-  theme_name: string | null;
   image_url: string | null;
 }
 
@@ -80,7 +77,7 @@ export interface SearchResponse {
   size: number;
   sort: string;
   items: SetSummary[];
-  /** anonymous visitors only: sets that exist only in members-only shops (no price, no shop) */
+  /** anonymous visitors only: sets that exist only in members-only shops (picture only) */
   locked?: { total: number; items: LockedSet[] };
   facets: { themes: { slug: string | null; count: number }[]; shops: { id: string; count: number }[] };
 }

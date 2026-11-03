@@ -124,8 +124,8 @@ export default function SearchPage() {
                     {t('locked.text')} <Link to="/prijava" className="font-bold underline">{t('locked.login')}</Link>
                   </p>
                   <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
-                    {locked.items.map((s) => (
-                      <LockedCard key={s.set_num} s={s} />
+                    {locked.items.map((s, i) => (
+                      <LockedCard key={i} s={s} />
                     ))}
                   </div>
                 </section>
