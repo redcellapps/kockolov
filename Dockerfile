@@ -7,6 +7,8 @@ COPY web/package.json web/
 RUN npm ci --no-audit --no-fund
 COPY server server
 COPY web web
+# web/public/lego-catalog.json (optional, see deploy/myvesta/README.md) is part of the web build
+RUN test -f web/public/lego-catalog.json || echo 'NOTE: web/public/lego-catalog.json missing - classifieds only suggest sets that Kockolov tracks'
 RUN npm run build -w server && npm run build -w web
 
 # ---- runtime ----

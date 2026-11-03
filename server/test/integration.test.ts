@@ -376,6 +376,8 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       // Google draws the pages with JavaScript, so it may fetch the API; the API's answers are noindex
       expect(robots).not.toContain('Disallow: /api');
       expect(robots).toContain('Disallow: /admin');
+      for (const path of ['/poruke', '/moji-oglasi', '/oglasi/novi', '/oglasi/*/izmeni']) expect(robots).toContain(`Disallow: ${path}`);
+      expect(robots).not.toMatch(/Disallow: \/oglasi\n/);
       expect(robots).toContain('Sitemap: ');
       const api = await app.inject({ method: 'GET', url: '/api/sets?q=10280' });
       expect(api.headers['x-robots-tag']).toBe('noindex');

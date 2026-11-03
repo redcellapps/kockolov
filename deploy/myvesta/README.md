@@ -268,6 +268,17 @@ The pictures of Oglasi live in the `listings` Docker volume (`/app/data/listings
 next to the database dump (`docker run --rm -v kockolov_listings:/d -v /backup/kockolov:/b alpine tar czf /b/listings-$(date +%F).tgz -C /d .`
 and delete old ones the same way). The volume name starts with the compose project name (`docker volume ls | grep listings`).
 
+## Catalog of all sets (for Oglasi)
+
+The ad form fills in name, theme, year and pieces for any LEGO set from `web/public/lego-catalog.json`.
+It is made once from Rebrickable's free CSV files and committed to the repository, so it ends up in the Docker image:
+
+1. On your computer, download `sets.csv.gz` and `themes.csv.gz` from https://rebrickable.com/downloads/
+2. In the repository: `npm run catalog -w web -- path/to/sets.csv.gz path/to/themes.csv.gz`
+3. `git add web/public/lego-catalog.json && git commit -m "Katalog setova" && git push`, then update as usual (below).
+
+Without the file the form still works, but only suggests sets that Kockolov tracks. Refresh it a few times a year.
+
 ## Oglasi (classifieds)
 
 Off until you switch it on. In `/opt/kockolov/.env`: `LISTINGS_MODE=admins` shows it to administrators only (test it on the live

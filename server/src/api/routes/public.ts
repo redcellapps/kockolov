@@ -57,6 +57,11 @@ export async function publicRoutes(app: FastifyInstance) {
       'Disallow: /poziv/',
       'Disallow: /potvrda/',
       'Disallow: /odjava/',
+      // Oglasi: private pages (inbox, own ads, forms). The public list and ad pages stay open.
+      'Disallow: /poruke',
+      'Disallow: /moji-oglasi',
+      'Disallow: /oglasi/novi',
+      'Disallow: /oglasi/*/izmeni',
       '',
       `Sitemap: ${site()}/sitemap.xml`,
       '',
