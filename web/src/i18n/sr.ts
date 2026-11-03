@@ -108,7 +108,7 @@ export const sr = {
   'locked.title': "Još {n} u prodavnicama za članove",
   'locked.titleOne': "Još 1 u prodavnicama za članove",
   'locked.text': "Ovi setovi se trenutno nalaze samo u prodavnicama čije podatke vide registrovani korisnici. Registracija je besplatna.",
-  'locked.price': "Naziv i cena za članove",
+  'locked.price': "Cena za članove",
   'locked.cta': "Registruj se i vidi cenu",
   'locked.login': "Već imaš nalog? Prijavi se",
 

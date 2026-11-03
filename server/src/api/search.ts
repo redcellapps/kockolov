@@ -161,7 +161,7 @@ export function buildShopFacet(f: SearchFilters) {
 
 /**
  * Teaser for anonymous visitors: sets that match the text, theme and age filters and are in stock only in
- * members-only shops. Only the picture is selected: no name, number, theme, price, shop or offer reaches the browser.
+ * members-only shops. Only name and picture are selected: no number, theme, price, shop or offer reaches the browser.
  */
 export function buildLockedSearch(f: SearchFilters, limit = 8) {
   const p = new Params();
@@ -174,7 +174,7 @@ export function buildLockedSearch(f: SearchFilters, limit = 8) {
                       WHERE o.set_num = s.set_num AND o.active AND o.in_stock AND sh.members_only AND sh.enabled)
          AND NOT EXISTS (SELECT 1 FROM public_offers po WHERE po.set_num = s.set_num AND po.active AND po.in_stock)
     )
-    SELECT base.image_url, count(*) OVER()::int AS total
+    SELECT base.name, base.image_url, count(*) OVER()::int AS total
       FROM base LEFT JOIN themes t ON t.slug = base.theme_slug
       ${w.sql}
      ORDER BY ${w.qNorm ? `(base.set_num = ${p.add(w.qNorm)}) DESC, similarity(base.search_text, ${p.add(w.qNorm)}) DESC, ` : ''}base.set_num DESC
