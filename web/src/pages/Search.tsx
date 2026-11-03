@@ -1,8 +1,9 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useSearchParams, Link } from 'react-router';
 import { Filters, activeFilterCount, readFilters, writeFilters, type FilterState } from '../components/Filters';
 import { FilterIcon, XIcon } from '../components/icons';
+import { LockedCard } from '../components/LockedCard';
 import { SetCard } from '../components/SetCard';
 import { Button, CardSkeleton, EmptyState, ErrorState, Spinner, cx } from '../components/ui';
 import { t, tn, type TKey } from '../i18n';
@@ -39,6 +40,7 @@ export default function SearchPage() {
   const first = q.data?.pages[0];
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
   const total = first?.total ?? 0;
+  const locked = first?.locked;
   const sort = f.sort || first?.sort || (f.q ? 'relevance' : 'deal');
   const update = (next: FilterState) => setParams(writeFilters(next), { replace: false });
   const nActive = activeFilterCount(f);
@@ -95,7 +97,7 @@ export default function SearchPage() {
                 <CardSkeleton key={i} />
               ))}
             </div>
-          ) : items.length === 0 ? (
+          ) : items.length === 0 && !locked?.items.length ? (
             <EmptyState
               title={t('results.empty.title')}
               text={t('results.empty.text')}
@@ -109,11 +111,25 @@ export default function SearchPage() {
             />
           ) : (
             <>
+              {items.length === 0 && <p className="mb-4 font-semibold text-ink-2">{t('results.empty.title')}</p>}
               <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
                 {items.map((s) => (
                   <SetCard key={s.set_num} s={s} />
                 ))}
               </div>
+              {locked && locked.items.length > 0 && (
+                <section className="mt-10">
+                  <h2 className="text-lg font-extrabold">{locked.total === 1 ? t('locked.titleOne') : t('locked.title', { n: locked.total })}</h2>
+                  <p className="mb-4 mt-1 text-sm text-ink-2">
+                    {t('locked.text')} <Link to="/prijava" className="font-bold underline">{t('locked.login')}</Link>
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+                    {locked.items.map((s) => (
+                      <LockedCard key={s.set_num} s={s} />
+                    ))}
+                  </div>
+                </section>
+              )}
               {q.hasNextPage && (
                 <div className="mt-8 flex justify-center">
                   <Button variant="outline" size="lg" onClick={() => q.fetchNextPage()} disabled={q.isFetchingNextPage}>

@@ -66,12 +66,22 @@ export interface SetSummary {
   deal_rank: number | null;
 }
 
+export interface LockedSet {
+  set_num: string;
+  name: string;
+  theme_slug: string | null;
+  theme_name: string | null;
+  image_url: string | null;
+}
+
 export interface SearchResponse {
   total: number;
   page: number;
   size: number;
   sort: string;
   items: SetSummary[];
+  /** anonymous visitors only: sets that exist only in members-only shops (no price, no shop) */
+  locked?: { total: number; items: LockedSet[] };
   facets: { themes: { slug: string | null; count: number }[]; shops: { id: string; count: number }[] };
 }
 

@@ -158,3 +158,27 @@ export function buildShopFacet(f: SearchFilters) {
     params: p.values,
   };
 }
+
+/**
+ * Teaser for anonymous visitors: sets that match the text, theme and age filters and are in stock only in
+ * members-only shops. No price, shop or offer is selected, so nothing sensitive reaches the browser.
+ */
+export function buildLockedSearch(f: SearchFilters, limit = 8) {
+  const p = new Params();
+  const w = where(p, { q: f.q, setNums: f.setNums, themes: f.themes, ages: f.ages, stock: false }, null);
+  return {
+    sql: `WITH base AS (
+      SELECT s.set_num, s.name, s.theme_slug, s.image_url, s.age_min, s.search_text
+        FROM sets s
+       WHERE EXISTS (SELECT 1 FROM offers o JOIN shops sh ON sh.id = o.shop_id
+                      WHERE o.set_num = s.set_num AND o.active AND o.in_stock AND sh.members_only AND sh.enabled)
+         AND NOT EXISTS (SELECT 1 FROM public_offers po WHERE po.set_num = s.set_num AND po.active AND po.in_stock)
+    )
+    SELECT base.set_num, base.name, base.theme_slug, t.name AS theme_name, base.image_url, count(*) OVER()::int AS total
+      FROM base LEFT JOIN themes t ON t.slug = base.theme_slug
+      ${w.sql}
+     ORDER BY ${w.qNorm ? `(base.set_num = ${p.add(w.qNorm)}) DESC, similarity(base.search_text, ${p.add(w.qNorm)}) DESC, ` : ''}base.set_num DESC
+     LIMIT ${p.add(limit)}`,
+    params: p.values,
+  };
+}

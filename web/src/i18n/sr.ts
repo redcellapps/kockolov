@@ -105,6 +105,12 @@ export const sr = {
   'results.empty.title': 'Nema setova za ove uslove',
   'results.empty.text': 'Probaj drugačiji pojam ili ukloni neki filter.',
   'results.more': 'Učitaj još',
+  'locked.title': "Još {n} u prodavnicama za članove",
+  'locked.titleOne': "Još 1 u prodavnicama za članove",
+  'locked.text': "Ovi setovi se trenutno nalaze samo u prodavnicama čije cene vide registrovani korisnici. Registracija je besplatna.",
+  'locked.price': "Cena za članove",
+  'locked.cta': "Registruj se i vidi cenu",
+  'locked.login': "Već imaš nalog? Prijavi se",
 
   'card.shops.one': 'u {n} prodavnici',
   'card.shops.few': 'u {n} prodavnice',

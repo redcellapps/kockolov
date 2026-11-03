@@ -3,7 +3,7 @@ import { setForCode } from '../../crawler/ean.js';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
 import { audienceOf, latestDeals, offersFor } from '../audience.js';
-import { buildSearch, buildShopFacet, buildThemeFacet, type SearchFilters } from '../search.js';
+import { buildLockedSearch, buildSearch, buildShopFacet, buildThemeFacet, type SearchFilters } from '../search.js';
 
 const csv = z
   .string()
@@ -49,12 +49,17 @@ export async function catalogRoutes(app: FastifyInstance) {
     const s = buildSearch(f);
     const tf = buildThemeFacet(f);
     const sf = buildShopFacet(f);
-    const [rows, themes, shops] = await Promise.all([
+    // anonymous visitors on the first page also see sets that exist only in members-only shops (no price, no shop)
+    const wantLocked = f.audience === 'public' && s.page === 1 && !!(f.q || f.themes?.length) && !f.shops?.length && f.min === undefined && f.max === undefined && !f.sale;
+    const lq = wantLocked ? buildLockedSearch(f) : null;
+    const [rows, themes, shops, lockedRows] = await Promise.all([
       query(s.sql, s.params),
       query(tf.sql, tf.params),
       query(sf.sql, sf.params),
+      lq ? query(lq.sql, lq.params) : Promise.resolve([]),
     ]);
     return {
+      locked: { total: lockedRows[0]?.total ?? 0, items: lockedRows.map(({ total, ...r }) => r) },
       total: rows[0]?.total ?? 0,
       page: s.page,
       size: s.size,
