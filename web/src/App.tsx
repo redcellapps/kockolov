@@ -22,6 +22,7 @@ import ListingsPage from './ads/ListingsPage';
 import MyListings from './ads/MyListings';
 import MessagesPage from './ads/MessagesPage';
 import NewListing from './ads/NewListing';
+import AdminListings from './pages/AdminListings';
 
 /** While the site is private, every page except login needs a session. */
 function Gate({ children, needUser, needAdmin, needAds }: { children: ReactNode; needUser?: boolean; needAdmin?: boolean; needAds?: boolean }) {
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/blog" element={<Gate><BlogListPage /></Gate>} />
         <Route path="/blog/:slug" element={<Gate><BlogPostPage /></Gate>} />
         <Route path="/" element={<Gate><Home /></Gate>} />
+        <Route path="/admin/oglasi" element={<Gate needAds needAdmin><AdminListings /></Gate>} />
         <Route path="/oglasi" element={<Gate needAds><ListingsPage /></Gate>} />
         <Route path="/oglasi/novi" element={<Gate needAds needUser><NewListing /></Gate>} />
         <Route path="/oglasi/:id" element={<Gate needAds><ListingDetail /></Gate>} />

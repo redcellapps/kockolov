@@ -227,7 +227,12 @@ describe.skipIf(!dbAvailable)('Oglasi: ads, pictures, following, messages, moder
     expect((await app.inject({ method: 'PUT', url: `/api/oglasi/${adId}`, headers: as('alice'), payload: ad([imgId]) })).statusCode).toBe(403);
     expect((await app.inject({ method: 'POST', url: `/api/oglasi/${adId}/poruke`, headers: as('bob'), payload: { text: 'još tu?' } })).statusCode).toBe(404);
     expect(json(await app.inject({ method: 'GET', url: '/api/admin/oglasi/prijave', headers: as('admin') })).items).toHaveLength(1); // the conversation report is still open
+    expect((await app.inject({ method: 'GET', url: '/api/admin/oglasi/uklonjeni', headers: as('bob') })).statusCode).toBe(403);
+    const gone = json(await app.inject({ method: 'GET', url: '/api/admin/oglasi/uklonjeni', headers: as('admin') })).items;
+    expect(gone).toHaveLength(1);
+    expect(gone[0].removed_reason).toBe('Nije LEGO');
     expect((await app.inject({ method: 'POST', url: `/api/admin/oglasi/${adId}/vrati`, headers: as('admin') })).statusCode).toBe(200);
+    expect(json(await app.inject({ method: 'GET', url: '/api/admin/oglasi/uklonjeni', headers: as('admin') })).items).toHaveLength(0);
     expect((await one('SELECT status FROM listings WHERE id = $1', [adId]))!.status).toBe('paused');
   });
 

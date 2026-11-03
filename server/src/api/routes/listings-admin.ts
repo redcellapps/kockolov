@@ -25,6 +25,16 @@ export async function listingAdminRoutes(app: FastifyInstance) {
     return { items };
   });
 
+  /** Ads taken down by moderators (to put one back) */
+  app.get('/api/admin/oglasi/uklonjeni', async () => {
+    const items = await query(
+      `SELECT l.id, l.title, l.removed_reason, l.updated_at, u.email AS owner_email
+         FROM listings l JOIN users u ON u.id = l.user_id
+        WHERE l.status = 'removed' ORDER BY l.updated_at DESC LIMIT 100`,
+    );
+    return { items };
+  });
+
   /** A moderator reads a reported conversation (only the reported one) */
   app.get<{ Params: { id: string } }>('/api/admin/oglasi/razgovor/:id', async (req, reply) => {
     const reported = await one('SELECT 1 FROM listing_reports WHERE conversation_id = $1', [Number(req.params.id) || 0]);
