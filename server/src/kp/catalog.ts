@@ -37,7 +37,7 @@ export function loadCatalog(file = catalogFile()): Map<string, CatalogSet> {
 }
 
 /** Catalog themes that are not building sets (Rebrickable's names) */
-const NOT_SETS = /^(collectible minifigures|minifigures|gear|books|key chains|magnets|bulk bricks|service packs|supplemental|video games|clikits|storage|watches|clocks|stationery|pens)$/i;
+const NOT_SETS = /^(collectible minifigures|minifigures|gear|books|promotional|dimensions|key chains|magnets|bulk bricks|service packs|supplemental|video games|clikits|storage|watches|clocks|stationery|pens)$/i;
 
 /** What a set number means: our own sets first (Serbian names, LEGO Store price), then the catalog */
 export async function knownSets(catalog = loadCatalog()): Promise<(num: string) => KnownSet | null> {
