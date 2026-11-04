@@ -16,13 +16,21 @@ const MERCH = [
   'kutija za baterije', 'kuka', 'kuke za kacenje',
   // seen on the members-only shops (Oct 2026)
   'narukvice', 'privesci', 'pernice', 'rancic', 'lampica', 'svetleca cigla', 'baterijska lampa',
-  // used items and bulk bricks are not comparable offers for a set
-  'polovn', 'polovan', 'koriscen',
 ];
+// used items are not comparable offers for a set in a shop (classified ads keep them, see kp/classify.ts)
+const USED = ['polovn', 'polovan', 'koriscen'];
+
+/** Normalized text contains one of the words (at a word start) */
+export const hasWord = (text: string, words: readonly string[]) => {
+  const n = ` ${normalizeText(text)} `;
+  return words.some((w) => n.includes(` ${w}`));
+};
+
+/** LEGO-branded things that are not building sets (without the used-item words) */
+export const isMerchandise = (title: string) => hasWord(title, MERCH);
 
 export function isMerch(title: string): boolean {
-  const n = ` ${normalizeText(title)} `;
-  return MERCH.some((w) => n.includes(` ${w}`));
+  return hasWord(title, MERCH) || hasWord(title, USED);
 }
 
 /** BrickLink-style code of a single minifigure as a shop SKU: sw0360, frnd0660, col05-9, colspi-9 */
@@ -61,13 +69,13 @@ const THEME_FAMILIES = [
   ['marvel', 'dc', 'super-heroes'],
   ['icons', 'botanicals', 'creator', 'iconic'],
 ];
-const sameFamily = (a: string, b: string) => a === b || THEME_FAMILIES.some((f) => f.includes(a) && f.includes(b));
+export const sameFamily = (a: string, b: string) => a === b || THEME_FAMILIES.some((f) => f.includes(a) && f.includes(b));
 
 const THEME_WORDS = new Set(THEMES.flatMap((t) => t.match.flatMap((m) => m.split(' '))));
 const FILLER = new Set(['lego', 'sa', 'za', 'od', 'the', 'and', 'with', 'set', 'kocke', 'kocka']);
 
 /** Words that say what a set is, without brand, theme or filler words */
-function nameWords(s: string): Set<string> {
+export function nameWords(s: string): Set<string> {
   return new Set(
     normalizeText(s)
       .split(' ')
