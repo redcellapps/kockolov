@@ -36,6 +36,9 @@ export function loadCatalog(file = catalogFile()): Map<string, CatalogSet> {
   return new Map(Object.entries(data).map(([num, [name, year, pieces, theme, subtheme]]) => [num, { name, year, pieces, theme, subtheme }]));
 }
 
+/** Catalog themes that are not building sets (Rebrickable's names) */
+const NOT_SETS = /^(collectible minifigures|minifigures|gear|books|key chains|magnets|bulk bricks|service packs|supplemental|video games|clikits|storage|watches|clocks|stationery|pens)$/i;
+
 /** What a set number means: our own sets first (Serbian names, LEGO Store price), then the catalog */
 export async function knownSets(catalog = loadCatalog()): Promise<(num: string) => KnownSet | null> {
   const idx = await loadMatchIndex();
@@ -45,6 +48,7 @@ export async function knownSets(catalog = loadCatalog()): Promise<(num: string) 
     if (!ours && !cat) return null;
     const names = [...(ours?.names ?? []), ...(cat ? [cat.name] : [])];
     const theme = ours?.theme ?? (cat ? (themeFromRaw(cat.subtheme ?? '') ?? themeFromRaw(cat.theme)) : null);
-    return { names, theme, rrp: ours?.rrp ?? null };
+    const notASet = !ours && !!cat && (NOT_SETS.test(cat.theme) || NOT_SETS.test(cat.subtheme ?? ''));
+    return { names, theme, rrp: ours?.rrp ?? null, notASet };
   };
 }

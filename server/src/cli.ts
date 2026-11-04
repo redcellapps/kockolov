@@ -15,6 +15,7 @@ import { todayLocal } from './lib/time.js';
 import { sendWatchAlerts } from './push/alerts.js';
 import { sendPushToUser } from './push/push.js';
 import { fillEans } from './crawler/ean.js';
+import { kpReport } from './kp/report.js';
 
 const HELP = `Kockolov CLI
 
@@ -28,6 +29,7 @@ const HELP = `Kockolov CLI
   push [--dry-run]                         pošalji obaveštenja o praćenim setovima (inače uz jutarnji pregled)
   push:test --email x@y.rs                 probno obaveštenje na sve uređaje tog korisnika
   ean [broj]                               preuzmi bar-kodove kutija iz LEGO Store-a (podrazumevano 400)
+  kp:izvestaj kp-oglasi.jsonl [--out x.xlsx]   probni izveštaj o KP oglasima (ništa se ne upisuje)
   user:create --email x@y.rs [--name Ime] [--admin] [--password tajna]
   user:invite --email x@y.rs [--name Ime] [--admin]   (e-mail sa linkom za postavljanje lozinke)
   user:password --email x@y.rs [--password tajna]
@@ -46,6 +48,7 @@ async function main() {
       admin: { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
       preview: { type: 'string' },
+      out: { type: 'string' },
     },
   });
   if (!cmd || cmd === 'help' || cmd === '--help') {
@@ -92,6 +95,12 @@ async function main() {
     case 'ean':
       console.log(await fillEans({ log: console.log, max: positionals[0] ? Number(positionals[0]) : undefined }));
       break;
+    case 'kp:izvestaj': {
+      if (!positionals[0]) throw new Error('Navedi fajl kp-oglasi.jsonl (kp-agent.mjs --sve)');
+      const counts = await kpReport(positionals[0], values.out ?? 'kp-izvestaj.xlsx');
+      console.table(Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([odluka, broj]) => ({ odluka, broj })));
+      break;
+    }
     case 'push':
       await sendWatchAlerts({ dryRun: values['dry-run'] });
       break;

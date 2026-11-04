@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { classifyAd, kpPrice, setNumbersIn, type KnownSet, type KpAd } from '../src/kp/classify.js';
+import { parseKpSearch } from '../src/kp/parse.js';
 
 // our sets (Serbian names, LEGO Store regular price) and catalog-only retired sets
 const SETS: Record<string, KnownSet> = {
@@ -93,7 +95,73 @@ describe('KP ads that are one set we can show', () => {
     expect(decide('LEGO Technic Lamborghini 75192', '400 €')).toMatchObject({ kind: 'review', setNum: '75192', why: 'name' });
     // 5.860 RSD for a 109.999 RSD set
     expect(decide('LEGO 75192 Millennium Falcon', '50 €')).toMatchObject({ kind: 'review', why: 'price' });
-    expect(decide('LEGO Titanic', '600 €', 'Set 10294, kompletan sa kutijom')).toMatchObject({ kind: 'review', setNum: '10294', why: 'number_in_text' });
+    expect(decide('LEGO veliki brod', '600 €', 'Set 10294, kompletan sa kutijom')).toMatchObject({ kind: 'review', setNum: '10294', why: 'number_in_text' });
+    // ...but when the title names the same set, the number in the description is enough
+    expect(decide('LEGO Titanic', '600 €', 'Set 10294, kompletan sa kutijom')).toMatchObject({ kind: 'show', setNum: '10294' });
     expect(decide('LEGO 75192 Millennium Falcon', '700 €', 'Imam i 75257, pitajte')).toMatchObject({ kind: 'review', setNum: '75192', why: 'more_numbers' });
+  });
+});
+
+describe('KP search page', () => {
+  const page = (n: number) => parseKpSearch(readFileSync(new URL(`./fixtures/kp/pretraga-strana-${n}.html`, import.meta.url), 'utf8'));
+
+  it('reads the ads from the page data (KupujemProdajem, 4 Nov 2026)', () => {
+    const p = page(1);
+    expect(p).toMatchObject({ blocked: false, page: 1, pages: 172, total: 5139 });
+    expect(p.ads).toHaveLength(30);
+    expect(p.ads.find((a) => a.id === '196749898')).toEqual({
+      id: '196749898',
+      title: "LEGO 4195 Queen Anne's Revenge",
+      snippet: "LGO 4195 Queen Anne's Revenge nov, neotpakovan, bez oštećenja",
+      priceText: '900 €',
+      priceAmount: 900,
+      currency: 'EUR',
+      condition: 'nekorisceno',
+      type: 'sell',
+      location: 'Subotica',
+      url: 'https://www.kupujemprodajem.com/igracke-i-igre/kockice/lego-4195-queen-anne-s-revenge/oglas/196749898',
+      image: expect.stringMatching(/^https:\/\/images\.kupujemprodajem\.com\/photos\/oglasi\/.+\.webp$/),
+      thumb: expect.stringContaining('/tmb-300x300-'),
+      postedAt: '2026-10-29 14:17:53',
+    });
+    expect(page(2).page).toBe(2);
+    expect(new Set([...page(1).ads, ...page(2).ads].map((a) => a.condition))).toEqual(new Set(['novo', 'nekorisceno', 'korisceno']));
+  });
+
+  it('notices a check page instead of results', () => {
+    expect(parseKpSearch('<html><body>Are you human?</body></html>').blocked).toBe(true);
+    const html = readFileSync(new URL('./fixtures/kp/pretraga-strana-1.html', import.meta.url), 'utf8').replace(
+      '"captchaSiteKey": ""',
+      '"captchaSiteKey": "6Lc-abc"',
+    );
+    expect(parseKpSearch(html).blocked).toBe(true);
+  });
+
+  it('decides on the real ads of the first two pages', () => {
+    // set numbers the catalog knows (a few, with their names); a minifigure series is not a set
+    const cat: Record<string, KnownSet> = {
+      '4195': { names: ["Queen Anne's Revenge"], theme: null, rrp: null },
+      '6039': { names: ['Twisted Time Train'], theme: null, rrp: null },
+      '75954': { names: ['Hogwarts Great Hall'], theme: 'harry-potter', rrp: null },
+      '21309': { names: ['NASA Apollo Saturn V'], theme: 'ideas', rrp: null },
+      '31214': { names: ['Love'], theme: 'art', rrp: null },
+      '71011': { names: ['Minifigures Series 15'], theme: null, rrp: null, notASet: true },
+      '7412': { names: ['Yoda'], theme: 'star-wars', rrp: null },
+      '4500': { names: ['Rebel Snowspeeder'], theme: 'star-wars', rrp: null },
+    };
+    const ads = [...page(1).ads, ...page(2).ads];
+    const d = (id: string) => classifyAd(ads.find((a) => a.id === id)!, { known: (n) => cat[n] ?? null, eurRate: 117.2 });
+    expect(d('196749898')).toMatchObject({ kind: 'show', setNum: '4195' }); // Queen Anne's Revenge, 900 €
+    expect(d('184454130')).toMatchObject({ kind: 'show', setNum: '6039' }); // "vintage Lego 1988 godina"
+    expect(d('182931301')).toMatchObject({ kind: 'show', setNum: '75954' });
+    expect(d('192307608')).toMatchObject({ kind: 'skip', why: 'no_number' }); // "Veliki izbor setova", 23 €
+    expect(d('196887395')).toMatchObject({ kind: 'skip', why: 'bulk' }); // 11 kg of bricks
+    expect(d('192020580')).toMatchObject({ kind: 'skip', why: 'not_a_set' }); // minifigure series 1/4/5/6
+    const titled = (re: RegExp) => ads.find((a) => re.test(a.title))!.id;
+    expect(d(titled(/lighting kit/))).toMatchObject({ kind: 'skip' }); // a light kit "for lego 31214"
+    expect(d(titled(/Series 15 Minifigures 71011/))).toMatchObject({ kind: 'skip', why: 'not_a_set' });
+    expect(d(titled(/Saturn V/))).toMatchObject({ kind: 'show', setNum: '21309' }); // number only in the description
+    expect(d(titled(/yeti 7412/))).toMatchObject({ kind: 'skip', why: 'multi' });
+    expect(d(titled(/njo0009/))).toMatchObject({ kind: 'skip' }); // a minifigure code
   });
 });

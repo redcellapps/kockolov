@@ -19,9 +19,13 @@ export interface KpAd {
   title: string;
   /** the start of the description shown in the search results */
   snippet: string;
-  /** "23 €", "1.200 din", "Kontakt" */
+  /** "23 €", "1.200 din", "Kontakt" (read only when the amount and currency are not given) */
   priceText: string;
+  priceAmount?: number | null;
+  currency?: 'RSD' | 'EUR' | null;
   condition: KpCondition | null;
+  /** "sell" (Prodajem) or "buy" (Kupujem) */
+  type?: string;
 }
 
 /** What we know about a set number: from our own sets (Serbian names, LEGO Store price) and/or the catalog */
@@ -31,6 +35,8 @@ export interface KnownSet {
   theme: string | null;
   /** the LEGO Store's regular price; null for sets it doesn't sell (retired ones) */
   rrp: number | null;
+  /** the catalog files it under minifigures, gear, books, bulk bricks... (see catalog.ts) */
+  notASet?: boolean;
 }
 
 export interface KpContext {
@@ -69,7 +75,10 @@ export interface KpPrice {
 // ---- words (normalized: lowercase, no diacritics) ----
 
 const WANTED = ['kupujem', 'trazim', 'menjam', 'zamena', 'potrebn'];
+/** in the title: anything that says copy; in the description only the clear ones ("bez replika" is a good sign) */
+const NOT_LEGO_TEXT = ['kompatibil', 'compatible', 'lepin', 'tipa lego', 'kao lego', 'nije original', 'nisu original', 'lego like'];
 const NOT_LEGO = [
+  'compatible',
   'kompatibil', 'lepin', 'sluban', 'cobi', 'mega bloks', 'megabloks', 'tipa lego', 'kao lego', 'slicno lego',
   'slicne lego', 'lego like', 'nije original', 'nisu original', 'nije lego', 'nisu lego', 'kopija',
   'replika', 'fake', 'alternativ', 'imitacij', 'no name', 'noname', 'decool',
@@ -88,7 +97,8 @@ const NOT_A_SET = [
   'blu ray', 'poster', 'nalepnic', 'stiker', 'casopis', 'magazin', 'katalog',
   // around a set, not a set
   'uputstvo za', 'uputstva za', 'samo uputstv', 'prazna kutija', 'samo kutija', 'kutija bez', 'bez kocaka', 'vitrin',
-  'stalak', 'display', 'led ', 'osvetljenj', 'rasvet', 'svetla za', 'light kit', 'lightkit', 'kofer za',
+  'stalak', 'display', 'led ', 'osvetljenj', 'rasvet', 'svetla za', 'svetlo', 'light kit', 'lightkit', 'lighting',
+  'brickbling', 'kofer za',
 ];
 /** a single minifigure: the title starts with it */
 const MINIFIG_START = /^(lego\s+)?(mini\s*)?(figur|minifig)/;
@@ -115,7 +125,8 @@ export const toRsd = (p: KpPrice, eurRate: number) => Math.round(p.currency === 
 export function setNumbersIn(text: string, isKnown: (n: string) => boolean): string[] {
   const t = text.replace(PHONE, ' ');
   const out: string[] = [];
-  const re = /(?<![\d.,/])(\d{4,6})(?:-1)?(?![\d/]|[.,]\d)/g;
+  // not glued to letters either: "njo0009" is a minifigure code, not set 0009
+  const re = /(?<![\p{L}\d.,/])(\d{4,6})(?:-1)?(?![\d/]|[.,]\d)/gu;
   let m: RegExpExecArray | null;
   while ((m = re.exec(t))) {
     const num = m[1];
@@ -124,16 +135,20 @@ export function setNumbersIn(text: string, isKnown: (n: string) => boolean): str
     if (/^\s*(delova|dela|delov|komad|kom\b|kom\.|pcs|pieces|elemen|kockic|kocki|din|rsd|€|eur|evr|cm|mm|god|g\.)/.test(after)) continue;
     if (/(€|eur|din|rsd|cena|cenu)\s*:?\s*$/.test(before)) continue;
     if (YEAR_RE.test(num) && (/^\s*\./.test(after) || /(iz|od|do|za|god\.?|godine|godina)\s*$/.test(before))) continue;
-    if (!isKnown(num) || out.includes(num)) continue;
+    if (num.startsWith('0') || !isKnown(num) || out.includes(num)) continue;
     out.push(num);
   }
   return out;
 }
 
+function sharesName(title: string, set: KnownSet): boolean {
+  const words = nameWords(title);
+  return set.names.some((n) => [...nameWords(n)].some((w) => words.has(w)));
+}
+
 /** The title points to another theme than the set's, and shares no word with the set's names */
 function nameConflict(title: string, set: KnownSet): boolean {
-  const words = nameWords(title);
-  if (set.names.some((n) => [...nameWords(n)].some((w) => words.has(w)))) return false;
+  if (sharesName(title, set)) return false;
   const theme = themeFromRaw(title);
   return !!theme && !!set.theme && !sameFamily(theme, set.theme);
 }
@@ -151,8 +166,8 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
   const both = `${title} ${ad.snippet}`;
   const nTitle = normalizeText(title);
 
-  if (WANTED.some((w) => nTitle.startsWith(w))) return { kind: 'skip', why: 'wanted' };
-  if (hasWord(both, NOT_LEGO)) return { kind: 'skip', why: 'not_lego' };
+  if ((ad.type && ad.type !== 'sell') || WANTED.some((w) => nTitle.startsWith(w))) return { kind: 'skip', why: 'wanted' };
+  if (hasWord(title, NOT_LEGO) || hasWord(ad.snippet, NOT_LEGO_TEXT)) return { kind: 'skip', why: 'not_lego' };
   if (hasWord(title, BULK) || BULK_RE.test(title)) return { kind: 'skip', why: 'bulk' };
   if (hasWord(both, PROMO)) return { kind: 'skip', why: 'promo' };
   if (MINIFIG_START.test(nTitle) || hasWord(title, NOT_A_SET) || isMerchandise(title)) return { kind: 'skip', why: 'not_a_set' };
@@ -176,10 +191,14 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
     return { kind: 'skip', why: 'no_number' };
   }
 
-  const price = kpPrice(ad.priceText);
+  const set = ctx.known(setNum)!;
+  if (set.notASet) return { kind: 'skip', why: 'not_a_set', setNums: [setNum] };
+  // the number only in the description is enough when the title names the same set
+  if (doubt === 'number_in_text' && sharesName(title, set)) doubt = null;
+
+  const price = ad.priceAmount && ad.currency ? { amount: ad.priceAmount, currency: ad.currency } : kpPrice(ad.priceText);
   if (!price) return { kind: 'skip', why: 'no_price', setNums: [setNum] };
   const priceRsd = toRsd(price, ctx.eurRate);
-  const set = ctx.known(setNum)!;
   if (!doubt && nameConflict(title, set)) doubt = 'name';
   if (!doubt && !believablePrice(priceRsd, set)) doubt = 'price';
   return doubt ? { kind: 'review', setNum, priceRsd, price, why: doubt } : { kind: 'show', setNum, priceRsd, price };
