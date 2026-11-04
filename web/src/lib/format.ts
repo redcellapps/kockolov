@@ -123,7 +123,7 @@ export function ageLabel(age: number | null | undefined): string {
 export function reasonText(r: Reason): string {
   switch (r.type) {
     case 'vs_rrp':
-      return t('reason.vs_rrp', { pct: r.pct });
+      return t(r.sale ? 'reason.vs_rrp.sale' : 'reason.vs_rrp', { pct: r.pct });
     case 'vs_next':
       return t('reason.vs_next', { amount: money(r.amount) });
     case 'shop_sale':

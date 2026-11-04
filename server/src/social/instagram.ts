@@ -136,7 +136,9 @@ export function buildCaption(c: Candidate, day: string): string {
   const pct = c.rrp_rsd && c.rrp_rsd > c.best_price ? Math.round((100 * (c.rrp_rsd - c.best_price)) / c.rrp_rsd) : 0;
   const opener =
     pct >= 10
-      ? `${pct}% jeftinije nego u LEGO® Store-u 🔥`
+      ? c.best_shop === 'lstore'
+        ? `Akcija u LEGO® Store-u: −${pct}% 🔥`
+        : `${pct}% jeftinije od redovne cene u LEGO® Store-u 🔥`
       : OPENERS[Number(day.replace(/-/g, '')) % OPENERS.length];
   const title = [c.theme_name ? `LEGO® ${c.theme_name}` : 'LEGO®', c.name].join(' ');
   const lines = [
@@ -145,7 +147,8 @@ export function buildCaption(c: Candidate, day: string): string {
     `🧱 ${title} (${c.set_num})`,
     `💰 Najniža cena ${dayGenitive(day)}: ${rsd(c.best_price)}, ${shopLabel(c.best_shop, c.best_seller)}`,
   ];
-  if (c.rrp_rsd && c.best_shop !== 'lstore' && c.rrp_rsd !== c.best_price) lines.push(`🏷️ U LEGO® Store-u: ${rsd(c.rrp_rsd)}`);
+  // the LEGO Store's regular price; during its own sale too (the sale price is the line above)
+  if (c.rrp_rsd && c.rrp_rsd !== c.best_price) lines.push(`🏷️ Redovna cena u LEGO® Store-u: ${rsd(c.rrp_rsd)}`);
   if (c.member_shops > 0) {
     const where = `${c.member_shops} ${plural(c.member_shops, 'prodavnici', 'prodavnice', 'prodavnica')}`;
     lines.push(
