@@ -12,6 +12,8 @@
  *
  *   node kp-agent.mjs            one run (schedule it twice a day)
  *   node kp-agent.mjs --uzorak   saves two search pages and one ad in ./kp-uzorak (for development)
+ *   node kp-agent.mjs --sve      reads every search page (about 25 minutes) and saves the ads in
+ *                                ./kp-uzorak/kp-oglasi.jsonl, one per line, for a trial report
  *
  * Polite on purpose (KP's rule: slowly, or "are you human" stops you): one request at a time, 6–10 s
  * apart (the server sets the pause), our real name in User-Agent, robots.txt respected, and the run
@@ -140,5 +142,49 @@ async function run() {
   }
 }
 
+// ---- every page, saved for a trial report (no server needed) ----
+const KEEP = [
+  'id', 'name', 'descriptionSnippetDecoded', 'type', 'conditionId', 'condition', 'location', 'adUrl', 'priceNumber',
+  'currencyAcronym', 'priceText', 'isExchange', 'image', 'smallImage', 'postedRaw', 'categoryId', 'groupId',
+];
+function pageData(html) {
+  const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!m) return null;
+  const st = JSON.parse(m[1])?.props?.initialReduxState;
+  const nav = st?.adNavigation;
+  const bot = st?.antiBot ?? {};
+  const check = Object.keys(bot.antiBotHumanCheck ?? {}).length || Object.keys(bot.areYouHumanError ?? {}).length || bot.captchaSiteKey;
+  if (!nav || check) return null;
+  return { page: nav.page, pages: nav.pages, total: nav.total, ads: nav.adsIds.map((id) => nav.byId[id]).filter(Boolean) };
+}
+
+async function everything() {
+  const dir = join(process.cwd(), 'kp-uzorak');
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, 'kp-oglasi.jsonl');
+  const seen = new Set();
+  const lines = [];
+  let pages = 1;
+  for (let page = 1; page <= pages; page++) {
+    if (page > 1) await sleep(6000 + Math.random() * 4000);
+    const r = await getKp(page === 1 ? FIRST_PAGE : `${FIRST_PAGE}&page=${page}`);
+    const data = r.status === 200 ? pageData(r.html) : null;
+    if (!data) {
+      log(`strana ${page}: ${r.status}${r.error ? ` (${r.error})` : ''}, nema oglasa ili traži proveru — stajem`);
+      break;
+    }
+    pages = data.pages;
+    for (const a of data.ads) {
+      if (seen.has(a.id)) continue; // promoted ads show up on several pages
+      seen.add(a.id);
+      lines.push(JSON.stringify(Object.fromEntries(KEEP.map((k) => [k, a[k]]))));
+    }
+    writeFileSync(file, `${lines.join('\n')}\n`);
+    if (page === 1 || page % 10 === 0 || page === pages) log(`strana ${page}/${pages}, ${seen.size} oglasa`);
+  }
+  log(`Gotovo: ${seen.size} oglasa u ${file}`);
+}
+
 if (process.argv.includes('--uzorak')) await samples();
+else if (process.argv.includes('--sve')) await everything();
 else await run();
