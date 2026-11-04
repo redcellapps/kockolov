@@ -77,9 +77,60 @@ describe('KP ads that are one set we can show', () => {
     expect(decide('LEGO promo set 75192', '10 €')).toEqual({ kind: 'skip', why: 'promo' });
     expect(decide('LEGO 75192 Millennium Falcon', '700 €', '', 'osteceno')).toEqual({ kind: 'skip', why: 'damaged' });
     expect(decide('LEGO 75192 Millennium Falcon', 'Kontakt')).toMatchObject({ kind: 'skip', why: 'no_price' });
-    expect(decide('LEGO setovi razni', '20 €')).toEqual({ kind: 'skip', why: 'no_number' });
+    expect(decide('LEGO kocke razne boje', '20 €')).toEqual({ kind: 'skip', why: 'no_number' });
+    expect(decide('LEGO setovi razni', '20 €')).toEqual({ kind: 'skip', why: 'multi' });
     // a LEGO Mixels set is not a "mix" of bricks
     expect(decide('LEGO Mixels 10294', '5 €').kind).not.toBe('skip');
+  });
+
+  it('does not take years, piece counts, prices or model names for set numbers (seen on KP, Nov 2026)', () => {
+    const more: Record<string, KnownSet> = {
+      ...SETS,
+      '42141': { names: ['McLaren Formula 1 Team'], theme: 'technic', rrp: 24999 },
+      '2022': { names: ['Some 2022 set'], theme: null, rrp: null },
+      '2024': { names: ['Duck Rattle'], theme: 'duplo', rrp: null },
+      '42130': { names: ['BMW M 1000 RR'], theme: 'technic', rrp: 26999 },
+      '1000': { names: ['Basic Building Set'], theme: null, rrp: null },
+      '1500': { names: ['Old thing'], theme: null, rrp: null },
+      '3929': { names: ['Old set'], theme: null, rrp: null },
+      '42055': { names: ['Bucket Wheel Excavator'], theme: 'technic', rrp: null },
+    };
+    const c = { known: (n: string) => more[n] ?? null, eurRate: 117.2 };
+    const k = (title: string, price: string, snippet = '') => classifyAd(ad(title, price, snippet), c);
+    expect(k('LEGO Technic: 42141 McLaren Formula 1 Team 2022', '25.599 din')).toMatchObject({ kind: 'show', setNum: '42141' });
+    expect(k('Lego Christmas 2024 Bundle - Lego Christmas Tree', '99 €')).toMatchObject({ kind: 'skip', why: 'no_number' });
+    expect(k('Lego City staze na prodaju (1500 obe)', '1.500 din')).toMatchObject({ kind: 'skip', why: 'no_number' });
+    expect(k('Lego Technic 42055 Bucket Wheel Excavator Building Kit (3929', '557 €')).toMatchObject({ kind: 'show', setNum: '42055' });
+    expect(k('LEGO Technic BMW M 1000 RR', '230 €', 'Article No. 42130 Manufacturer LEGO')).toMatchObject({ kind: 'show', setNum: '42130' });
+    // LEGO's own descriptions call a model a "replika"; a real Mario expansion is "kompatibilan" with the starter set
+    expect(k('LEGO 42141 McLaren', '200 €', 'detaljnu LEGO repliku bolida')).toMatchObject({ kind: 'show' });
+    expect(k('LEGO 42141 McLaren', '200 €', 'Kompatibilan sa početnim setom')).toMatchObject({ kind: 'show' });
+    expect(k('LEGO 42141 McLaren', '50 €', 'vrlo kvalitetna kopija, identična')).toMatchObject({ kind: 'skip', why: 'not_lego' });
+  });
+
+  it('reads set numbers the way KP sellers write them (Nov 2026)', () => {
+    const more: Record<string, KnownSet> = {
+      ...SETS,
+      '21320': { names: ['Dinosaur Fossils'], theme: 'ideas', rrp: null },
+      '76457': { names: ["Hogsmeade Village – Collectors' Edition"], theme: 'harry-potter', rrp: 43999 },
+      '1470': { names: ['Old thing'], theme: null, rrp: null },
+      '42218': { names: ['John Deere 9700 Forage Harvester'], theme: 'technic', rrp: 12999 },
+      '71374': { names: ['Nintendo Entertainment System'], theme: 'super-mario', rrp: null },
+      '10713': { names: ['Creative Suitcase'], theme: 'classic', rrp: null },
+      '60500': { names: ['Kombi'], theme: 'city', rrp: 3999 },
+      '10283': { names: ['NASA Space Shuttle Discovery'], theme: 'icons', rrp: 21999 },
+    };
+    const c = { known: (n: string) => more[n] ?? null, eurRate: 117.2 };
+    const k = (title: string, price: string) => classifyAd(ad(title, price), c);
+    expect(k('LEgo Ideas 21320 Dinosaur Fossils Construction Toy', '124 €')).toMatchObject({ kind: 'show', setNum: '21320' }); // not "din"
+    expect(k('LEGO Harry Potter 76457Selo Hogsmid kolekcionarsko izdanje', '43.990 din')).toMatchObject({ kind: 'show', setNum: '76457' });
+    expect(k('LEGO Technic 42218 John Deere 1470H kombajn', '12.990 din')).toMatchObject({ kind: 'show', setNum: '42218' });
+    expect(k('LEGO Super Mario Nintendo Entertainment System 71374 Komplet', '377 €')).toMatchObject({ kind: 'show', setNum: '71374' });
+    expect(k('LEGO Classic – Kreativni kofer (10713)', '1.700 din')).toMatchObject({ kind: 'show', setNum: '10713' });
+    expect(k('LEGO City 60500 policajac i kombi', '3.590 din')).toMatchObject({ kind: 'show', setNum: '60500' });
+    expect(k('LEGO NASA Space Shuttle Discovery 10283 Build and Display Model', '281 €')).toMatchObject({ kind: 'show', setNum: '10283' });
+    expect(k('Akrilna vitrina za LEGO 10283', '60 €')).toMatchObject({ kind: 'skip', why: 'not_a_set' });
+    expect(k('Torba za LEGO kocke', '15 €')).toMatchObject({ kind: 'skip', why: 'not_a_set' });
   });
 
   it('skips ads with several sets', () => {
@@ -154,7 +205,7 @@ describe('KP search page', () => {
     expect(d('196749898')).toMatchObject({ kind: 'show', setNum: '4195' }); // Queen Anne's Revenge, 900 €
     expect(d('184454130')).toMatchObject({ kind: 'show', setNum: '6039' }); // "vintage Lego 1988 godina"
     expect(d('182931301')).toMatchObject({ kind: 'show', setNum: '75954' });
-    expect(d('192307608')).toMatchObject({ kind: 'skip', why: 'no_number' }); // "Veliki izbor setova", 23 €
+    expect(d('192307608')).toMatchObject({ kind: 'skip', why: 'multi' }); // "Veliki izbor setova", 23 €
     expect(d('196887395')).toMatchObject({ kind: 'skip', why: 'bulk' }); // 11 kg of bricks
     expect(d('192020580')).toMatchObject({ kind: 'skip', why: 'not_a_set' }); // minifigure series 1/4/5/6
     const titled = (re: RegExp) => ads.find((a) => re.test(a.title))!.id;

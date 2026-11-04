@@ -75,8 +75,20 @@ export interface KpPrice {
 // ---- words (normalized: lowercase, no diacritics) ----
 
 const WANTED = ['kupujem', 'trazim', 'menjam', 'zamena', 'potrebn'];
-/** in the title: anything that says copy; in the description only the clear ones ("bez replika" is a good sign) */
-const NOT_LEGO_TEXT = ['kompatibil', 'compatible', 'lepin', 'tipa lego', 'kao lego', 'nije original', 'nisu original', 'lego like'];
+/**
+ * In the title: anything that says copy. In the description only clear phrases: a real Mario
+ * expansion set is "kompatibilan" with the starter set, and "bez replika" is a good sign.
+ */
+const NOT_LEGO_TEXT = [
+  'kompatibil sa lego', 'kompatibilan sa lego', 'kompatibilna sa lego', 'kompatibilne sa lego', 'kompatibilni sa lego',
+  'kompatibilno sa lego', 'kompatibilan sa orig', 'kompatibilni sa orig', 'compatible with lego', 'lego compatible',
+  'lego kompatibil', 'tipa lego', 'kao lego', 'slicno lego', 'lepin', 'nije original', 'nisu original', 'kopij',
+  'lego like',
+];
+// ("replika" is LEGO's own word in descriptions: "detaljna LEGO replika kacige")
+const NEGATED = /\b(bez|nije|nisu|nema)\s+(replik|kopij)\w*/g;
+/** several sets offered together, said in words */
+const MULTI_WORDS = ['setovi', 'setova', 'kolekcij', 'set of', 'oba ', 'dva seta', 'tri seta', 'preostal'];
 const NOT_LEGO = [
   'compatible',
   'kompatibil', 'lepin', 'sluban', 'cobi', 'mega bloks', 'megabloks', 'tipa lego', 'kao lego', 'slicno lego',
@@ -92,13 +104,14 @@ const BULK = [
 const BULK_RE = /\d\s*(kg|kila|kilo)\b/i;
 const PROMO = ['promo', 'promotivn', 'poklon uz', 'gwp', 'reklamn'];
 const NOT_A_SET = [
-  // games and media
-  'igric', 'video igra', 'ps4', 'ps5', 'ps3', 'playstation', 'xbox', 'nintendo', 'switch', 'pc igra', 'wii', 'dvd',
+  // games and media ("Nintendo Entertainment System" 71374 is a set)
+  'igric', 'video igra', 'ps4', 'ps5', 'ps3', 'playstation', 'xbox', 'pc igra', 'wii', 'dvd',
   'blu ray', 'poster', 'nalepnic', 'stiker', 'casopis', 'magazin', 'katalog',
   // around a set, not a set
+  // ("Build and Display Model" is LEGO's own wording, a display case is not a set)
   'uputstvo za', 'uputstva za', 'samo uputstv', 'prazna kutija', 'samo kutija', 'kutija bez', 'bez kocaka', 'vitrin',
-  'stalak', 'display', 'led ', 'osvetljenj', 'rasvet', 'svetla za', 'svetlo', 'light kit', 'lightkit', 'lighting',
-  'brickbling', 'kofer za',
+  'stalak', 'display case', 'display stand', 'display box', 'case for', 'led ', 'osvetljenj', 'rasvet', 'svetla za',
+  'svetlo', 'light kit', 'lightkit', 'lighting', 'brickbling', 'briksmax', 'lightailing', 'kofer za', 'za lego', 'for lego',
 ];
 /** a single minifigure: the title starts with it */
 const MINIFIG_START = /^(lego\s+)?(mini\s*)?(figur|minifig)/;
@@ -132,7 +145,10 @@ export function setNumbersIn(text: string, isKnown: (n: string) => boolean): str
     const num = m[1];
     const after = t.slice(m.index + m[0].length, m.index + m[0].length + 14).toLowerCase();
     const before = t.slice(Math.max(0, m.index - 8), m.index).toLowerCase();
-    if (/^\s*(delova|dela|delov|komad|kom\b|kom\.|pcs|pieces|elemen|kockic|kocki|din|rsd|€|eur|evr|cm|mm|god|g\.)/.test(after)) continue;
+    // (whole words: "21320 Dinosaur Fossils" is not "din")
+    if (/^\s*(delova|dela\b|delov|dijel|komad|kom\b|kom\.|pcs\b|psc\b|pieces|elemen|kockic|kocki\b|din\b|rsd\b|€|eur\b|evr|cm\b|mm\b|god\b|god\.|godin|g\.)/i.test(after)) continue;
+    // glued to a word: fine for a modern number ("76457Selo Hogsmid"), not for a model name ("John Deere 1470H")
+    if (num.length === 4 && /^\p{L}/u.test(t.slice(m.index + m[0].length))) continue;
     if (/(€|eur|din|rsd|cena|cenu)\s*:?\s*$/.test(before)) continue;
     if (YEAR_RE.test(num) && (/^\s*\./.test(after) || /(iz|od|do|za|god\.?|godine|godina)\s*$/.test(before))) continue;
     if (num.startsWith('0') || !isKnown(num) || out.includes(num)) continue;
@@ -167,16 +183,31 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
   const nTitle = normalizeText(title);
 
   if ((ad.type && ad.type !== 'sell') || WANTED.some((w) => nTitle.startsWith(w))) return { kind: 'skip', why: 'wanted' };
-  if (hasWord(title, NOT_LEGO) || hasWord(ad.snippet, NOT_LEGO_TEXT)) return { kind: 'skip', why: 'not_lego' };
+  if (hasWord(title, NOT_LEGO) || hasWord(normalizeText(ad.snippet).replace(NEGATED, ' '), NOT_LEGO_TEXT)) return { kind: 'skip', why: 'not_lego' };
   if (hasWord(title, BULK) || BULK_RE.test(title)) return { kind: 'skip', why: 'bulk' };
   if (hasWord(both, PROMO)) return { kind: 'skip', why: 'promo' };
-  if (MINIFIG_START.test(nTitle) || hasWord(title, NOT_A_SET) || isMerchandise(title)) return { kind: 'skip', why: 'not_a_set' };
+  if (MINIFIG_START.test(nTitle) || hasWord(title, NOT_A_SET)) return { kind: 'skip', why: 'not_a_set' };
+  // bags, bottles, keyrings...: skipped unless the number is a real set ("Kreativni kofer 10713" is one);
+  // ("policajac" is not "polica", a shelf)
+  const merch = isMerchandise(title.replace(/polica(j|jc)/gi, 'pandur'));
   if (ad.condition === 'osteceno') return { kind: 'skip', why: 'damaged' };
 
   const isKnown = (n: string) => !!ctx.known(n);
-  const inTitle = setNumbersIn(title, isKnown);
+  // a number that looks like a year ("Formula 2004", "Božićni kalendar 2024"), a price or a quantity
+  // ("staze (1500 obe)") counts only when the title names that set; next to a modern 5–6 digit number,
+  // 4-digit ones are piece counts or model names ("42063 BMW R 1200", "42055 ... (3929")
+  const weak = (n: string) => YEAR_RE.test(n) || Number(n) < 2000;
+  const strongest = (nums: string[]) => {
+    const out = nums.filter((n) => !weak(n) || sharesName(title, ctx.known(n)!));
+    return out.some((n) => n.length >= 5) ? out.filter((n) => n.length >= 5) : out;
+  };
+  if (hasWord(title, MULTI_WORDS)) return { kind: 'skip', why: 'multi' };
+  let inTitle = strongest(setNumbersIn(title, isKnown));
   if (inTitle.length > 1) return { kind: 'skip', why: 'multi', setNums: inTitle };
-  const inText = setNumbersIn(ad.snippet, isKnown);
+  const inText = strongest(setNumbersIn(ad.snippet, isKnown));
+  // "LEGO Technic BMW M 1000 RR" + "Article No. 42130": the set number is the one in the description
+  const modern = inText.filter((n) => n.length >= 5 && sharesName(title, ctx.known(n)!));
+  if (inTitle.length === 1 && inTitle[0].length === 4 && modern.length === 1) inTitle = modern;
   let setNum: string;
   let doubt: ReviewReason | null = null;
   if (inTitle.length === 1) {
@@ -188,7 +219,7 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
   } else if (inText.length > 1) {
     return { kind: 'skip', why: 'multi', setNums: inText };
   } else {
-    return { kind: 'skip', why: 'no_number' };
+    return { kind: 'skip', why: merch ? 'not_a_set' : 'no_number' };
   }
 
   const set = ctx.known(setNum)!;
@@ -199,7 +230,7 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
   const price = ad.priceAmount && ad.currency ? { amount: ad.priceAmount, currency: ad.currency } : kpPrice(ad.priceText);
   if (!price) return { kind: 'skip', why: 'no_price', setNums: [setNum] };
   const priceRsd = toRsd(price, ctx.eurRate);
-  if (!doubt && nameConflict(title, set)) doubt = 'name';
   if (!doubt && !believablePrice(priceRsd, set)) doubt = 'price';
+  if (!doubt && nameConflict(title, set) && set.rrp && (priceRsd < set.rrp * 0.5 || priceRsd > set.rrp * 2)) doubt = 'name';
   return doubt ? { kind: 'review', setNum, priceRsd, price, why: doubt } : { kind: 'show', setNum, priceRsd, price };
 }
