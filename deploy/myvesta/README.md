@@ -242,7 +242,13 @@ shops are just counted ("+ još 4 prodavnice uz nalog").
   5. Administracija → Instagram nalog → paste → Poveži. The server finds the Page linked to Instagram and keeps the
      Page's token, which doesn't expire (it stops working only if you change the Facebook password or remove the app).
      The admin page then shows "preko Facebook stranice „Kockolov“".
-- Put `kockolov.rs` (with `?utm_source=instagram`) in the profile's bio: the captions say "link u bio-u".
+     If Facebook first asks to switch accounts ("Zamena naloga"), continue: the token is given by your own profile,
+     not the Page's. In the dialog choose "Opt in to current Pages only" / "current Businesses only" and tick only
+     Kockolov. Check before extending: query `me/accounts?fields=name,instagram_business_account{username}` in the
+     Explorer must list Kockolov with the Instagram username.
+- Put `kockolov.rs/ig` in the profile's bio, once: Instagram's API can't change the bio link, so it always points to
+  this page, which shows the newest post on top and the earlier ones below (same pictures as the profile grid), each
+  with today's price and a link to the set (visits counted as utm_source=instagram, utm_medium=bio).
 - Another time: `INSTAGRAM_CRON=0 9 * * *` in `.env`, then `docker compose up -d worker`; empty turns it off.
 
 ## Updating

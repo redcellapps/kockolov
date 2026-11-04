@@ -255,6 +255,15 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
   if (p === '/privatnost') {
     return { ...DEFAULT, path: p, canonical: p, title: `Politika privatnosti | ${SITE}`, description: 'Koje podatke Kockolov čuva, zašto i kako da ostvariš svoja prava.' };
   }
+  if (p === '/ig') {
+    return {
+      ...DEFAULT,
+      path: p,
+      canonical: p,
+      title: `Set dana sa Instagrama | ${SITE}`,
+      description: 'Svakog jutra jedan LEGO set po najboljoj ceni u srpskim prodavnicama. Svi setovi sa Kockolovog Instagrama, sa današnjim cenama.',
+    };
+  }
   if (p === '/brisanje-naloga') {
     return { ...DEFAULT, path: p, canonical: p, title: `Brisanje naloga | ${SITE}`, description: 'Kako da obrišeš nalog na Kockolovu (sajt i aplikacija) i šta se tada briše.' };
   }

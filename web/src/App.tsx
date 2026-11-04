@@ -8,6 +8,7 @@ import AdminPage from './pages/Admin';
 import AdminOffersPage from './pages/AdminOffers';
 import { BlogListPage, BlogPostPage } from './pages/Blog';
 import Home from './pages/Home';
+import InstagramPage from './pages/Instagram';
 import InvitePage from './pages/Invite';
 import LoginPage from './pages/Login';
 import { DealsPage, NotFoundPage, ThemesPage, WatchlistPage } from './pages/Other';
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/odjava/:token" element={<UnsubscribePage />} />
         <Route path="/privatnost" element={<PrivacyPage />} />
         <Route path="/brisanje-naloga" element={<DeleteAccountPage />} />
+        <Route path="/ig" element={<Gate><InstagramPage /></Gate>} />
         <Route path="/blog" element={<Gate><BlogListPage /></Gate>} />
         <Route path="/blog/:slug" element={<Gate><BlogPostPage /></Gate>} />
         <Route path="/" element={<Gate><Home /></Gate>} />

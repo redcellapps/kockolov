@@ -5,8 +5,10 @@ import { cached, firstPicture, renderCollectionCard, renderInstagramCard, render
 import { keyPart, sendCard, setCardFor } from '../../seo/cards.js';
 import { loadCollection, loadSet, version } from '../../seo/pages.js';
 import { listPosts } from '../../blog/posts.js';
-import { getPost } from '../../social/instagram.js';
+import { getAccount, getPost, postedFeed } from '../../social/instagram.js';
+import sharp from 'sharp';
 
+const IG_THUMB_WIDTH = 540;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const site = () => config.APP_URL.replace(/\/$/, '');
 
@@ -75,14 +77,45 @@ export async function publicRoutes(app: FastifyInstance) {
   });
 
   // ---- the Instagram "set dana" picture (1080×1350), drawn from what the post froze; Instagram itself
-  // fetches it from here when the worker publishes ----
-  app.get<{ Params: { file: string } }>('/og/ig/:file', async (req, reply) => {
+  // fetches it from here when the worker publishes. ?w=540 is the smaller copy for the grid on /ig. ----
+  app.get<{ Params: { file: string }; Querystring: { w?: string } }>('/og/ig/:file', async (req, reply) => {
     const id = Number(jpgName(req.params.file));
+    const w = req.query.w === undefined ? null : Number(req.query.w);
+    if (w !== null && w !== IG_THUMB_WIDTH) return reply.code(404).send('');
     const p = Number.isSafeInteger(id) && id > 0 ? await getPost(id) : null;
     if (!p) return reply.code(404).send('');
-    const prefix = `ig-${id}-`;
-    const buf = await cached(`${prefix}${version(p.card)}`, () => renderInstagramCard(p.card), prefix);
+    const v = version(p.card);
+    const full = () => cached(`ig-${id}-${v}`, () => renderInstagramCard(p.card), `ig-${id}-`);
+    const buf = w
+      ? await cached(`igs-${id}-${w}-${v}`, async () => sharp(await full()).resize(w).jpeg({ quality: 82, mozjpeg: true }).toBuffer(), `igs-${id}-${w}-`)
+      : await full();
     return reply.type('image/jpeg').header('Cache-Control', 'public, max-age=86400').send(buf);
+  });
+
+  // ---- the page behind the link in the Instagram bio (/ig): every set that was posted, newest first,
+  // with its price today (the post shows the price of its own morning) ----
+  app.get('/api/instagram', async () => {
+    const [items, account] = await Promise.all([postedFeed(24), getAccount()]);
+    return {
+      username: account?.username || null,
+      items: items.map((p) => {
+        const v = version(p.card);
+        return {
+          id: p.id,
+          day: p.day,
+          set_num: p.set_num,
+          name: p.name,
+          theme_name: p.theme_name,
+          image: `/og/ig/${p.id}.jpg?v=${v}`,
+          thumb: `/og/ig/${p.id}.jpg?w=${IG_THUMB_WIDTH}&v=${v}`,
+          permalink: p.permalink,
+          post_price: p.card.bestPrice,
+          best_price: p.best_price,
+          best_shop: p.best_shop,
+          best_seller: p.best_seller,
+        };
+      }),
+    };
   });
 
   // ---- product pictures, squared on white and shrunk (the TV app's WebGL textures need a same-origin

@@ -1,9 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { t } from '../../i18n';
 import { api } from '../../lib/api';
 import { ago } from '../../lib/format';
+import { SITE_URL } from '../../lib/site';
 import { Button, Spinner, buttonClasses, cx } from '../ui';
+
+/** what goes in the Instagram bio, once: the page /ig changes behind it */
+const BIO_LINK = `${SITE_URL.replace(/^https?:\/\//, '')}/ig`;
 
 type Status = 'ready' | 'publishing' | 'published' | 'posted_by_hand' | 'failed' | 'skipped';
 
@@ -191,6 +196,14 @@ export function Instagram() {
       )}
 
       <h3 className="mb-2 text-base font-extrabold">{t('admin.ig.account')}</h3>
+      <p className="mb-3 max-w-3xl text-sm text-ink-3">
+        {t('admin.ig.bio')}{' '}
+        <Link to="/ig" className="font-bold text-ink underline decoration-brand decoration-2 underline-offset-2">
+          {BIO_LINK}
+        </Link>
+        .{' '}
+        {t('admin.ig.bio.text')}
+      </p>
       {acc ? (
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <span className="text-sm text-ink-2">
