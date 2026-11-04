@@ -14,7 +14,7 @@ interface Row {
   best?: boolean;
 }
 
-/** Best offer, the next cheapest one and the LEGO Store price, for the comparison bars. */
+/** Best offer, the next cheapest one and the LEGO Store's regular price, for the comparison bars. */
 function comparisonRows(d: Deal): Row[] {
   const rows: Row[] = [];
   if (d.best_shop) rows.push({ key: 'best', shop: d.best_shop, label: shopLabel(d.best_shop, d.best_seller), price: d.best_price_rsd, best: true });

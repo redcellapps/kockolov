@@ -250,7 +250,7 @@ export async function renderSetCard(c: SetCard, alternatives: string[] = []): Pr
                 'div',
                 { fontSize: 28, fontWeight: 500, color: C.muted, gap: 8 },
                 h('span', { textDecoration: 'line-through' }, rsd(c.refPrice)),
-                h('span', {}, 'u LEGO® Store-u'),
+                h('span', {}, 'redovna cena u LEGO® Store-u'),
               ),
             )
           : c.shopLabel
@@ -397,7 +397,7 @@ export async function renderInstagramCard(c: InstagramCard): Promise<Buffer> {
                   'div',
                   { fontSize: 26, fontWeight: 500, color: C.muted, gap: 8 },
                   h('span', { textDecoration: 'line-through' }, rsd(c.refPrice)),
-                  h('span', {}, 'LEGO® Store'),
+                  h('span', {}, 'redovna u LEGO® Store-u'),
                 )
               : null,
             c.moreShops > 0

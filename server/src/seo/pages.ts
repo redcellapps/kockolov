@@ -145,7 +145,7 @@ export async function loadCollection(kind: 'home' | 'deals' | 'theme', slug?: st
     return {
       title: 'LEGO ponude dana',
       subtitle: st.max_pct
-        ? `${count(st.deals, 'najisplativija kupovina', 'najisplativije kupovine', 'najisplativijih kupovina')} danas, do${NB}−${st.max_pct}% u odnosu na LEGO® Store.`
+        ? `${count(st.deals, 'najisplativija kupovina', 'najisplativije kupovine', 'najisplativijih kupovina')} danas, do${NB}−${st.max_pct}% u odnosu na redovnu cenu u LEGO® Store-u.`
         : 'Najisplativije LEGO kupovine u srpskim prodavnicama, svakog jutra.',
       items,
     };
@@ -212,7 +212,7 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
       canonical: p,
       title: day ? `LEGO ponude dana, ${day} | ${SITE}` : `LEGO ponude dana | ${SITE}`,
       description: st.max_pct
-        ? `Najisplativije LEGO kupovine danas u srpskim prodavnicama: ${st.deals} ponuda, do −${st.max_pct}% u odnosu na LEGO Store. Lista se osvežava svakog jutra.`
+        ? `Najisplativije LEGO kupovine danas u srpskim prodavnicama: ${st.deals} ponuda, do −${st.max_pct}% u odnosu na redovnu cenu u LEGO Store-u. Lista se osvežava svakog jutra.`
         : 'Najisplativije LEGO kupovine u srpskim prodavnicama. Lista se osvežava svakog jutra.',
       image: { url: `/og/deals.jpg?v=${version(st.deals, st.max_pct, items[0]?.best_price)}`, alt: 'LEGO ponude dana na Kockolovu' },
       body: await dealsBody(),
@@ -364,7 +364,7 @@ async function setPage(setNum: string): Promise<PageMeta> {
   const title = s.best_price ? `${label} – od ${rsd(s.best_price)} | ${SITE}` : `${label}: cena i dostupnost | ${SITE}`;
   const description = s.best_price
     ? `Uporedi cene za LEGO ${theme}${s.set_num} ${s.name}. Najjeftinije danas: ${rsd(s.best_price)} (${shop})` +
-      (pct >= 3 ? `, ${pct}% manje nego u LEGO Store-u.` : '.') +
+      (pct >= 3 ? `, ${pct}% ispod redovne cene u LEGO Store-u.` : '.') +
       ` Cene iz ${fromShops(Math.max(s.shops_in_stock, 1)).replace(NB, ' ')} i istorija cena.`
     : `LEGO ${theme}${s.set_num} ${s.name} trenutno nije na stanju u srpskim prodavnicama. Prati set na Kockolovu i saznaj kad se pojavi i po kojoj ceni.`;
 

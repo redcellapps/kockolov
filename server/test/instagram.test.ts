@@ -21,12 +21,12 @@ const base: Candidate = {
 };
 
 describe('Instagram "set dana" caption', () => {
-  it('leads with a real discount and names price, shop and the LEGO Store price', () => {
+  it("leads with a real discount and names price, shop and the LEGO Store's regular price", () => {
     const c = buildCaption(base, '2026-10-29');
-    expect(c.split('\n')[0]).toBe('26% jeftinije nego u LEGO® Store-u 🔥');
+    expect(c.split('\n')[0]).toBe('26% jeftinije od redovne cene u LEGO® Store-u 🔥');
     expect(c).toContain('🧱 LEGO® Botanicals Crvenolisni japanski bonsai javor (10348)');
     expect(c).toContain('💰 Najniža cena 29. oktobra: 5.752 RSD, Kockarium');
-    expect(c).toContain('🏷️ U LEGO® Store-u: 7.799 RSD');
+    expect(c).toContain('🏷️ Redovna cena u LEGO® Store-u: 7.799 RSD');
     expect(c).toContain('🔎 Ima ga i u još 12 prodavnica. Njihove cene vidiš uz besplatan nalog.');
     expect(c).toContain('kockolov.rs/set/10348');
     expect(c.split('\n').at(-1)).toBe('#lego #legosrbija #legobotanicals #lego10348 #legoakcija #kockolov');
@@ -44,6 +44,12 @@ describe('Instagram "set dana" caption', () => {
     expect(c).toContain('7.799 RSD, LEGO® Store');
     expect(c).not.toContain('🏷️');
     expect(c).toContain('#legostarwars');
+  });
+  it("calls the LEGO Store's own discount a LEGO Store sale, with the regular price under it", () => {
+    const c = buildCaption({ ...base, best_shop: 'lstore', best_price: 5459 }, '2026-11-04');
+    expect(c.split('\n')[0]).toBe('Akcija u LEGO® Store-u: −30% 🔥');
+    expect(c).toContain('💰 Najniža cena 4. novembra: 5.459 RSD, LEGO® Store');
+    expect(c).toContain('🏷️ Redovna cena u LEGO® Store-u: 7.799 RSD');
   });
   it('fits Instagram: under 2,200 characters and 30 hashtags', () => {
     const c = buildCaption({ ...base, name: 'x'.repeat(300) }, '2026-12-31');

@@ -32,6 +32,22 @@ describe('deal scoring', () => {
       scoreSet({ set_num: 'x', rrp_rsd: 20000, low90: null, history_days: null }, [offer(1, 'ananas', 1500, 'Shop'), offer(2, 'lstore', 20000)]),
     ).toBeNull();
   });
+  it("counts the LEGO Store's own sale against its regular price, like any other shop's discount", () => {
+    // LEGO Store: 13.799 regular, 9.659 on sale; the reference is the regular price (see refresh.ts)
+    const d = scoreSet({ set_num: 'x', rrp_rsd: 13799, low90: null, history_days: null }, [
+      offer(1, 'lstore', 9659, '', 13799),
+      offer(2, 'kockarium', 11999),
+    ])!;
+    expect(d.bestOfferId).toBe(1);
+    expect(d.referencePrice).toBe(13799);
+    expect(d.reasons.find((r) => r.type === 'vs_rrp')).toEqual({ type: 'vs_rrp', pct: 30, amount: 4140, sale: true });
+    // another shop below the regular price: an ordinary discount, not the LEGO Store's sale
+    const other = scoreSet({ set_num: 'x', rrp_rsd: 13799, low90: null, history_days: null }, [
+      offer(1, 'lstore', 12499, '', 13799),
+      offer(2, 'kockarium', 10999),
+    ])!;
+    expect(other.reasons.find((r) => r.type === 'vs_rrp')).toEqual({ type: 'vs_rrp', pct: 20, amount: 2800 });
+  });
   it('flags a new lowest price once there is enough history', () => {
     const d = scoreSet({ set_num: 'x', rrp_rsd: 10000, low90: 8500, history_days: 30 }, [offer(1, 'kockarium', 8000), offer(2, 'lstore', 10000)])!;
     expect(d.reasons.some((r) => r.type === 'new_low')).toBe(true);

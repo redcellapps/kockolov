@@ -9,6 +9,8 @@ interface OfferRow {
   title: string;
   image_url: string | null;
   price_rsd: number;
+  /** the shop's "old price" when the offer is on sale */
+  regular_price_rsd: number | null;
   in_stock: boolean;
   theme_raw: string[];
   age_min: number | null;
@@ -88,9 +90,11 @@ export function deriveSet(set: SetRow, offers: OfferRow[]): Partial<SetRow> {
   const img = byShop(offers.filter((o) => o.image_url), IMAGE_ORDER)[0]?.image_url ?? null;
   if (img && img !== set.image_url) out.image_url = img;
 
-  // Reference price = LEGO Store price (even when out of stock there)
+  // Reference price = the LEGO Store's regular price (even when out of stock there). During a LEGO Store
+  // sale that is the price before the sale, not the sale price: the sale then counts as a discount like any
+  // other shop's, and the other shops' discounts are still measured from the real retail price.
   const lstore = offers.filter((o) => o.shop_id === 'lstore').sort((a, b) => Number(b.in_stock) - Number(a.in_stock))[0];
-  const rrp = lstore?.price_rsd ?? null;
+  const rrp = lstore ? Math.max(lstore.price_rsd, lstore.regular_price_rsd ?? 0) : null;
   if (rrp !== set.rrp_rsd) out.rrp_rsd = rrp;
 
   // Age: lowest stated
@@ -120,7 +124,7 @@ export async function refreshSets(log: (m: string) => void = console.log): Promi
     'SELECT set_num, name, name_en, theme_slug, theme_locked, image_url, age_min, rrp_rsd, search_text FROM sets',
   );
   const offers = await query<OfferRow>(
-    `SELECT set_num, shop_id, title, image_url, price_rsd, in_stock, theme_raw, age_min
+    `SELECT set_num, shop_id, title, image_url, price_rsd, regular_price_rsd, in_stock, theme_raw, age_min
        FROM offers WHERE active AND set_num IS NOT NULL`,
   );
   const bySet = new Map<string, OfferRow[]>();

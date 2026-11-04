@@ -161,7 +161,8 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
   it('returns a set page with all offers and history', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/sets/10280', headers: { cookie } });
     const body = r.json();
-    expect(body.set).toMatchObject({ set_num: '10280', name: 'Buket cveća', theme_name: 'Botanicals', rrp_rsd: 8999 });
+    // the LEGO Store sells it for 8.999 on sale (regular 9.999): the reference is the regular price
+    expect(body.set).toMatchObject({ set_num: '10280', name: 'Buket cveća', theme_name: 'Botanicals', rrp_rsd: 9999 });
     expect(body.offers.map((o: { shop_id: string }) => o.shop_id)).toEqual(['ananas', 'lstore']);
     expect(body.history.length).toBe(2);
     expect(body.deal.reasons[0]).toMatchObject({ type: 'vs_rrp' });

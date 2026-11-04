@@ -95,7 +95,7 @@ export async function setBody(s: SetSeo): Promise<string> {
   const saving = s.best_price && s.rrp_rsd && s.rrp_rsd > s.best_price ? s.rrp_rsd - s.best_price : 0;
   const summary = s.best_price
     ? `<p>Najniža cena: ${price(s.best_price)}${s.shops_in_stock ? `, ponude iz ${s.shops_in_stock}${NB}${plural(s.shops_in_stock, 'prodavnice', 'prodavnice', 'prodavnica')}` : ''}.` +
-      (saving ? ` Cena u LEGO Store-u: ${price(s.rrp_rsd)}, ušteda ${price(saving)}.` : '') +
+      (saving ? ` Redovna cena u LEGO Store-u: ${price(s.rrp_rsd)}, ušteda ${price(saving)}.` : '') +
       `</p>`
     : `<p>Set trenutno nije na stanju u prodavnicama koje pratimo.</p>`;
   const table = offers.length
