@@ -30,7 +30,9 @@ function Thread({ c }: { c: Conversation }) {
     if (q.isSuccess && c.unread) void actions.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q.isSuccess, c.id]);
-  useEffect(() => end.current?.scrollIntoView({ block: 'end' }), [msgs.length]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: 'end' });
+  }, [msgs.length]);
 
   async function send() {
     const v = text.trim();
