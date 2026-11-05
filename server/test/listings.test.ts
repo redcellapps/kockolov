@@ -89,7 +89,7 @@ describe.skipIf(!dbAvailable)('Oglasi: ads, pictures, following, messages, moder
     expect(json((await app.inject({ method: 'GET', url: '/api/auth/me', headers: as('alice') }))).listings).toBe(true);
   });
 
-  it('turns any photo into a uniform 1200×900 JPEG with the stamp, and needs a phone to post', async () => {
+  it('turns any photo into a uniform 1200×900 JPEG with the stamp, and accepts a valid phone', async () => {
     const bad = await upload('alice', Buffer.from('not a picture'));
     expect(bad.statusCode).toBe(400);
     const r = await upload('alice', await png(600, 900)); // portrait
@@ -104,9 +104,6 @@ describe.skipIf(!dbAvailable)('Oglasi: ads, pictures, following, messages, moder
     expect((await px(600, 450))[0]).toBeGreaterThan(150); // red photo in the middle
     expect((await px(1100, 860))[0]).toBeLessThan(120); // stamp pill, dark
 
-    const noPhone = await app.inject({ method: 'POST', url: '/api/oglasi', headers: as('alice'), payload: ad([imgId]) });
-    expect(noPhone.statusCode).toBe(400);
-    expect(json(noPhone).code).toBe('phone_required');
     expect((await app.inject({ method: 'PATCH', url: '/api/me', headers: as('alice'), payload: { phone: 'abc' } })).statusCode).toBe(400);
     expect((await app.inject({ method: 'PATCH', url: '/api/me', headers: as('alice'), payload: { phone: '+381 63 805 2042' } })).statusCode).toBe(200);
   });
@@ -124,6 +121,17 @@ describe.skipIf(!dbAvailable)('Oglasi: ads, pictures, following, messages, moder
     adId = json(ok).id;
     expect((await post(ad([imgId]))).statusCode).toBe(400); // already attached to the first ad
     await query('DELETE FROM listing_images WHERE user_id = (SELECT id FROM users WHERE email = $1)', ['bob@example.com']);
+  });
+
+  it('lets a seller post without a phone: buyers then only get the messages', async () => {
+    const pic = json(await upload('bob', await png(800, 600))).id;
+    const posted = await app.inject({ method: 'POST', url: '/api/oglasi', headers: as('bob'), payload: ad([pic]) });
+    expect(posted.statusCode).toBe(200);
+    const id = json(posted).id;
+    const detail = json(await app.inject({ method: 'GET', url: `/api/oglasi/${id}`, headers: as('alice') }));
+    expect(detail.has_phone).toBe(false);
+    expect((await app.inject({ method: 'GET', url: `/api/oglasi/${id}/telefon`, headers: as('alice') })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'DELETE', url: `/api/oglasi/${id}`, headers: as('bob') })).statusCode).toBe(200);
   });
 
   it('lists active ads without the seller\'s phone, and gives the phone only on request', async () => {

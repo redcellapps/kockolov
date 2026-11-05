@@ -49,6 +49,7 @@ function ListingForm({ edit }: { edit?: Listing }) {
   const [negotiable, setNegotiable] = useState(edit?.negotiable ?? true);
   const [city, setCity] = useState(edit?.city ?? '');
   const [phone, setPh] = useState(savedPhone);
+  const [hidePhone, setHidePhone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const [sugg, setSugg] = useState<{ num: string; name: string; theme: string }[]>([]);
@@ -142,13 +143,14 @@ function ListingForm({ edit }: { edit?: Listing }) {
 
   async function publish() {
     const p = Number(price);
-    const e = !(p > 0) ? t('ads.new.errPrice') : !city.trim() ? t('ads.new.errCity') : phone.replace(/\D/g, '').length < 8 ? t('ads.new.errPhone') : null;
+    const e = !(p > 0) ? t('ads.new.errPrice') : !city.trim() ? t('ads.new.errCity') : !hidePhone && phone.trim() && phone.replace(/\D/g, '').length < 8 ? t('ads.new.errPhone') : null;
     setErr(e);
     if (e || saving) return;
     setSaving(true);
     try {
       // the phone lives on the account, so it is saved first when it changed
-      if (phone.trim() !== savedPhone) await profile.mutateAsync({ phone: phone.trim() });
+      const wanted = hidePhone ? '' : phone.trim();
+      if (wanted !== savedPhone) await profile.mutateAsync({ phone: wanted });
       const form: AdForm = {
         title: title.trim(),
         description: desc.trim(),
@@ -327,8 +329,9 @@ function ListingForm({ edit }: { edit?: Listing }) {
             </div>
             <Field label={t('ads.new.cityLabel')} value={city} onChange={(e) => setCity(e.target.value)} autoComplete="address-level2" />
             <div>
-              <Field label={t('ads.new.phoneLabel')} value={phone} onChange={(e) => setPh(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="+381 6x xxx xxxx" />
-              <p className="mt-1.5 text-xs text-ink-3">{savedPhone ? t('ads.new.phoneHint') : `${t('ads.new.phoneNeeded')} ${t('ads.new.phoneHint')}`}</p>
+              <Field label={t('ads.new.phoneLabel')} value={hidePhone ? '' : phone} disabled={hidePhone} onChange={(e) => setPh(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="+381 6x xxx xxxx" />
+              <p className="mt-1.5 text-xs text-ink-3">{t('ads.new.phoneHint')}</p>
+              <label className="mt-3 flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={hidePhone} onChange={(e) => setHidePhone(e.target.checked)} /> {t('ads.new.phoneHidden')}</label>
             </div>
             <p className="text-xs text-ink-3">{t('ads.new.rules')} <Link to="/uslovi" className="font-semibold underline">{t('ads.new.rulesLink')}</Link></p>
           </>

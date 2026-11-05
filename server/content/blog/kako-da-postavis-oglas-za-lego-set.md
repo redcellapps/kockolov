@@ -15,7 +15,7 @@ Primer: prodajem LEGO Botanicals 10328 Buket ruža, korišćen, sa kutijom i upu
 
 ## Pre nego što počneš
 
-Treba ti Kockolov nalog i broj telefona u profilu. Telefon kupac ne vidi odmah, već tek kad klikne „Prikaži telefon“. Fizička lica na Kockolovu prodaju samo korišćene proizvode, i samo LEGO®, bez falsifikata.
+Treba ti samo Kockolov nalog. Telefon nije obavezan: ako ga uneseš, kupac ga ne vidi odmah, već tek kad klikne „Prikaži telefon“, a ako ne želiš da ga ostaviš, kupci te kontaktiraju porukama na sajtu. Fizička lica na Kockolovu prodaju samo korišćene proizvode, i samo LEGO®, bez falsifikata.
 
 Nemaš nalog? [Napravi ga ovde](/registracija).
 
@@ -45,7 +45,7 @@ Idealna fotografija je vodoravna, 1200 × 900 piksela (odnos 4:3). Svaku sliku s
 
 ## Korak 4: Cena i kontakt
 
-Upiši cenu u dinarima i označi da li si spreman da se dogovorite. Izaberi da li je preuzimanje samo lično ili šalješ i poštom, upiši grad i potvrdi telefon. Pre nego što klikneš **Objavi oglas**, pročitaj kratka pravila oglasa i [Uslove korišćenja](/uslovi).
+Upiši cenu u dinarima i označi da li si spreman da se dogovorite. Izaberi da li je preuzimanje samo lično ili šalješ i poštom, upiši grad i, ako želiš, telefon. Ne moraš da ga ostaviš: kvačicom „Ne prikazuj telefon“ kupci te kontaktiraju samo porukama na sajtu. Pre nego što klikneš **Objavi oglas**, pročitaj kratka pravila oglasa i [Uslove korišćenja](/uslovi).
 
 ![Četvrti korak: cena, dogovor, preuzimanje, grad i telefon, dugme Objavi oglas](/media/blog/oglasi-korak-4-cena.jpg)
 

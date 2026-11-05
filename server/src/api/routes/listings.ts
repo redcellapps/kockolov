@@ -136,20 +136,10 @@ export async function listingRoutes(app: FastifyInstance) {
     return { items: rows.map((l) => present(l, req.user!.id)) };
   });
 
-  // ---- writing ----
-  async function checkProfile(req: FastifyRequest, reply: FastifyReply) {
-    const u = await one<{ phone: string | null }>('SELECT phone FROM users WHERE id = $1', [req.user!.id]);
-    if (!u?.phone) {
-      reply.code(400).send({ error: 'Da bi postavio oglas, dodaj telefon u profilu.', code: 'phone_required' });
-      return false;
-    }
-    return true;
-  }
-
+  // ---- writing (a phone is optional: without one, buyers write through the site's messages) ----
   app.post('/api/oglasi', { preHandler: [gate, requireUser] }, async (req, reply) => {
     const userId = req.user!.id;
     const b = adBody.parse(req.body);
-    if (!(await checkProfile(req, reply))) return;
     if (limits.create.hit(String(userId))) return reply.code(429).send({ error: 'Danas si postavio dosta oglasa. Pokušaj sutra.' });
     const active = await one<{ n: number }>("SELECT count(*)::int AS n FROM listings WHERE user_id = $1 AND status IN ('active', 'paused')", [userId]);
     if ((active?.n ?? 0) >= MAX_ACTIVE_PER_USER) return reply.code(400).send({ error: `Najviše ${MAX_ACTIVE_PER_USER} aktivnih oglasa po nalogu.` });
@@ -179,7 +169,6 @@ export async function listingRoutes(app: FastifyInstance) {
     const l = await ownOpen(req, reply);
     if (!l) return;
     const b = adBody.parse(req.body);
-    if (!(await checkProfile(req, reply))) return;
     if (!(await ownedFreeImages(req.user!.id, b.images, l.id))) return reply.code(400).send({ error: 'Fotografije nisu ispravne. Otpremi ih ponovo.' });
     const gone = await tx(async (c) => {
       const vals = FIELDS.map((f) => (b as Record<string, unknown>)[f] ?? null);

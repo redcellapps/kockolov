@@ -12,6 +12,7 @@ export function SellerCard() {
   const { user, listings } = useAuth();
   const save = useProfileMutation();
   const [v, setV] = useState(user?.phone ?? '');
+  const [hide, setHide] = useState(false);
   const [ok, setOk] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   if (!listings || !user) return null;
@@ -24,12 +25,15 @@ export function SellerCard() {
         onSubmit={(e) => {
           e.preventDefault();
           setErr(null);
-          save.mutate({ phone: v.trim() }, { onSuccess: () => setOk(true), onError: (x) => setErr(x instanceof ApiError ? x.message : t('ads.detail.errorGeneric')) });
+          save.mutate({ phone: hide ? '' : v.trim() }, { onSuccess: () => setOk(true), onError: (x) => setErr(x instanceof ApiError ? x.message : t('ads.detail.errorGeneric')) });
         }}
       >
         <label className="block">
           <span className="mb-1.5 block text-sm font-bold text-ink-2">{t('ads.new.phoneLabel')}</span>
-          <input className={input} value={v} onChange={(e) => (setV(e.target.value), setOk(false))} inputMode="tel" autoComplete="tel" placeholder="+381 6x xxx xxxx" />
+          <input className={input} value={hide ? '' : v} disabled={hide} onChange={(e) => (setV(e.target.value), setOk(false))} inputMode="tel" autoComplete="tel" placeholder="+381 6x xxx xxxx" />
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" checked={hide} onChange={(e) => (setHide(e.target.checked), setOk(false))} /> {t('ads.new.phoneHidden')}
         </label>
         <label className="flex items-start gap-2 text-sm font-semibold">
           <input type="checkbox" className="mt-1" checked={user.msg_email_enabled ?? true} onChange={(e) => save.mutate({ msgEmailEnabled: e.target.checked })} />
