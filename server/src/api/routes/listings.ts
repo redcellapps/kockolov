@@ -214,18 +214,20 @@ export async function listingRoutes(app: FastifyInstance) {
     // putting an ad back on also gives it a fresh 30 days if its time ran out meanwhile
     await query(
       `UPDATE listings SET status = $2, updated_at = now(),
-              expires_at = CASE WHEN $2 = 'active' AND expires_at < now() + interval '1 day' THEN now() + make_interval(days => $3) ELSE expires_at END
+              expires_at = CASE WHEN $2 = 'active' AND expires_at < now() + interval '1 day' THEN now() + make_interval(days => $3) ELSE expires_at END,
+              notified_stage = CASE WHEN $2 = 'active' AND expires_at < now() + interval '1 day' THEN 0 ELSE notified_stage END,
+              expired_at = CASE WHEN $2 = 'active' THEN NULL ELSE expired_at END
         WHERE id = $1`,
       [l.id, status, AD_DAYS],
     );
     return { ok: true };
   });
 
-  /** "Obnovi": another 30 days (also for ads that expired) */
+  /** "Produži": another 30 days; an ad that already expired becomes active again (the owner has 30 days for that) */
   app.post<{ Params: { id: string } }>('/api/oglasi/:id/obnovi', { preHandler: [gate, requireUser] }, async (req, reply) => {
     const l = await ownOpen(req, reply);
     if (!l) return;
-    await query("UPDATE listings SET status = CASE WHEN status = 'sold' THEN status ELSE 'active' END, expires_at = now() + make_interval(days => $2), updated_at = now() WHERE id = $1", [l.id, AD_DAYS]);
+    await query("UPDATE listings SET status = CASE WHEN status = 'expired' THEN 'active' ELSE status END, expires_at = now() + make_interval(days => $2), notified_stage = 0, expired_at = NULL, updated_at = now() WHERE id = $1", [l.id, AD_DAYS]);
     return { ok: true };
   });
 

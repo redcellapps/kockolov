@@ -53,10 +53,14 @@ function Thread({ c }: { c: Conversation }) {
         <Avatar name={c.other} />
         <div className="min-w-0 flex-1">
           <div className="font-extrabold">{c.other}</div>
-          <Link to={`/oglasi/${c.listing_id}`} className="block truncate text-xs text-ink-3 hover:underline">{c.listing_title}</Link>
+          {c.listing_id ? (
+            <Link to={`/oglasi/${c.listing_id}`} className="block truncate text-xs text-ink-3 hover:underline">{c.listing_title}</Link>
+          ) : (
+            <span className="block truncate text-xs text-ink-3">{c.listing_title} · {t('msg.adDeleted')}</span>
+          )}
         </div>
         {c.listing_image && <img src={c.listing_image} alt="" className="hidden h-11 w-14 rounded-lg object-cover sm:block" />}
-        <div className="tabular text-sm font-extrabold">{money(c.listing_price)}</div>
+        {c.listing_price !== null && <div className="tabular text-sm font-extrabold">{money(c.listing_price)}</div>}
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-4" style={{ maxHeight: '28rem' }}>
         <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs leading-relaxed text-ink-3">{t('msg.safety')}</p>

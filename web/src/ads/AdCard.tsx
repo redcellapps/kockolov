@@ -26,7 +26,7 @@ export function AdCard({ l, footer }: { l: Listing; footer?: React.ReactNode }) 
           <AdWatchHeart l={l} className="absolute right-3 top-3" />
           {l.status !== 'active' && (
             <span className="absolute inset-0 grid place-items-center bg-ink/55 text-sm font-extrabold uppercase tracking-wide text-bg">
-              {l.status === 'sold' ? t('ads.detail.sold') : t('ads.detail.paused')}
+              {l.status === 'sold' ? t('ads.detail.sold') : l.status === 'expired' ? t('ads.mine.expired') : t('ads.detail.paused')}
             </span>
           )}
         </div>

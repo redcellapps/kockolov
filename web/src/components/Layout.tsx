@@ -192,6 +192,9 @@ function Footer() {
             <Link to="/privatnost" className="text-ink-2 hover:text-ink hover:underline">
               {t('footer.privacy')}
             </Link>
+            <Link to="/uslovi" className="text-ink-2 hover:text-ink hover:underline">
+              {t('footer.terms')}
+            </Link>
             <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink-2 hover:text-ink hover:underline">
               {t('footer.contact')}: {CONTACT_EMAIL}
             </a>

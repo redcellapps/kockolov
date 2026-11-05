@@ -257,6 +257,71 @@ describe.skipIf(!dbAvailable)('Oglasi: ads, pictures, following, messages, moder
     expect(json(await app.inject({ method: 'GET', url: '/api/oglasi', headers: as('bob') })).items).toHaveLength(1);
   });
 
+  it('reminds 7, 3 and 1 day before the end, keeps expired ads 30 days, then deletes them with a mail', async () => {
+    const { sendExpiryReminders, purgeExpiredListings } = await import('../src/listings/service.js');
+    const outbox: Sent[] = [];
+    const send = async (m: Sent) => void outbox.push(m);
+    const img2 = json(await upload('alice', await png(400, 300))).id;
+    const mk = await app.inject({ method: 'POST', url: '/api/oglasi', headers: as('alice'), payload: ad([img2], { title: 'LEGO 10328 Buket ruža' }) });
+    expect(mk.statusCode).toBe(200);
+    const id = json(mk).id;
+    await app.inject({ method: 'POST', url: `/api/oglasi/${id}/poruke`, headers: as('bob'), payload: { text: 'Da li je još tu?' } });
+    const stage = async () => (await one<{ notified_stage: number }>('SELECT notified_stage FROM listings WHERE id = $1', [id]))!.notified_stage;
+    const left = (interval: string) => query(`UPDATE listings SET expires_at = now() + interval '${interval}' WHERE id = $1`, [id]);
+
+    expect(await sendExpiryReminders(send)).toBe(0); // 30 days left: nothing to say
+    await left('6 days');
+    expect(await sendExpiryReminders(send)).toBe(1);
+    expect(await sendExpiryReminders(send)).toBe(0); // one mail per stage
+    expect(outbox[0].subject).toContain('ističe za 7 dana');
+    await left('2 days');
+    expect(await sendExpiryReminders(send)).toBe(1);
+    expect(outbox[1].subject).toContain('za 3 dana');
+    await left('10 hours');
+    expect(await sendExpiryReminders(send)).toBe(1);
+    expect(outbox[2].subject).toContain('ističe sutra');
+    expect(await stage()).toBe(3);
+
+    // extending the ad starts the reminders over
+    expect((await app.inject({ method: 'POST', url: `/api/oglasi/${id}/obnovi`, headers: as('alice') })).statusCode).toBe(200);
+    expect(await stage()).toBe(0);
+    expect((await one<{ n: number }>("SELECT count(*)::int AS n FROM listings WHERE id = $1 AND expires_at > now() + interval '29 days'", [id]))!.n).toBe(1);
+
+    // a failed e-mail is tried again on the next run
+    await left('5 days');
+    expect(await sendExpiryReminders(async () => { throw new Error('smtp'); })).toBe(0);
+    expect(await stage()).toBe(0);
+    expect(await sendExpiryReminders(send)).toBe(1);
+
+    // it runs out: the owner still sees it (expired) for 30 days and can bring it back
+    await left('-1 hour');
+    expect(await expireListings()).toBe(1);
+    const mine = json(await app.inject({ method: 'GET', url: '/api/me/oglasi', headers: as('alice') })).items.find((x: { id: string }) => x.id === id);
+    expect(mine).toMatchObject({ status: 'expired' });
+    expect(mine.delete_at).toBeTruthy();
+    expect(mine.notified_stage).toBeUndefined();
+    outbox.length = 0;
+    expect(await purgeExpiredListings(send)).toBe(0); // not yet
+    await query("UPDATE listings SET expired_at = now() - interval '29 days' WHERE id = $1", [id]);
+    expect(await purgeExpiredListings(send)).toBe(0);
+
+    // reactivated in time: the clock is cleared
+    expect((await app.inject({ method: 'POST', url: `/api/oglasi/${id}/obnovi`, headers: as('alice') })).statusCode).toBe(200);
+    expect((await one<{ expired_at: string | null }>('SELECT expired_at FROM listings WHERE id = $1', [id]))!.expired_at).toBeNull();
+
+    // untouched for 30 days: deleted with its pictures, the owner is told, the conversation stays
+    await left('-1 hour');
+    await expireListings();
+    await query("UPDATE listings SET expired_at = now() - interval '31 days' WHERE id = $1", [id]);
+    const file = (await one<{ file: string }>('SELECT file FROM listing_images WHERE id = $1', [img2]))!.file;
+    expect(await purgeExpiredListings(send)).toBe(1);
+    expect(await one('SELECT 1 FROM listings WHERE id = $1', [id])).toBeNull();
+    expect(existsSync(path.join(config.LISTINGS_DIR, file))).toBe(false);
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0].subject).toContain('je obrisan');
+    expect(await one('SELECT 1 FROM conversations WHERE listing_id IS NULL AND listing_title = $1', ['LEGO 10328 Buket ruža'])).toBeTruthy();
+  });
+
   it('makes public ads findable: head, sitemap, and noindex for the private pages', async () => {
     const { pageMeta } = await import('../src/seo/pages.js');
     const before = config.PUBLIC_MODE;
@@ -298,7 +363,10 @@ describe.skipIf(!dbAvailable)('Oglasi: ads, pictures, following, messages, moder
     expect((await app.inject({ method: 'DELETE', url: `/api/oglasi/${adId}`, headers: as('bob') })).statusCode).toBe(404);
     expect((await app.inject({ method: 'DELETE', url: `/api/oglasi/${adId}`, headers: as('alice') })).statusCode).toBe(200);
     expect(existsSync(path.join(config.LISTINGS_DIR, file))).toBe(false);
-    expect((await one('SELECT count(*)::int AS n FROM conversations'))!.n).toBe(0);
+    // the messages stay, the conversation just loses its link to the ad
+    expect(await one('SELECT id FROM conversations WHERE listing_id IS NULL AND listing_title IS NOT NULL')).toBeTruthy();
+    const kept = json(await app.inject({ method: 'GET', url: '/api/poruke', headers: as('bob') })).items.find((x: { listing_title: string }) => x.listing_title.startsWith('LEGO 75192 Millennium Falcon'));
+    expect(kept).toMatchObject({ listing_status: 'deleted' });
 
     const img = json(await upload('alice', await png(300, 300))).id;
     const f2 = (await one<{ file: string }>('SELECT file FROM listing_images WHERE id = $1', [img]))!.file;

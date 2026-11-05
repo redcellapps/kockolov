@@ -39,6 +39,8 @@ export interface Listing {
   views: number;
   /** only for the owner */
   expires_at?: string;
+  /** expired ads only: when they will be deleted unless renewed */
+  delete_at?: string;
   removed_reason?: string | null;
 }
 
@@ -53,10 +55,11 @@ export interface AdsStatus {
 
 export interface Conversation {
   id: number;
-  listing_id: number;
+  /** null once the ad was deleted: the conversation stays */
+  listing_id: number | null;
   listing_title: string;
-  listing_price: number;
-  listing_status: Listing['status'];
+  listing_price: number | null;
+  listing_status: Listing['status'] | 'deleted';
   listing_image: string | null;
   my_ad: boolean;
   other: string;
@@ -65,7 +68,7 @@ export interface Conversation {
 }
 export interface Thread {
   id: number;
-  listing_id: number;
+  listing_id: number | null;
   messages: { id: number; mine: boolean; text: string; at: string }[];
 }
 

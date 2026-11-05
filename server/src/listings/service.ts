@@ -1,10 +1,15 @@
 import { config } from '../config.js';
 import { one, pool, query, tx, type Queryable } from '../db.js';
+import { renderListingMail } from '../mail/listing.js';
 import { isImageName, removeImage } from './images.js';
 
 export const MAX_IMAGES = 8;
 export const AD_DAYS = 30;
 export const MAX_ACTIVE_PER_USER = 50;
+/** An expired ad is kept (the owner can renew it) this long, then it is deleted */
+export const EXPIRED_KEEP_DAYS = 30;
+/** Reminder e-mails: days before the end for stages 1, 2 and 3 */
+export const REMINDER_DAYS = [7, 3, 1] as const;
 
 export type Condition = 'like_new' | 'used_complete' | 'used_incomplete' | 'parts';
 
@@ -53,6 +58,8 @@ export interface ListingRow {
   created_at: string;
   updated_at: string;
   expires_at: string;
+  expired_at: string | null;
+  notified_stage: number;
   seller_name: string;
   seller_since: string;
   has_phone: boolean;
@@ -73,7 +80,7 @@ export const LISTING_SELECT = `
 
 /** What the web app gets: no user id of the seller, no e-mail, no phone */
 export function present(l: ListingRow, viewerId: number | null) {
-  const { user_id, removed_reason, expires_at, updated_at, seller_name, ...rest } = l;
+  const { user_id, removed_reason, expires_at, expired_at, notified_stage, updated_at, seller_name, ...rest } = l;
   const mine = viewerId !== null && user_id === viewerId;
   return {
     ...rest,
@@ -81,6 +88,8 @@ export function present(l: ListingRow, viewerId: number | null) {
     seller: seller_name?.trim() || 'Korisnik',
     mine,
     expires_at: mine ? expires_at : undefined,
+    /** when an expired ad will be deleted unless it is renewed (owner only) */
+    delete_at: mine && expired_at ? new Date(+new Date(expired_at) + EXPIRED_KEEP_DAYS * 86_400_000).toISOString() : undefined,
     removed_reason: mine ? removed_reason : undefined,
   };
 }
@@ -104,9 +113,73 @@ export async function filesOfUser(userId: number): Promise<string[]> {
   return (await query<{ file: string }>('SELECT file FROM listing_images WHERE user_id = $1', [userId])).map((r) => r.file);
 }
 
-/** Moves ads to "expired" once their 30 days are over; returns how many */
+/** Moves ads to "expired" once their 30 days are over (active and paused ones); returns how many */
 export async function expireListings(): Promise<number> {
-  const r = await query<{ id: number }>("UPDATE listings SET status = 'expired', updated_at = now() WHERE status = 'active' AND expires_at < now() RETURNING id");
+  const r = await query<{ id: number }>(
+    "UPDATE listings SET status = 'expired', expired_at = now(), updated_at = now() WHERE status IN ('active', 'paused') AND expires_at < now() RETURNING id",
+  );
+  return r.length;
+}
+
+/** Reminder stage for an ad with this much time left (0 = none yet) */
+export const reminderStage = (msLeft: number) => (msLeft <= 1 * 86_400_000 ? 3 : msLeft <= 3 * 86_400_000 ? 2 : msLeft <= 7 * 86_400_000 ? 1 : 0);
+
+type Mailer = (m: { to: string; subject: string; html: string; text: string }) => Promise<void>;
+
+/**
+ * E-mails the owner 7, 3 and 1 day before an ad runs out (one e-mail per stage, even if the job was late).
+ * Renewing the ad starts over (notified_stage goes back to 0). Returns how many e-mails went out.
+ */
+export async function sendExpiryReminders(send: Mailer, log: (m: string) => void = () => {}): Promise<number> {
+  const rows = await query<{ id: number; title: string; expires_at: string; notified_stage: number; email: string; name: string }>(
+    `SELECT l.id, l.title, l.expires_at, l.notified_stage, u.email, u.name
+       FROM listings l JOIN users u ON u.id = l.user_id
+      WHERE l.status IN ('active', 'paused') AND l.expires_at > now() AND l.expires_at <= now() + interval '7 days'`,
+  );
+  let sent = 0;
+  for (const r of rows) {
+    const stage = reminderStage(+new Date(r.expires_at) - Date.now());
+    if (stage <= r.notified_stage) continue;
+    // claim the stage first, so two overlapping runs never send the same e-mail twice
+    const claimed = await one('UPDATE listings SET notified_stage = $2 WHERE id = $1 AND notified_stage < $2 RETURNING id', [r.id, stage]);
+    if (!claimed) continue;
+    try {
+      const m = renderListingMail({ kind: 'expiring', name: r.name, title: r.title, daysLeft: REMINDER_DAYS[stage - 1], expiresAt: r.expires_at });
+      await send({ to: r.email, subject: m.subject, html: m.html, text: m.text });
+      sent++;
+    } catch (err) {
+      log(`oglasi: podsetnik za oglas ${r.id} nije poslat: ${(err as Error).message}`);
+      await query('UPDATE listings SET notified_stage = $2 WHERE id = $1 AND notified_stage = $3', [r.id, r.notified_stage, stage]);
+    }
+  }
+  return sent;
+}
+
+/** Deletes ads that stayed expired for 30 days (pictures too) and tells their owners. Conversations stay. */
+export async function purgeExpiredListings(send: Mailer, log: (m: string) => void = () => {}): Promise<number> {
+  const rows = await query<{ id: number; title: string; email: string; name: string; files: string[] }>(
+    `SELECT l.id, l.title, u.email, u.name,
+            coalesce((SELECT array_agg(i.file) FROM listing_images i WHERE i.listing_id = l.id), '{}') AS files
+       FROM listings l JOIN users u ON u.id = l.user_id
+      WHERE l.status = 'expired' AND l.expired_at < now() - make_interval(days => $1)`,
+    [EXPIRED_KEEP_DAYS],
+  );
+  for (const r of rows) {
+    await query("DELETE FROM listings WHERE id = $1 AND status = 'expired'", [r.id]);
+    await dropFiles(r.files);
+    try {
+      const m = renderListingMail({ kind: 'deleted', name: r.name, title: r.title });
+      await send({ to: r.email, subject: m.subject, html: m.html, text: m.text });
+    } catch (err) {
+      log(`oglasi: mejl o brisanju oglasa ${r.id} nije poslat: ${(err as Error).message}`);
+    }
+  }
+  return rows.length;
+}
+
+/** Resolved reports are not kept longer than a year */
+export async function purgeOldReports(): Promise<number> {
+  const r = await query("DELETE FROM listing_reports WHERE resolved_at < now() - interval '365 days' RETURNING id");
   return r.length;
 }
 

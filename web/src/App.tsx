@@ -23,6 +23,7 @@ import MyListings from './ads/MyListings';
 import MessagesPage from './ads/MessagesPage';
 import NewListing from './ads/NewListing';
 import AdminListings from './pages/AdminListings';
+import TermsPage from './pages/Terms';
 
 /** While the site is private, every page except login needs a session. */
 function Gate({ children, needUser, needAdmin, needAds }: { children: ReactNode; needUser?: boolean; needAdmin?: boolean; needAds?: boolean }) {
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/potvrda/:token" element={<InvitePage />} />
         <Route path="/odjava/:token" element={<UnsubscribePage />} />
         <Route path="/privatnost" element={<PrivacyPage />} />
+        <Route path="/uslovi" element={<TermsPage />} />
         <Route path="/brisanje-naloga" element={<DeleteAccountPage />} />
         <Route path="/blog" element={<Gate><BlogListPage /></Gate>} />
         <Route path="/blog/:slug" element={<Gate><BlogPostPage /></Gate>} />

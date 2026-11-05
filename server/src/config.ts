@@ -108,6 +108,8 @@ const schema = z.object({
   // production — so a shared link shows its picture at once, also right after a deploy
   // Oglasi (classifieds): off = hidden, admins = only administrators (testing on the live site), on = every signed-in user
   LISTINGS_MODE: z.enum(['off', 'admins', 'on']).default('off'),
+  // daily: reminders before an ad expires, expiring, deleting ads that stayed expired for 30 days
+  LISTINGS_CRON: z.string().default('0 9 * * *'),
   LISTINGS_DIR: z.string().default(fileURLToPath(new URL('../../data/listings', import.meta.url))),
   OG_CACHE_DIR: z.string().default(fileURLToPath(new URL('../../cache/og', import.meta.url))),
   // minutes between rounds that prepare every public set's preview image ahead of time; 0 = off

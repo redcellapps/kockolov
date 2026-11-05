@@ -330,7 +330,7 @@ function ListingForm({ edit }: { edit?: Listing }) {
               <Field label={t('ads.new.phoneLabel')} value={phone} onChange={(e) => setPh(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="+381 6x xxx xxxx" />
               <p className="mt-1.5 text-xs text-ink-3">{savedPhone ? t('ads.new.phoneHint') : `${t('ads.new.phoneNeeded')} ${t('ads.new.phoneHint')}`}</p>
             </div>
-            <p className="text-xs text-ink-3">{t('ads.new.rules')}</p>
+            <p className="text-xs text-ink-3">{t('ads.new.rules')} <Link to="/uslovi" className="font-semibold underline">{t('ads.new.rulesLink')}</Link></p>
           </>
         )}
 

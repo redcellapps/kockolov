@@ -50,7 +50,7 @@ export async function sendMessage(conv: Conv, senderId: number, senderName: stri
 
 async function myConversation(id: number, userId: number) {
   return one<Conv>(
-    `SELECT c.id, c.listing_id, c.buyer_id, c.seller_id, l.title FROM conversations c JOIN listings l ON l.id = c.listing_id
+    `SELECT c.id, c.listing_id, c.buyer_id, c.seller_id, coalesce(l.title, c.listing_title, 'oglas') AS title FROM conversations c LEFT JOIN listings l ON l.id = c.listing_id
       WHERE c.id = $1 AND $2 IN (c.buyer_id, c.seller_id)`,
     [id, userId],
   );
@@ -60,14 +60,14 @@ export async function messageRoutes(app: FastifyInstance) {
   app.get('/api/poruke', { preHandler: [gate, requireUser] }, async (req) => {
     const me = req.user!.id;
     const rows = await query(
-      `SELECT c.id, c.listing_id, l.title AS listing_title, l.price_rsd AS listing_price, l.status AS listing_status,
+      `SELECT c.id, c.listing_id, coalesce(l.title, c.listing_title, 'Obrisan oglas') AS listing_title, l.price_rsd AS listing_price, coalesce(l.status, 'deleted') AS listing_status,
               (SELECT '/media/oglasi/' || i.file FROM listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1) AS listing_image,
               (c.seller_id = $1) AS my_ad,
               coalesce(nullif(o.name, ''), 'Korisnik') AS other,
               (SELECT json_build_object('text', m.body, 'at', m.created_at, 'mine', m.sender_id = $1) FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last,
               (SELECT count(*)::int FROM messages m WHERE m.conversation_id = c.id AND m.read_at IS NULL AND m.sender_id <> $1) AS unread
          FROM conversations c
-         JOIN listings l ON l.id = c.listing_id
+         LEFT JOIN listings l ON l.id = c.listing_id
          JOIN users o ON o.id = CASE WHEN c.seller_id = $1 THEN c.buyer_id ELSE c.seller_id END
         WHERE $1 IN (c.buyer_id, c.seller_id) AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)
         ORDER BY c.last_message_at DESC LIMIT 200`,
@@ -112,7 +112,7 @@ export async function messageRoutes(app: FastifyInstance) {
     if (!c) {
       // a new conversation per ad is limited, so one account can't write to the whole site
       if (limits.newConv.hit(String(me.id))) return reply.code(429).send({ error: 'Danas si započeo dosta razgovora. Pokušaj sutra.' });
-      c = await one<Conv>('INSERT INTO conversations (listing_id, buyer_id, seller_id) VALUES ($1, $2, $3) RETURNING id, listing_id, buyer_id, seller_id, $4::text AS title', [l.id, me.id, l.user_id, l.title]);
+      c = await one<Conv>('INSERT INTO conversations (listing_id, buyer_id, seller_id, listing_title) VALUES ($1, $2, $3, $4) RETURNING id, listing_id, buyer_id, seller_id, $4::text AS title', [l.id, me.id, l.user_id, l.title]);
     }
     await sendMessage(c!, me.id, me.name, text, (e) => req.log.error(e));
     return { ok: true, conversation_id: c!.id };

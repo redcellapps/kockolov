@@ -162,6 +162,7 @@ export async function publicRoutes(app: FastifyInstance) {
       url('/teme'),
       url('/pretraga'),
       url('/privatnost'),
+      url('/uslovi'),
       url('/blog', posts[0]?.date),
       ...posts.map((post) => url(`/blog/${post.slug}`, post.date)),
       ...themes.map((t) => url(`/pretraga?theme=${encodeURIComponent(t.slug)}`)),

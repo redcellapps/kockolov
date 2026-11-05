@@ -281,6 +281,10 @@ Without the file the form still works, but only suggests sets that Kockolov trac
 
 ## Oglasi (classifieds)
 
+Life of an ad: 30 days; e-mail reminders 7, 3 and 1 day before the end (`LISTINGS_CRON`, daily at 09:00); an expired ad stays in
+the owner's account for 30 days (can be renewed), then it is deleted with its pictures and the owner gets an e-mail.
+Conversations are never deleted on a timer. The job needs SMTP (`SMTP_HOST`), otherwise reminders are skipped and logged.
+
 Off until you switch it on. In `/opt/kockolov/.env`: `LISTINGS_MODE=admins` shows it to administrators only (test it on the live
 site first), `LISTINGS_MODE=on` to every signed-in user, then `docker compose up -d`. nginx must allow photo uploads
 (`client_max_body_size 14m` in `kockolov.stpl`; re-apply the template after updating it). Reports and removals: Administracija → Oglasi.

@@ -53,12 +53,12 @@ export default function MyListings() {
               l={l}
               footer={
                 <div className="grid gap-1.5 border-t border-line p-3">
-                  <p className="text-xs text-ink-3">{t('ads.detail.views', { n: l.views })} · {l.status === 'expired' ? t('ads.mine.expired') : l.status === 'sold' ? t('ads.mine.soldLabel') : l.status === 'paused' ? t('ads.mine.pausedLabel') : t('ads.mine.expires', { n: Math.max(1, left(l)) })}</p>
+                  <p className="text-xs text-ink-3">{t('ads.detail.views', { n: l.views })} · {l.status === 'expired' ? (l.delete_at ? t('ads.mine.expiredDelete', { n: Math.max(1, Math.ceil((+new Date(l.delete_at) - Date.now()) / 86_400_000)) }) : t('ads.mine.expired')) : l.status === 'sold' ? t('ads.mine.soldLabel') : l.status === 'paused' ? t('ads.mine.pausedLabel') : t('ads.mine.expires', { n: Math.max(1, left(l)) })}</p>
                   <div className="flex flex-wrap gap-1.5">
                     <Link to={`/oglasi/${l.id}/izmeni`} className={buttonClasses('outline', 'sm')}>{t('ads.edit.link')}</Link>
                     <PriceEditor l={l} />
                     <Button size="sm" variant="outline" onClick={() => void actions.setStatus(l.id, l.status === 'paused' ? 'active' : 'paused')} disabled={l.status === 'sold' || l.status === 'expired'}>{l.status === 'paused' ? t('ads.mine.resume') : t('ads.mine.pause')}</Button>
-                    {(l.status === 'active' || l.status === 'expired') && <Button size="sm" variant="outline" onClick={() => void actions.renew(l.id)}>{t('ads.mine.renew')}</Button>}
+                    {l.status !== 'sold' && <Button size="sm" variant={l.status === 'expired' || left(l) <= 7 ? 'dark' : 'outline'} onClick={() => void actions.renew(l.id)}>{l.status === 'expired' ? t('ads.mine.reactivate') : t('ads.mine.renew')}</Button>}
                     {l.status !== 'sold' && <Button size="sm" variant="outline" onClick={() => void actions.setStatus(l.id, 'sold')}>{t('ads.mine.sold')}</Button>}
                     <Button size="sm" variant="ghost" onClick={() => { if (window.confirm(t('ads.mine.confirmDelete'))) void actions.remove(l.id); }}>{t('ads.mine.delete')}</Button>
                   </div>
