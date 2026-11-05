@@ -38,7 +38,8 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 }
 
 export type Reason =
-  | { type: 'vs_rrp'; pct: number; amount: number }
+  /** sale = the LEGO Store itself has the set below its regular price */
+  | { type: 'vs_rrp'; pct: number; amount: number; sale?: true }
   | { type: 'vs_next'; pct: number; amount: number; shop: string; seller: string }
   | { type: 'shop_sale'; pct: number }
   | { type: 'new_low'; days: number }

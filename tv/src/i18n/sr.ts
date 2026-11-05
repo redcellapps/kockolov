@@ -44,7 +44,7 @@ export const sr = {
   'watch.login': 'Prijavi se da pratiš cenu',
 
   'home.top.label': 'Najbolja ponuda danas',
-  'home.top.rrp': 'U LEGO® Store-u {amount}',
+  'home.top.rrp': 'Redovna cena u LEGO® Store-u {amount}',
   'home.top.saving': 'Ušteda {amount} ({pct}%)',
   'home.top.at': 'Najjeftinije: {shop}',
   'home.top.cta': 'Pogledaj set',
@@ -65,8 +65,8 @@ export const sr = {
   'set.number': 'Set {num}',
   'set.bestPrice': 'Najniža cena',
   'set.at': 'u prodavnici {shop}',
-  'set.youSave': 'Ušteda {amount} ({pct}%) u odnosu na LEGO® Store',
-  'set.rrp': 'LEGO® Store: {amount}',
+  'set.youSave': 'Ušteda {amount} ({pct}%) u odnosu na redovnu cenu u LEGO® Store-u',
+  'set.rrp': 'Redovna cena u LEGO® Store-u: {amount}',
   'set.rrp.unknown': 'LEGO® Store trenutno nema ovaj set',
   'set.lowestEver': 'Najniža zabeležena: {amount}',
   'set.lowest30': 'Najniža u 30 dana: {amount}',
@@ -110,7 +110,7 @@ export const sr = {
 
   'about.title': 'O aplikaciji',
   'about.text':
-    'Kockolov svakog jutra obilazi prodavnice u Srbiji, beleži cene LEGO® setova i izdvaja prave popuste u odnosu na cenu u LEGO® Store-u. Na televizoru gledaš, na telefonu kupuješ: skeniraj QR kod na stranici seta.',
+    'Kockolov svakog jutra obilazi prodavnice u Srbiji, beleži cene LEGO® setova i izdvaja prave popuste u odnosu na redovnu cenu u LEGO® Store-u. Na televizoru gledaš, na telefonu kupuješ: skeniraj QR kod na stranici seta.',
   'about.shops': 'Prodavnice u ovoj verziji: {shops}. Uz besplatan nalog na kockolov.rs vidiš još {more} prodavnica — povezivanje televizora sa nalogom stiže u sledećoj verziji.',
   'about.legal': 'LEGO® je zaštićeni žig LEGO Grupe, koja ne sponzoriše, ne odobrava i nije povezana sa ovom aplikacijom.',
   'about.privacy': 'Politika privatnosti',
