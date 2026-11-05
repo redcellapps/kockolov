@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { eurRate } from '../fx.js';
 import { xlsx, type XlsxCell } from '../lib/xlsx.js';
-import { catalogFile, knownSets, loadCatalog } from './catalog.js';
+import { catalogFile, kpContext, loadCatalog } from './catalog.js';
 import { classifyAd, type KpCondition, type KpDecision, type ReviewReason, type SkipReason } from './classify.js';
 import { listingFromKp, type KpListing } from './parse.js';
 
@@ -26,6 +26,7 @@ const REVIEW: Record<ReviewReason, string> = {
   price: 'Cena nije realna',
   more_numbers: 'U opisu i drugi setovi',
   number_in_text: 'Broj seta samo u opisu',
+  name_only: 'Samo naziv seta, bez broja',
 };
 const CONDITION: Record<KpCondition, string> = { novo: 'Novo', nekorisceno: 'Nekorišćeno', korisceno: 'Korišćeno', osteceno: 'Oštećeno' };
 const ORDER = { show: 0, review: 1, skip: 2 } as const;
@@ -38,8 +39,8 @@ export async function kpReport(file: string, out: string, log: (m: string) => vo
   const catFile = catalogFile();
   const catalog = loadCatalog(catFile);
   log(catFile ? `katalog: ${catalog.size} setova (${catFile})` : 'katalog nije nađen: poznati su samo naši setovi');
-  const known = await knownSets(catalog);
-  const ctx = { known, eurRate: (await eurRate()).rate };
+  const ctx = await kpContext(catalog, (await eurRate()).rate);
+  const known = ctx.known;
 
   const rows = ads.map((a) => ({ a, d: classifyAd(a, ctx) as KpDecision }));
   rows.sort((x, y) => ORDER[x.d.kind] - ORDER[y.d.kind] || reason(x.d).localeCompare(reason(y.d)) || setOf(x.d).localeCompare(setOf(y.d)));

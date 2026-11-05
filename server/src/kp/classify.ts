@@ -1,5 +1,6 @@
 import { hasWord, isMerchandise, nameWords, sameFamily } from '../crawler/matching.js';
 import { normalizeText } from '../lib/normalize.js';
+import { cleanTitle } from '../lib/setnum.js';
 import { themeFromRaw } from '../lib/themes.js';
 
 /*
@@ -41,6 +42,8 @@ export interface KnownSet {
 
 export interface KpContext {
   known: (num: string) => KnownSet | null;
+  /** set names that belong to one set only, for ads without a number (see buildNameIndex) */
+  names?: NameIndex;
   /** RSD per EUR (NBS middle rate) */
   eurRate: number;
 }
@@ -60,7 +63,8 @@ export type ReviewReason =
   | 'name' // the title points to another theme than the set's
   | 'price' // far from the LEGO Store price, or not believable
   | 'more_numbers' // one set in the title, other set numbers in the description
-  | 'number_in_text'; // the number is only in the description
+  | 'number_in_text' // the number is only in the description
+  | 'name_only'; // no number, and the set's name is short or common
 
 export type KpDecision =
   | { kind: 'show'; setNum: string; priceRsd: number; price: KpPrice }
@@ -149,7 +153,8 @@ export function setNumbersIn(text: string, isKnown: (n: string) => boolean): str
     if (/^\s*(delova|dela\b|delov|dijel|komad|kom\b|kom\.|pcs\b|psc\b|pieces|elemen|kockic|kocki\b|din\b|rsd\b|€|eur\b|evr|cm\b|mm\b|god\b|god\.|godin|g\.)/i.test(after)) continue;
     // glued to a word: fine for a modern number ("76457Selo Hogsmid"), not for a model name ("John Deere 1470H")
     if (num.length === 4 && /^\p{L}/u.test(t.slice(m.index + m[0].length))) continue;
-    if (/(€|eur|din|rsd|cena|cenu)\s*:?\s*$/.test(before)) continue;
+    // a price word just before ("cena: 4500", "din 4500"), but not the end of a word ("Lego Aladdin 40613")
+    if (/(?:^|[^\p{L}])(€|eur|din|rsd|cena|cenu)\s*:?\s*$/u.test(before)) continue;
     if (YEAR_RE.test(num) && (/^\s*\./.test(after) || /(iz|od|do|za|god\.?|godine|godina)\s*$/.test(before))) continue;
     if (num.startsWith('0') || !isKnown(num) || out.includes(num)) continue;
     out.push(num);
@@ -219,7 +224,12 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
   } else if (inText.length > 1) {
     return { kind: 'skip', why: 'multi', setNums: inText };
   } else {
-    return { kind: 'skip', why: merch ? 'not_a_set' : 'no_number' };
+    // no number: the set's own name in the title ("LEGO Avatar: The Way of Water Payakan The Tulkun & Crabsuit")
+    const hit = !merch && ctx.names ? setByName(title, ctx.names) : null;
+    if (hit === 'ambiguous') return { kind: 'skip', why: 'multi' };
+    if (!hit) return { kind: 'skip', why: merch ? 'not_a_set' : 'no_number' };
+    setNum = hit.num;
+    if (!distinctiveName(hit.name)) doubt = 'name_only';
   }
 
   const set = ctx.known(setNum)!;
@@ -233,4 +243,88 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
   if (!doubt && !believablePrice(priceRsd, set)) doubt = 'price';
   if (!doubt && nameConflict(title, set) && set.rrp && (priceRsd < set.rrp * 0.5 || priceRsd > set.rrp * 2)) doubt = 'name';
   return doubt ? { kind: 'review', setNum, priceRsd, price, why: doubt } : { kind: 'show', setNum, priceRsd, price };
+}
+
+// ---- set names, for ads without a number ----
+
+/**
+ * exact: first word of a normalized name -> the names starting with it and their set;
+ * bags: a name's own words in any order (three or more), keyed by its first one
+ */
+export interface NameIndex {
+  exact: Map<string, { name: string; num: string }[]>;
+  bags: Map<string, { name: string; num: string; words: string[] }[]>;
+}
+
+/**
+ * Names that belong to exactly one set (our Serbian names and the catalog's English ones) and still
+ * say something without the theme: "Harry Potter: Hogwarts" or "Sonic the Hedgehog" is just the theme,
+ * and a name several sets share ("Millennium Falcon", "Police Station") is left out, so it can never
+ * pick one of them.
+ */
+export function buildNameIndex(rows: { num: string; names: string[] }[]): NameIndex {
+  const owner = new Map<string, string | null>();
+  const bagOwner = new Map<string, { num: string | null; name: string; words: string[] }>();
+  const claim = <T extends { num: string | null }>(map: Map<string, T>, key: string, value: T) => {
+    const prev = map.get(key);
+    map.set(key, prev === undefined || prev.num === value.num ? value : { ...prev, num: null });
+  };
+  for (const r of rows) {
+    for (const raw of r.names) {
+      const n = normalizeText(cleanTitle(raw, r.num));
+      const words = [...nameWords(n)];
+      if (n.length < 10 || n.split(' ').length < 2 || words.length < 2) continue;
+      const prev = owner.get(n);
+      owner.set(n, prev === undefined || prev === r.num ? r.num : null);
+      if (words.length >= 3) claim(bagOwner, [...words].sort().join(' '), { num: r.num, name: n, words });
+    }
+  }
+  const idx: NameIndex = { exact: new Map(), bags: new Map() };
+  for (const [name, num] of owner) {
+    if (!num) continue;
+    const first = name.split(' ')[0];
+    if (!idx.exact.has(first)) idx.exact.set(first, []);
+    idx.exact.get(first)!.push({ name, num });
+  }
+  for (const { num, name, words } of bagOwner.values()) {
+    if (!num) continue;
+    if (!idx.bags.has(words[0])) idx.bags.set(words[0], []);
+    idx.bags.get(words[0])!.push({ name, num, words });
+  }
+  return idx;
+}
+
+/**
+ * The one set whose name is in the title; the longest name wins over a shorter one inside it. Then,
+ * in any word order, a name of three or more words of its own ("Gardens of Ninjago City" for
+ * "Ninjago City Gardens", "The Pirate Ship Going Merry" for "Going Merry Pirate Ship").
+ */
+export function setByName(title: string, idx: NameIndex): { name: string; num: string } | 'ambiguous' | null {
+  const padded = ` ${normalizeText(title)} `;
+  const titleWords = new Set(padded.trim().split(' '));
+  const hits: { name: string; num: string }[] = [];
+  for (const word of titleWords) {
+    for (const c of idx.exact.get(word) ?? []) if (padded.includes(` ${c.name} `)) hits.push(c);
+  }
+  hits.sort((a, b) => b.name.length - a.name.length);
+  const kept: { name: string; num: string }[] = [];
+  for (const h of hits) if (!kept.some((k) => k.name.includes(h.name))) kept.push(h);
+  if (new Set(kept.map((k) => k.num)).size > 1) return 'ambiguous';
+  if (kept[0]) return kept[0];
+
+  const bagHits = [...titleWords].flatMap((w) => (idx.bags.get(w) ?? []).filter((c) => c.words.every((x) => titleWords.has(x))));
+  if (!bagHits.length) return null;
+  const most = Math.max(...bagHits.map((h) => h.words.length));
+  const best = bagHits.filter((h) => h.words.length === most);
+  if (new Set(best.map((h) => h.num)).size > 1) return 'ambiguous';
+  return { name: best[0].name, num: best[0].num };
+}
+
+/**
+ * Without a number, only a name with three words of its own is shown at once ("Payakan the Tulkun &
+ * Crabsuit", "Old Trafford – Manchester United"); a shorter one can be a movie title or a minifigure
+ * ("Chamber of Secrets", "Golden Dragon") and waits for the admin.
+ */
+function distinctiveName(name: string): boolean {
+  return nameWords(name).size >= 3;
 }

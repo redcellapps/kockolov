@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { classifyAd, kpPrice, setNumbersIn, type KnownSet, type KpAd } from '../src/kp/classify.js';
+import { buildNameIndex, classifyAd, kpPrice, setByName, setNumbersIn, type KnownSet, type KpAd } from '../src/kp/classify.js';
 import { parseKpSearch } from '../src/kp/parse.js';
 
 // our sets (Serbian names, LEGO Store regular price) and catalog-only retired sets
@@ -131,6 +131,38 @@ describe('KP ads that are one set we can show', () => {
     expect(k('LEGO NASA Space Shuttle Discovery 10283 Build and Display Model', '281 €')).toMatchObject({ kind: 'show', setNum: '10283' });
     expect(k('Akrilna vitrina za LEGO 10283', '60 €')).toMatchObject({ kind: 'skip', why: 'not_a_set' });
     expect(k('Torba za LEGO kocke', '15 €')).toMatchObject({ kind: 'skip', why: 'not_a_set' });
+  });
+
+  it('finds the set by its name when the ad has no number (KP, Nov 2026)', () => {
+    const names = buildNameIndex([
+      { num: '75579', names: ['Payakan the Tulkun & Crabsuit'] },
+      { num: '4730', names: ['Chamber of Secrets'] },
+      { num: '3862', names: ['Harry Potter: Hogwarts'] }, // only the theme: never used
+      { num: '75192', names: ['Millennium Falcon'] }, // shared by several sets: never used
+      { num: '75257', names: ['Millennium Falcon'] },
+      { num: '76454', names: ['Hogwarts Castle: The Main Tower'] },
+      { num: '40613', names: ['Mini Disney Palace of Agrabah'] },
+      { num: '75639', names: ['The Going Merry Pirate Ship'] },
+    ]);
+    const more: Record<string, KnownSet> = {
+      ...SETS,
+      '75579': { names: ['Payakan the Tulkun & Crabsuit'], theme: null, rrp: null },
+      '4730': { names: ['Chamber of Secrets'], theme: 'harry-potter', rrp: null },
+      '76454': { names: ['Hogwarts Castle: The Main Tower'], theme: 'harry-potter', rrp: 22999 },
+      '40613': { names: ['Mini Disney Palace of Agrabah'], theme: 'disney', rrp: null },
+    };
+    const c = { known: (n: string) => more[n] ?? null, names, eurRate: 117.2 };
+    const k = (title: string, price: string) => classifyAd(ad(title, price), c);
+    expect(k('LEGO Avatar: The Way of Water Payakan The Tulkun & Crabsuit', '188 €')).toMatchObject({ kind: 'show', setNum: '75579', priceRsd: 22034 });
+    expect(k('LEGO Harry Potter Hogwarts Castle: The Main Tower - Toy with figures', '208 €')).toMatchObject({ kind: 'show', setNum: '76454' });
+    // two words of its own could be a movie title: the admin decides
+    expect(k('LEGO Harry Potter and The Chamber of Secrets Hogwarts', '153 €')).toMatchObject({ kind: 'review', setNum: '4730', why: 'name_only' });
+    // the same words in another order
+    expect(setByName('LEGO ONE PIECE - The Pirate Ship Going Merry - Playset', names)).toMatchObject({ num: '75639' });
+    expect(setByName('LEGO Harry Potter Hogwarts Express', names)).toBeNull();
+    expect(setByName('LEGO Star Wars Millennium Falcon', names)).toBeNull();
+    // a number glued after "Aladdin" is not a price in dinars
+    expect(k('Lego Aladdin 40613 Mini Disney Palace of Agrabah', '3.499 din')).toMatchObject({ kind: 'show', setNum: '40613' });
   });
 
   it('skips ads with several sets', () => {

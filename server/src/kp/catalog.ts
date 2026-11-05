@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadMatchIndex } from '../crawler/pipeline.js';
 import { themeFromRaw } from '../lib/themes.js';
-import type { KnownSet } from './classify.js';
+import { buildNameIndex, type KnownSet, type KpContext } from './classify.js';
 
 /*
  * Every LEGO set ever made (Rebrickable's free data, the same file the classifieds use:
@@ -37,7 +37,7 @@ export function loadCatalog(file = catalogFile()): Map<string, CatalogSet> {
 }
 
 /** Catalog themes that are not building sets (Rebrickable's names) */
-const NOT_SETS = /^(collectible minifigures|minifigures|gear|books|promotional|dimensions|key chains|magnets|bulk bricks|service packs|supplemental|video games|clikits|storage|watches|clocks|stationery|pens)$/i;
+const NOT_SETS = /^(collectible minifigures|minifigures|gear|books|promotional|dimensions|games|power functions|key chains|magnets|bulk bricks|service packs|supplemental|video games|clikits|storage|watches|clocks|stationery|pens)$/i;
 
 /** What a set number means: our own sets first (Serbian names, LEGO Store price), then the catalog */
 export async function knownSets(catalog = loadCatalog()): Promise<(num: string) => KnownSet | null> {
@@ -51,4 +51,18 @@ export async function knownSets(catalog = loadCatalog()): Promise<(num: string) 
     const notASet = !ours && !!cat && (NOT_SETS.test(cat.theme) || NOT_SETS.test(cat.subtheme ?? ''));
     return { names, theme, rrp: ours?.rrp ?? null, notASet };
   };
+}
+
+/** Everything classifyAd needs: what each number is, the names of single sets, and the euro rate */
+export async function kpContext(catalog = loadCatalog(), eurRate: number): Promise<KpContext> {
+  const known = await knownSets(catalog);
+  const idx = await loadMatchIndex();
+  const rows = new Map<string, string[]>();
+  for (const [num, facts] of idx.sets ?? []) rows.set(num, [...facts.names]);
+  for (const [num, c] of catalog) {
+    if (NOT_SETS.test(c.theme) || NOT_SETS.test(c.subtheme ?? '')) continue;
+    rows.set(num, [...(rows.get(num) ?? []), c.name]);
+  }
+  const names = buildNameIndex([...rows].map(([num, names]) => ({ num, names })));
+  return { known, names, eurRate };
 }
