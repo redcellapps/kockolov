@@ -98,4 +98,22 @@ describe.skipIf(!dbAvailable)('sign-in with the bot check and Google', () => {
     const stolen = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: victim, password: 'napadac-lozinka' } });
     expect(stolen.statusCode).toBe(401);
   });
+
+  it('a suspended account can\'t sign in, and its existing session stops working', async () => {
+    const email = `suspendovan-${Date.now()}@example.com`;
+    const { hashPassword } = await import('../src/api/auth.js');
+    const u = await one<{ id: number }>(
+      `INSERT INTO users (email, name, password_hash, accepted_at) VALUES ($1, 'Sima', $2, now()) RETURNING id`,
+      [email, await hashPassword('tajna-lozinka')],
+    );
+    const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password: 'tajna-lozinka', recaptcha: 'x' } });
+    expect(login.statusCode).toBe(200);
+    const cookie = login.cookies.find((c) => c.name === 'kl_session')!.value;
+    await query('UPDATE users SET suspended_at = now() WHERE id = $1', [u!.id]);
+    const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie: `kl_session=${cookie}` } });
+    expect(me.json().user).toBeNull();
+    const again = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password: 'tajna-lozinka', recaptcha: 'x' } });
+    expect(again.statusCode).toBe(403);
+    expect(again.json().code).toBe('suspended');
+  });
 });

@@ -261,7 +261,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.get('/api/admin/users', async () =>
     query(
-      `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.created_at, u.last_login_at, u.accepted_at, u.self_signup,
+      `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.created_at, u.last_login_at, u.accepted_at, u.self_signup, u.suspended_at,
               (SELECT max(t.created_at) FROM user_tokens t WHERE t.user_id = u.id AND t.kind = 'invite') AS invited_at
          FROM users u ORDER BY u.created_at`,
     ),
@@ -302,8 +302,23 @@ export async function adminRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>('/api/admin/users/:id', async (req, reply) => {
     const id = Number(req.params.id);
     if (id === req.user!.id) return reply.code(400).send({ error: 'Ne možete obrisati sopstveni nalog.' });
-    await query('DELETE FROM users WHERE id = $1', [id]);
+    const gone = await query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+    if (!gone.length) return reply.code(404).send({ error: 'Korisnik ne postoji.' });
     return { ok: true };
+  });
+
+  // Suspend or restore an account. A suspended account is signed out at once and can't sign in again.
+  app.put<{ Params: { id: string } }>('/api/admin/users/:id/suspension', async (req, reply) => {
+    const id = Number(req.params.id);
+    const { suspended } = z.object({ suspended: z.boolean() }).parse(req.body ?? {});
+    if (id === req.user!.id) return reply.code(400).send({ error: 'Ne možete suspendovati sopstveni nalog.' });
+    const u = await one<{ id: number }>(
+      'UPDATE users SET suspended_at = CASE WHEN $2 THEN now() ELSE NULL END WHERE id = $1 RETURNING id',
+      [id, suspended],
+    );
+    if (!u) return reply.code(404).send({ error: 'Korisnik ne postoji.' });
+    if (suspended) await query('DELETE FROM sessions WHERE user_id = $1', [id]);
+    return { ok: true, suspended };
   });
 
   app.post('/api/admin/crawl', async (req, reply) => {
