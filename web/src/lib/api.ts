@@ -194,6 +194,8 @@ export interface MeResponse {
   registrationOpen: boolean;
   /** reCAPTCHA v3 site key; null = the bot check is off */
   recaptchaSiteKey?: string | null;
+  /** Google OAuth client ID; null = the Google button is off */
+  googleClientId?: string | null;
   /** NBS middle rate: RSD for 1 EUR (day is null while only the fallback is known) */
   fx?: { eur: { rate: number; day: string | null } };
   /** Umami address and website id; null while statistics are off */

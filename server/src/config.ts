@@ -34,6 +34,8 @@ const schema = z.object({
   // where the app's pages come from (iOS, Android): these may call the API from another origin
   APP_ORIGINS: z.string().default('capacitor://localhost,https://localhost'),
 
+  // Sign-in with Google: the OAuth client ID (public). Empty = the Google button stays off.
+  GOOGLE_CLIENT_ID: z.string().optional(),
   // Google reCAPTCHA v3 on sign-up, new-password and confirmation-mail requests. Without the secret the
   // check is off (local development); the site key is public and goes to the browser via /api/auth/me.
   RECAPTCHA_SITE_KEY: z.string().optional(),

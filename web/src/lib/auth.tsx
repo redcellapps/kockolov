@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     publicMode: q.data?.publicMode ?? false,
     registrationOpen: q.data?.registrationOpen ?? false,
     recaptchaSiteKey: q.data?.recaptchaSiteKey ?? null,
+    googleClientId: q.data?.googleClientId ?? null,
     fx: q.data?.fx,
     loading: q.isLoading,
     refresh: async () => {

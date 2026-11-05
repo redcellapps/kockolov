@@ -229,6 +229,7 @@ export const sr = {
   'login.email': 'E-mail',
   'login.password': 'Lozinka',
   'login.submit': 'Prijavi se',
+  'login.or': 'ili',
   'login.register': 'Nemaš nalog? Registruj se',
   'login.haveAccount': 'Već imaš nalog? Prijavi se',
   'register.title': 'Napravi nalog',
