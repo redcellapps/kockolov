@@ -6,6 +6,7 @@ import { Barcodes } from '../components/admin/Barcodes';
 import { Instagram } from '../components/admin/Instagram';
 import { OfferReview } from '../components/admin/OfferReview';
 import { Button, ShopDot, Spinner, cx } from '../components/ui';
+import { useAuth } from '../lib/auth';
 import { t } from '../i18n';
 import { api } from '../lib/api';
 import { ago, num, shopName } from '../lib/format';
@@ -49,6 +50,7 @@ interface AdminUser {
   accepted_at: string | null;
   invited_at: string | null;
   self_signup?: boolean;
+  suspended_at?: string | null;
 }
 
 interface LinkResult {
@@ -86,6 +88,16 @@ export default function AdminPage() {
   const crawl = useMutation({
     mutationFn: () => api('/api/admin/crawl', { method: 'POST', json: {} }),
     onSettled: () => qc.invalidateQueries({ queryKey: ['admin'] }),
+  });
+  const me = useAuth().user;
+  const suspend = useMutation({
+    mutationFn: (v: { id: number; suspended: boolean }) =>
+      api(`/api/admin/users/${v.id}/suspension`, { method: 'PUT', json: { suspended: v.suspended } }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => api(`/api/admin/users/${id}`, { method: 'DELETE' }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
   });
   const [newUser, setNewUser] = useState({ email: '', name: '', role: 'user' });
   const [linkResult, setLinkResult] = useState<LinkResult | null>(null);
@@ -248,6 +260,9 @@ export default function AdminPage() {
                   <td className="pr-3 text-ink-2">{u.name}</td>
                   <td className="pr-3 text-ink-2">{u.role === 'admin' ? t('admin.users.role.admin') : t('admin.users.role.user')}</td>
                   <td className="pr-3">
+                    {u.suspended_at && (
+                      <span className="mr-2 inline-flex rounded-full bg-deal-soft px-2 py-0.5 text-xs font-bold text-deal">{t('admin.users.suspended')}</span>
+                    )}
                     {u.accepted_at ? (
                       <span className="text-ink-3">{u.digest_enabled ? t('admin.users.digestOn') : t('admin.users.digestOff')}</span>
                     ) : (
@@ -270,6 +285,32 @@ export default function AdminPage() {
                     >
                       {u.accepted_at ? t('admin.users.reset') : u.self_signup ? t('admin.users.resendVerify') : t('admin.users.resend')}
                     </button>
+                    {u.id !== me?.id && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const suspended = !u.suspended_at;
+                            const msg = suspended ? t('admin.users.confirmSuspend', { email: u.email }) : t('admin.users.confirmRestore', { email: u.email });
+                            if (window.confirm(msg)) suspend.mutate({ id: u.id, suspended });
+                          }}
+                          disabled={suspend.isPending}
+                          className="cursor-pointer rounded-lg px-2 py-1 text-xs font-bold text-ink-2 hover:bg-surface-2 disabled:opacity-50"
+                        >
+                          {u.suspended_at ? t('admin.users.restore') : t('admin.users.suspend')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(t('admin.users.confirmDelete', { email: u.email }))) remove.mutate(u.id);
+                          }}
+                          disabled={remove.isPending}
+                          className="cursor-pointer rounded-lg px-2 py-1 text-xs font-bold text-deal hover:bg-deal-soft disabled:opacity-50"
+                        >
+                          {t('admin.users.delete')}
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

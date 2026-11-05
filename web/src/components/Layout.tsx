@@ -8,8 +8,8 @@ import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { ago, displayCurrency, rateText } from '../lib/format';
-import { CONTACT_EMAIL, CREDITS, INSTAGRAM_URL } from '../lib/site';
-import { ClockIcon, HeartIcon, InstagramIcon } from './icons';
+import { CONTACT_EMAIL, CREDITS, INSTAGRAM_URL, PLAY_URL } from '../lib/site';
+import { ClockIcon, GooglePlayIcon, HeartIcon, InstagramIcon } from './icons';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Logo } from './Logo';
 import { ScanButton } from './ScanButton';
@@ -203,6 +203,9 @@ function Footer() {
             <a href={INSTAGRAM_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-ink-2 hover:text-ink hover:underline">
               <InstagramIcon size={16} /> {t('footer.instagram')}
             </a>
+            <a href={PLAY_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-ink-2 hover:text-ink hover:underline">
+              <GooglePlayIcon size={18} className="text-brand" /> {t('footer.googlePlay')}
+            </a>
           </nav>
           <p className="mt-4 text-xs leading-relaxed text-ink-3">{t('footer.disclaimer')}</p>
           {displayCurrency() === 'EUR' && <p className="mt-2 text-xs leading-relaxed text-ink-3">{t('fx.note', { rate: rateText(fx?.eur.rate) })}</p>}
@@ -212,7 +215,7 @@ function Footer() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-4 text-xs text-ink-3 sm:px-6">
           <p className="font-semibold text-ink-2">{t('footer.copyright', { years: copyrightYears() })}</p>
           <p>
-            {t('footer.madeBy')} <span className="font-semibold text-ink-2">{CREDITS.author}</span>
+            {t('footer.madeBy')} <a href={CREDITS.authorUrl} target="_blank" rel="noopener" className="font-semibold text-ink-2 hover:text-ink hover:underline">{CREDITS.author}</a>
           </p>
           <p>
             {t('footer.poweredBy')}{' '}

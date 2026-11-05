@@ -2,6 +2,7 @@ import { trackEvent } from '../lib/analytics';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { LogoMark } from '../components/Logo';
+import { GoogleIcon } from '../components/icons';
 import { Button } from '../components/ui';
 import { t } from '../i18n';
 import { api, ApiError } from '../lib/api';
@@ -39,15 +40,29 @@ export function AuthCard({ children }: { children: ReactNode }) {
   );
 }
 
-/** Google's sign-in button; the callback is kept in a ref, so the button isn't redrawn on every render. */
+/**
+ * Sign in with Google, styled like the rest of the site: Google's own button is drawn invisibly on top
+ * of ours, so a click goes to Google's button. Its callback is kept in a ref, so it isn't redrawn on every render.
+ */
 function GoogleSignIn({ clientId, onCredential }: { clientId: string; onCredential: (credential: string) => void }) {
   const el = useRef<HTMLDivElement>(null);
   const latest = useRef(onCredential);
   latest.current = onCredential;
   useEffect(() => {
-    if (el.current) renderGoogleButton(el.current, clientId, (c) => latest.current(c)).catch(() => undefined);
+    if (el.current) renderGoogleButton(el.current, clientId, (c) => latest.current(c), el.current.offsetWidth || 320).catch(() => undefined);
   }, [clientId]);
-  return <div ref={el} className="flex min-h-[44px] justify-center" />;
+  return (
+    <div className="group relative h-12 w-full">
+      <div
+        aria-hidden
+        className="absolute inset-0 flex items-center justify-center gap-3 rounded-xl border border-line bg-surface text-[15px] font-bold text-ink transition group-hover:bg-surface-2"
+      >
+        <GoogleIcon size={20} />
+        {t('login.google')}
+      </div>
+      <div ref={el} className="absolute inset-0 overflow-hidden opacity-0" />
+    </div>
+  );
 }
 
 type Mode = 'login' | 'register' | 'forgot';

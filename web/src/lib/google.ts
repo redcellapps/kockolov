@@ -29,9 +29,9 @@ function loadScript(): Promise<void> {
 }
 
 /** Draws Google's button into `el`; `onCredential` gets the token when the person picks an account. */
-export async function renderGoogleButton(el: HTMLElement, clientId: string, onCredential: (credential: string) => void): Promise<void> {
+export async function renderGoogleButton(el: HTMLElement, clientId: string, onCredential: (credential: string) => void, width = 320): Promise<void> {
   await loadScript();
   const id = window.google!.accounts.id;
   id.initialize({ client_id: clientId, callback: (r) => onCredential(r.credential) });
-  id.renderButton(el, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: 320 });
+  id.renderButton(el, { type: 'standard', theme: 'filled_black', size: 'large', text: 'continue_with', shape: 'rectangular', width });
 }

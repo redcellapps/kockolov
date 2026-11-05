@@ -1,3 +1,4 @@
+import { alertConversationReport } from '../../jobs/alerts.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
@@ -131,7 +132,10 @@ export async function messageRoutes(app: FastifyInstance) {
     const c = await myConversation(Number(req.params.id) || 0, req.user!.id);
     if (!c) return reply.code(404).send({ error: 'Razgovor nije pronađen.' });
     if (limits.report.hit(String(req.user!.id))) return reply.code(429).send({ error: 'Previše prijava danas.' });
-    await query('INSERT INTO listing_reports (reporter_id, conversation_id, reason) VALUES ($1, $2, $3)', [req.user!.id, c.id, reason || 'Prijavljen razgovor']);
+    const reason2 = reason || 'Prijavljen razgovor';
+    await query('INSERT INTO listing_reports (reporter_id, conversation_id, reason) VALUES ($1, $2, $3)', [req.user!.id, c.id, reason2]);
+    // not awaited: the admin gets the mail, the person reporting doesn't wait for it
+    void alertConversationReport({ reporter: req.user!.name || req.user!.email, listingTitle: c.title ?? 'oglas', reason: reason2 }, (m) => req.log.error(m));
     return { ok: true };
   });
 }

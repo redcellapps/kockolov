@@ -118,8 +118,8 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.code(403).send({ error: NOT_HUMAN, code: 'captcha' });
       }
     }
-    const user = await one<{ id: number; password_hash: string; accepted_at: string | null }>(
-      'SELECT id, password_hash, accepted_at FROM users WHERE email = $1',
+    const user = await one<{ id: number; password_hash: string; accepted_at: string | null; suspended_at: string | null }>(
+      'SELECT id, password_hash, accepted_at, suspended_at FROM users WHERE email = $1',
       [email],
     );
     const ok = user ? await verifyPassword(body.data.password, user.password_hash) : await verifyPassword('x', 'scrypt$16384$AAAA$AAAA');
@@ -129,6 +129,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
     resetLoginAttempts(key);
     failedLogins.reset(email);
+    if (user.suspended_at) return reply.code(403).send({ error: 'Nalog je suspendovan. Javi se na kontakt@kockolov.rs.', code: 'suspended' });
     if (!user.accepted_at) {
       // right password, but the address hasn't been confirmed yet
       return reply.code(403).send({ error: 'Prvo potvrdi e-mail adresu: otvori link koji smo ti poslali.', code: 'unconfirmed' });
@@ -202,9 +203,13 @@ export async function authRoutes(app: FastifyInstance) {
     const who = await googleIdentity(body.data.credential, config.GOOGLE_CLIENT_ID);
     if (!who) return reply.code(401).send({ error: 'Google nije potvrdio nalog. Pokušaj ponovo.' });
     const email = normalizeEmail(who.email);
-    const existing = await one<{ id: number; accepted_at: string | null }>('SELECT id, accepted_at FROM users WHERE email = $1', [email]);
+    const existing = await one<{ id: number; accepted_at: string | null; suspended_at: string | null }>(
+      'SELECT id, accepted_at, suspended_at FROM users WHERE email = $1',
+      [email],
+    );
     let userId: number;
     if (existing) {
+      if (existing.suspended_at) return reply.code(403).send({ error: 'Nalog je suspendovan. Javi se na kontakt@kockolov.rs.', code: 'suspended' });
       if (!existing.accepted_at) {
         await query(
           `UPDATE users SET accepted_at = now(), password_hash = $2,
