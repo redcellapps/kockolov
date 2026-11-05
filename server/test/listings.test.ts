@@ -257,6 +257,41 @@ describe.skipIf(!dbAvailable)('Oglasi: ads, pictures, following, messages, moder
     expect(json(await app.inject({ method: 'GET', url: '/api/oglasi', headers: as('bob') })).items).toHaveLength(1);
   });
 
+  it('makes public ads findable: head, sitemap, and noindex for the private pages', async () => {
+    const { pageMeta } = await import('../src/seo/pages.js');
+    const before = config.PUBLIC_MODE;
+    config.PUBLIC_MODE = true;
+    try {
+      const m = await pageMeta(`/oglasi/${adId}`, new URLSearchParams());
+      expect(m.status).toBe(200);
+      expect(m.robots).toBeUndefined();
+      expect(m.title).toContain('Millennium Falcon');
+      expect(m.image?.url).toMatch(/^\/media\/oglasi\//);
+      expect((await pageMeta('/oglasi', new URLSearchParams())).robots).toBeUndefined();
+      for (const p of ['/poruke', '/poruke/5', '/moji-oglasi', '/oglasi/novi', `/oglasi/${adId}/izmeni`]) {
+        expect((await pageMeta(p, new URLSearchParams())).robots).toBe('noindex, follow');
+      }
+      const map = await app.inject({ method: 'GET', url: '/sitemap-oglasi.xml' });
+      expect(map.statusCode).toBe(200);
+      expect(map.body).toContain(`/oglasi/${adId}<`);
+      expect((await app.inject({ method: 'GET', url: '/sitemap.xml' })).body).toContain('sitemap-oglasi.xml');
+
+      // a paused ad stays out of the index
+      await query("UPDATE listings SET status = 'paused' WHERE id = $1", [adId]);
+      expect((await pageMeta(`/oglasi/${adId}`, new URLSearchParams())).robots).toBe('noindex, follow');
+      expect((await app.inject({ method: 'GET', url: '/sitemap-oglasi.xml' })).body).not.toContain(`/oglasi/${adId}<`);
+      await query("UPDATE listings SET status = 'active' WHERE id = $1", [adId]);
+
+      // off or admins-only: nothing is indexed
+      config.LISTINGS_MODE = 'admins';
+      expect((await pageMeta(`/oglasi/${adId}`, new URLSearchParams())).robots).toBe('noindex, nofollow');
+      expect((await app.inject({ method: 'GET', url: '/sitemap-oglasi.xml' })).statusCode).toBe(404);
+    } finally {
+      config.LISTINGS_MODE = 'on';
+      config.PUBLIC_MODE = before;
+    }
+  });
+
   it('deleting an ad removes its pictures; deleting the account removes the rest', async () => {
     const file = (await one<{ file: string }>('SELECT file FROM listing_images WHERE id = $1', [imgId]))!.file;
     expect(existsSync(path.join(config.LISTINGS_DIR, file))).toBe(true);

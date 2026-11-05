@@ -142,7 +142,7 @@ export async function publicRoutes(app: FastifyInstance) {
   app.get('/sitemap.xml', async (_req, reply) => {
     if (!config.PUBLIC_MODE) return reply.code(404).send('');
     const today = new Date().toISOString().slice(0, 10);
-    const entries = ['pages', 'sets'].map((n) => `<sitemap><loc>${site()}/sitemap-${n}.xml</loc><lastmod>${today}</lastmod></sitemap>`);
+    const entries = ['pages', 'sets', ...(config.LISTINGS_MODE === 'on' ? ['oglasi'] : [])].map((n) => `<sitemap><loc>${site()}/sitemap-${n}.xml</loc><lastmod>${today}</lastmod></sitemap>`);
     return reply
       .type('application/xml; charset=utf-8')
       .header('Cache-Control', 'public, max-age=3600')
@@ -166,6 +166,15 @@ export async function publicRoutes(app: FastifyInstance) {
       ...posts.map((post) => url(`/blog/${post.slug}`, post.date)),
       ...themes.map((t) => url(`/pretraga?theme=${encodeURIComponent(t.slug)}`)),
     ]);
+  });
+
+  app.get('/sitemap-oglasi.xml', async (_req, reply) => {
+    if (!config.PUBLIC_MODE || config.LISTINGS_MODE !== 'on') return reply.code(404).send('');
+    const ads = await query<{ id: string; updated: string }>(
+      `SELECT id::text, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS updated
+         FROM listings WHERE status = 'active' AND expires_at > now() ORDER BY id DESC LIMIT 5000`,
+    );
+    return xml(reply, [url('/oglasi'), ...ads.map((a) => url(`/oglasi/${a.id}`, a.updated))]);
   });
 
   app.get('/sitemap-sets.xml', async (_req, reply) => (config.PUBLIC_MODE ? xml(reply, await setUrls()) : reply.code(404).send('')));
