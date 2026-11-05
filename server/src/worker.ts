@@ -10,6 +10,7 @@ import { sendWatchAlerts } from './push/alerts.js';
 import { instagramJob } from './social/instagram.js';
 import { expireListings, purgeExpiredListings, purgeOldReports, sendExpiryReminders, sweepOrphanImages } from './listings/service.js';
 import { mailConfigured, sendAccountMail } from './mail/mailer.js';
+import { sendWelcomeMails } from './mail/welcome.js';
 
 const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
 
@@ -47,6 +48,17 @@ async function listingsJob() {
   }
 }
 
+/** Every minute: the welcome e-mail for accounts confirmed 10 minutes ago */
+async function welcomeJob() {
+  if (!mailConfigured()) return;
+  try {
+    const n = await sendWelcomeMails(sendAccountMail, log);
+    if (n) log(`dobrodošlica: poslato ${n}`);
+  } catch (err) {
+    log(`posao: dobrodošlica nije poslata: ${(err as Error).stack ?? err}`);
+  }
+}
+
 async function digestJob() {
   // phones first (quick), then the e-mails
   try {
@@ -76,6 +88,7 @@ async function main() {
   cron.schedule(config.CRAWL_CRON, crawlJob, { timezone: config.TZ_NAME, name: 'crawl' });
   cron.schedule(config.DIGEST_CRON, digestJob, { timezone: config.TZ_NAME, name: 'digest' });
   cron.schedule(config.LISTINGS_CRON, listingsJob, { timezone: config.TZ_NAME, name: 'listings' });
+  cron.schedule(config.WELCOME_CRON, welcomeJob, { timezone: config.TZ_NAME, name: 'welcome' });
   if (config.INSTAGRAM_CRON) cron.schedule(config.INSTAGRAM_CRON, instagram, { timezone: config.TZ_NAME, name: 'instagram' });
   log(
     `worker: preuzimanje "${config.CRAWL_CRON}", pregled "${config.DIGEST_CRON}", instagram "${config.INSTAGRAM_CRON || 'isključen'}", oglasi "${config.LISTINGS_CRON}" (${config.TZ_NAME})`,

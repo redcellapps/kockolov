@@ -125,6 +125,9 @@ const schema = z.object({
   LISTINGS_MODE: z.enum(['off', 'admins', 'on']).default('off'),
   // daily: reminders before an ad expires, expiring, deleting ads that stayed expired for 30 days
   LISTINGS_CRON: z.string().default('0 9 * * *'),
+  // welcome e-mail: checked every minute, sent this long after the account is confirmed
+  WELCOME_CRON: z.string().default('* * * * *'),
+  WELCOME_DELAY_MINUTES: z.coerce.number().int().min(0).default(10),
   LISTINGS_DIR: z.string().default(fileURLToPath(new URL('../../data/listings', import.meta.url))),
   OG_CACHE_DIR: z.string().default(fileURLToPath(new URL('../../cache/og', import.meta.url))),
   // minutes between rounds that prepare every public set's preview image ahead of time; 0 = off
