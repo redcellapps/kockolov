@@ -4,6 +4,7 @@ import { Button, cx, EmptyState, Spinner } from '../components/ui';
 import { t } from '../i18n';
 import { ApiError } from '../lib/api';
 import { money, timeHM } from '../lib/format';
+import { serverUrl } from '../lib/platform';
 import { usePageTitle } from '../lib/title';
 import { useAdActions, useConversations, useThread, type Conversation } from './store';
 
@@ -23,6 +24,7 @@ function Thread({ c }: { c: Conversation }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [reported, setReported] = useState(false);
+  const [blockAsk, setBlockAsk] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const msgs = q.data?.messages ?? [];
   // opening a conversation reads it on the server; refresh the badge and the list once it did
@@ -61,7 +63,7 @@ function Thread({ c }: { c: Conversation }) {
             <span className="block truncate text-xs text-ink-3">{c.listing_title} · {t('msg.adDeleted')}</span>
           )}
         </div>
-        {c.listing_image && <img src={c.listing_image} alt="" className="hidden h-11 w-14 rounded-lg object-cover sm:block" />}
+        {c.listing_image && <img src={serverUrl(c.listing_image)} alt="" className="hidden h-11 w-14 rounded-lg object-cover sm:block" />}
         {c.listing_price !== null && <div className="tabular text-sm font-extrabold">{money(c.listing_price)}</div>}
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-4" style={{ maxHeight: '28rem' }}>
@@ -77,6 +79,12 @@ function Thread({ c }: { c: Conversation }) {
         ))}
         <div ref={end} />
       </div>
+      {c.blocked ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line p-3 text-sm">
+          <span className="font-semibold text-ink-2">{t('block.inThread')}</span>
+          <Button size="sm" variant="outline" onClick={() => void actions.block({ conversation_id: c.id }, false).catch(() => {})}>{t('block.unblock')}</Button>
+        </div>
+      ) : (
       <form className="flex gap-2 border-t border-line p-3" onSubmit={(e) => (e.preventDefault(), void send())}>
         <textarea
           rows={1}
@@ -89,8 +97,20 @@ function Thread({ c }: { c: Conversation }) {
         />
         <Button type="submit" disabled={!text.trim() || busy}>{t('msg.send')}</Button>
       </form>
+      )}
       {err && <p role="alert" className="mx-3 mb-2 rounded-xl bg-deal-soft px-3 py-2 text-sm font-semibold text-deal">{err}</p>}
-      <div className="flex justify-end px-4 pb-3 text-xs text-ink-3">
+      {blockAsk && !c.blocked && (
+        <div className="mx-3 mb-2 rounded-2xl border border-line p-3 text-sm">
+          <p className="font-semibold">{t('block.confirm', { name: c.other })}</p>
+          <p className="mt-0.5 text-xs text-ink-3">{t('block.confirmText')}</p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="dark" onClick={() => void actions.block({ conversation_id: c.id }, true).then(() => setBlockAsk(false)).catch(() => {})}>{t('block.yes')}</Button>
+            <Button size="sm" variant="outline" onClick={() => setBlockAsk(false)}>{t('block.cancel')}</Button>
+          </div>
+        </div>
+      )}
+      <div className="flex justify-end gap-4 px-4 pb-3 text-xs text-ink-3">
+        {!c.blocked && <button className="font-bold underline" onClick={() => setBlockAsk(true)}>{t('block.user')}</button>}
         <button className="font-bold underline" disabled={reported} onClick={() => void actions.reportConversation(c.id).then(() => setReported(true)).catch(() => {})}>{reported ? t('msg.reported') : t('msg.report')}</button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { api, type PushKind } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 /** Private persons sell used items only (no fiscal receipts), so there is no "new" condition */
@@ -34,6 +34,8 @@ export interface Listing {
   has_phone: boolean;
   mine: boolean;
   watched: boolean;
+  /** I blocked this seller */
+  blocked?: boolean;
   status: 'active' | 'paused' | 'sold' | 'expired' | 'removed';
   created_at: string;
   views: number;
@@ -65,7 +67,18 @@ export interface Conversation {
   other: string;
   last: { text: string; at: string; mine: boolean } | null;
   unread: number;
+  /** I blocked the other person */
+  blocked?: boolean;
 }
+
+/** Someone I blocked (account page) */
+export interface BlockedUser {
+  id: number;
+  name: string;
+  since: string;
+}
+/** Who to block: the seller of an ad, or the other person in a conversation */
+export type BlockTarget = { listing_id: string | number } | { conversation_id: number };
 export interface Thread {
   id: number;
   listing_id: number | null;
@@ -84,6 +97,7 @@ export const useAds = () => useQuery({ queryKey: ['ads'], queryFn: () => api<{ i
 export const useAd = (id: string | undefined) => useQuery({ queryKey: ['ad', id], queryFn: () => api<Listing>(`/api/oglasi/${id}`), enabled: !!id, staleTime: 15_000, retry: false });
 export const useMyAds = () => useQuery({ queryKey: ['my-ads'], queryFn: () => api<{ items: Listing[] }>('/api/me/oglasi').then(items), staleTime: 15_000 });
 export const useWatchedAds = () => useQuery({ queryKey: ['watched-ads'], queryFn: () => api<{ items: WatchedListing[] }>('/api/me/oglasi/pracenje').then(items), staleTime: 15_000 });
+export const useBlocks = (enabled = true) => useQuery({ queryKey: ['blocks'], queryFn: () => api<{ items: BlockedUser[] }>('/api/me/blokade').then(items), enabled });
 export const useConversations = () =>
   useQuery({ queryKey: ['conversations'], queryFn: () => api<{ items: Conversation[] }>('/api/poruke').then(items), staleTime: 5_000, refetchInterval: 20_000 });
 export const useThread = (id: string | undefined) =>
@@ -121,7 +135,7 @@ export interface AdForm {
   images: number[];
 }
 
-const DATA_KEYS = ['ads', 'ad', 'my-ads', 'watched-ads', 'ads-status', 'conversations', 'thread'];
+const DATA_KEYS = ['ads', 'ad', 'my-ads', 'watched-ads', 'ads-status', 'conversations', 'thread', 'blocks'];
 
 /** Everything that changes data: each call refreshes the lists that may show it */
 export function useAdActions() {
@@ -145,6 +159,8 @@ export function useAdActions() {
     message: (adId: string, text: string) => run(api<{ conversation_id: number }>(`/api/oglasi/${adId}/poruke`, { method: 'POST', json: { text } })).then((r) => r.conversation_id),
     reply: (convId: number | string, text: string) => run(api(`/api/poruke/${convId}`, { method: 'POST', json: { text } })),
     reportConversation: (convId: number | string) => post(`/api/poruke/${convId}/prijava`),
+    block: (target: BlockTarget, on: boolean) => run(api(`/api/blokade`, { method: on ? 'POST' : 'DELETE', json: target })),
+    unblock: (id: number) => run(api(`/api/me/blokade/${id}`, { method: 'DELETE' })),
     uploadPhoto: async (file: File) => api<{ id: number; url: string }>('/api/oglasi/slike', { method: 'POST', body: await shrink(file), headers: { 'Content-Type': 'image/jpeg' } }),
   };
 }
@@ -153,7 +169,7 @@ export function useAdActions() {
 export function useProfileMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (patch: { phone?: string; msgEmailEnabled?: boolean }) => api('/api/me', { method: 'PATCH', json: patch }),
+    mutationFn: (patch: { phone?: string; msgEmailEnabled?: boolean; pushPrefs?: Partial<Record<PushKind, boolean>> }) => api('/api/me', { method: 'PATCH', json: patch }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['me'] }),
   });
 }

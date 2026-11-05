@@ -5,6 +5,7 @@ import { Button, cx, Spinner } from '../components/ui';
 import { Field } from '../pages/Login';
 import { t } from '../i18n';
 import { ApiError, api, type SearchResponse, type SetDetail, type Theme } from '../lib/api';
+import { isApp, serverUrl } from '../lib/platform';
 import { usePageTitle } from '../lib/title';
 import { useAuth } from '../lib/auth';
 import { CONDITIONS, loadCatalog, PHOTO_H, PHOTO_W, useAd, useAdActions, useProfileMutation, type AdForm, type Condition, type Listing } from './store';
@@ -293,7 +294,7 @@ function ListingForm({ edit }: { edit?: Listing }) {
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {images.map((im, i) => (
                 <div key={im.id} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-line">
-                  <img src={im.url} alt="" className="h-full w-full object-cover" />
+                  <img src={serverUrl(im.url)} alt="" className="h-full w-full object-cover" />
                   {i === 0 && <span className="absolute left-1 top-1 rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-extrabold text-bg">1</span>}
                   <button aria-label={t('ads.new.removePhoto')} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-ink/80 text-xs text-bg" onClick={() => setImages(images.filter((_, j) => j !== i))}>✕</button>
                 </div>
@@ -307,6 +308,13 @@ function ListingForm({ edit }: { edit?: Listing }) {
                 <label className="grid aspect-[4/3] cursor-pointer place-items-center rounded-xl border-2 border-dashed border-line text-center text-xs font-bold text-ink-2 hover:border-ink-3">
                   <span>＋<br />{t('ads.new.addPhoto')}</span>
                   <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => void addPhotos(e.target)} />
+                </label>
+              )}
+              {isApp && images.length + pending < 8 && (
+                // in the app the file picker opens the gallery; this one opens the camera straight away
+                <label className="grid aspect-[4/3] cursor-pointer place-items-center rounded-xl border-2 border-dashed border-line text-center text-xs font-bold text-ink-2 hover:border-ink-3">
+                  <span>📷<br />{t('ads.new.takePhoto')}</span>
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void addPhotos(e.target)} />
                 </label>
               )}
             </div>

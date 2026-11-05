@@ -6,7 +6,9 @@ import { t } from '../i18n';
 import { ApiError, api, type SetDetail } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { dateLong, money } from '../lib/format';
+import { serverUrl } from '../lib/platform';
 import { usePageTitle } from '../lib/title';
+import { ShareButton } from '../components/ShareButton';
 import { AdCard, CondBadge, adAgo } from './AdCard';
 import { priceChange, useAd, useAdActions, useAds } from './store';
 
@@ -27,6 +29,7 @@ export default function ListingDetail() {
   const [err, setErr] = useState<string | null>(null);
   const [reporting, setReporting] = useState<'closed' | 'open' | 'done'>('closed');
   const [reason, setReason] = useState('');
+  const [blockAsk, setBlockAsk] = useState(false);
   const following = !!l?.watched;
   const fail = (e: unknown) => setErr(e instanceof ApiError ? e.message : t('ads.detail.errorGeneric'));
   /** contacting and following need an account */
@@ -70,14 +73,14 @@ export default function ListingDetail() {
       <div className="mt-4 grid gap-8 lg:grid-cols-[1.15fr_1fr]">
         <div>
           <div className="relative overflow-hidden rounded-3xl border border-line bg-surface-2">
-            <img src={l.images[img]} alt={l.title} className="aspect-[4/3] w-full object-cover" />
+            <img src={l.images[img] ? serverUrl(l.images[img]) : undefined} alt={l.title} className="aspect-[4/3] w-full object-cover" />
             <CondBadge c={l.condition} className="absolute left-4 top-4 shadow-sm" />
           </div>
           {l.images.length > 1 && (
             <div className="mt-3 flex gap-2 overflow-x-auto">
               {l.images.map((src, i) => (
                 <button key={i} onClick={() => setImg(i)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${i === img ? 'border-ink' : 'border-transparent opacity-70'}`}>
-                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <img src={serverUrl(src)} alt="" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
@@ -99,6 +102,9 @@ export default function ListingDetail() {
             <Button variant={following ? 'dark' : 'outline'} size="sm" className="mt-3 w-full" disabled={l.mine || l.status !== 'active' && !following} onClick={() => { if (!needLogin()) void actions.watch(l.id, !following).catch(fail); }}>
               {following ? '♥ ' + t('ads.detail.following') : '♡ ' + t('ads.detail.follow')}
             </Button>
+            {l.status === 'active' && (
+              <ShareButton path={`/oglasi/${l.id}`} title={l.title} text={t('ads.share.text', { title: l.title, price: money(l.price_rsd) })} className="mt-2 w-full" dialogTitle={t('ads.share.title')} />
+            )}
             {cmp !== null && shopMin && (
               <p className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold ${cmp > 0 ? 'bg-save-soft text-save' : 'bg-surface-2 text-ink-2'}`}>
                 {cmp > 0 ? t('ads.cheaperThanShops', { pct: cmp }) : t('ads.pricierThanShops')} · {t('ads.shopsFrom', { price: money(shopMin) })}
@@ -126,7 +132,14 @@ export default function ListingDetail() {
                 <div className="text-xs text-ink-3">{t('ads.detail.memberSince', { date: dateLong(l.seller_since) })}</div>
               </div>
             </div>
-            <div className="mt-4 grid gap-2">
+            {l.blocked && (
+              <div className="mt-4 rounded-2xl bg-surface-2 p-3 text-sm">
+                <p className="font-semibold">{t('block.youBlocked')}</p>
+                <p className="mt-0.5 text-xs text-ink-3">{t('block.youBlockedText')}</p>
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => void actions.block({ listing_id: l.id }, false).catch(fail)}>{t('block.unblock')}</Button>
+              </div>
+            )}
+            <div className={`mt-4 grid gap-2 ${l.blocked ? 'hidden' : ''}`}>
               {l.has_phone && l.status === 'active' ? (
                 phone ? (
                   <a href={`tel:${phone.replace(/\s/g, '')}`} className="flex h-11 items-center justify-center rounded-xl bg-ink text-[15px] font-bold text-bg">📞 {phone}</a>
@@ -166,7 +179,22 @@ export default function ListingDetail() {
                   {reporting === 'done' ? t('ads.detail.reported') : t('ads.detail.report')}
                 </button>
               )}
+              {!l.mine && !l.blocked && (
+                <button className="text-ink-2 underline" onClick={() => !needLogin() && setBlockAsk(true)}>
+                  {t('block.seller')}
+                </button>
+              )}
             </div>
+            {blockAsk && !l.blocked && (
+              <div className="mt-3 rounded-2xl border border-line p-3 text-sm">
+                <p className="font-semibold">{t('block.confirm', { name: l.seller })}</p>
+                <p className="mt-0.5 text-xs text-ink-3">{t('block.confirmText')}</p>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="dark" onClick={() => void actions.block({ listing_id: l.id }, true).then(() => setBlockAsk(false)).catch(fail)}>{t('block.yes')}</Button>
+                  <Button size="sm" variant="outline" onClick={() => setBlockAsk(false)}>{t('block.cancel')}</Button>
+                </div>
+              </div>
+            )}
             {reporting === 'open' && (
               <div className="mt-3 grid gap-2">
                 <textarea rows={2} maxLength={500} className="w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-ink" placeholder={t('ads.detail.reportReason')} value={reason} onChange={(e) => setReason(e.target.value)} />

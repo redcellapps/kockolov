@@ -28,7 +28,7 @@ async function copy(text: string): Promise<boolean> {
  * "Podeli": the phone's share sheet (Viber, WhatsApp, …); on a computer the link is copied. The link always
  * points to kockolov.rs (also from the app) and carries utm_source=share, so the statistics show visits from shares.
  */
-export function ShareButton({ path, title, text, className }: { path: string; title: string; text: string; className?: string }) {
+export function ShareButton({ path, title, text, className, dialogTitle }: { path: string; title: string; text: string; className?: string; dialogTitle?: string }) {
   const [copied, setCopied] = useState(false);
   const share = async () => {
     const url = `${SITE_URL}${path}?utm_source=share`;
@@ -37,7 +37,7 @@ export function ShareButton({ path, title, text, className }: { path: string; ti
       if (isApp) {
         // the share plugin arrived with app 1.1: older builds fall through to copying
         const { Share } = await import('@capacitor/share');
-        await Share.share({ title, text, url, dialogTitle: t('share.title') });
+        await Share.share({ title, text, url, dialogTitle: dialogTitle ?? t('share.title') });
         return;
       }
       if (typeof navigator.share === 'function') {

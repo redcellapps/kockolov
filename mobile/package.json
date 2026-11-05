@@ -1,7 +1,7 @@
 {
   "name": "kockolov-mobile",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Kockolov za Android i iOS: isti sajt (web/) u Capacitor ljusci, sa obaveštenjima i skenerom bar-koda",
   "scripts": {
     "build:web": "npm run build:app --prefix ../web",

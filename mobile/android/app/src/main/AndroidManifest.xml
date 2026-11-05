@@ -21,6 +21,19 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- kockolov.rs links (sets, ads, messages, e-mail links) open in the app once Google has checked
+                 https://kockolov.rs/.well-known/assetlinks.json (ANDROID_CERT_SHA256 on the server); other pages stay in the browser -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="kockolov.rs" />
+                <data android:pathPrefix="/set/" />
+                <data android:pathPrefix="/oglasi" />
+                <data android:pathPrefix="/poruke" />
+                <data android:pathPrefix="/moji-oglasi" />
+                <data android:pathPrefix="/pracenje" />
+            </intent-filter>
 
         </activity>
 
