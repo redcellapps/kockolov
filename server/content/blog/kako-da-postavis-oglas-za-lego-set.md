@@ -2,7 +2,7 @@
 title: Kako da postaviš oglas za LEGO set: primer korak po korak
 seoTitle: Kako da postaviš oglas za LEGO set na Kockolovu | Kockolov
 description: Prodaješ korišćen LEGO set? Na primeru seta 10328 Buket ruža pokazujemo kako se postavlja oglas za par minuta, šta pisati u opisu i kako da ga produžiš.
-date: 2026-11-09
+date: 2026-11-05
 author: Milan Đorđević
 image: oglasi-naslovna.jpg
 imageAlt: Žuta naslovnica sa tekstom „Prodaj svoj LEGO set“ i snimkom ekrana forme za postavljanje oglasa na Kockolovu
