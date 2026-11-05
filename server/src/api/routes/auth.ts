@@ -1,10 +1,12 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { config } from '../../config.js';
 import { one, query, tx } from '../../db.js';
 import { eurRate } from '../../fx.js';
 import { accountFrom, mailConfigured } from '../../mail/mailer.js';
 import { hashToken, linkSentRecently, sendLink, validLink } from '../invites.js';
+import { verifyRecaptcha } from '../captcha.js';
+import { domainAcceptsMail, isDisposableEmail } from '../disposable.js';
 import {
   createLimiter,
   createSession,
@@ -20,7 +22,8 @@ const credentials = z.object({
   email: z.string().email().max(200),
   password: z.string().min(1).max(200),
 });
-const emailOnly = z.object({ email: z.string().email().max(200) });
+const emailOnly = z.object({ email: z.string().email().max(200), recaptcha: z.string().max(4000).optional() });
+const recaptchaField = z.string().max(4000).optional();
 
 // abuse protection for the public forms (per client IP, and per address for anything that sends mail)
 export const limits = {
@@ -29,6 +32,7 @@ export const limits = {
   mailAddress: createLimiter(5, 60 * 60_000),
 };
 const TOO_MANY = 'Previše pokušaja. Pokušaj ponovo malo kasnije.';
+const NOT_HUMAN = 'Nismo uspeli da potvrdimo da nisi robot. Osveži stranicu i pokušaj ponovo.';
 const MAIL_FAILED = 'Nismo uspeli da pošaljemo e-mail. Pokušaj ponovo za nekoliko minuta.';
 
 export async function authRoutes(app: FastifyInstance) {
@@ -51,6 +55,25 @@ export async function authRoutes(app: FastifyInstance) {
     return false;
   }
 
+  /** Sign-up and mail requests: throwaway or undeliverable addresses, then the bot check. Sends the refusal itself. */
+  async function botGuard(req: FastifyRequest, reply: FastifyReply, email: string, token: string | undefined, action: string): Promise<boolean> {
+    if (isDisposableEmail(email)) {
+      reply.code(400).send({ error: 'Ova adresa nije dozvoljena. Unesi svoju pravu e-mail adresu.' });
+      return false;
+    }
+    if (!(await domainAcceptsMail(email))) {
+      reply.code(400).send({ error: 'Domen ove adrese ne prima e-mail. Proveri adresu.' });
+      return false;
+    }
+    const v = await verifyRecaptcha(token, req.ip, action);
+    if (!v.ok) {
+      req.log.warn({ action, reason: v.reason }, 'reCAPTCHA odbila zahtev');
+      reply.code(403).send({ error: NOT_HUMAN });
+      return false;
+    }
+    return true;
+  }
+
   function mailLimited(ip: string, email: string, reply: FastifyReply): boolean {
     if (limits.mailIp.hit(ip) || limits.mailAddress.hit(email)) {
       reply.code(429).send({ error: TOO_MANY });
@@ -63,6 +86,8 @@ export async function authRoutes(app: FastifyInstance) {
     user: req.user ?? null,
     publicMode: config.PUBLIC_MODE,
     registrationOpen: config.registrationOpen,
+    // public key for the bot check on sign-up and password requests (null = check off)
+    recaptchaSiteKey: config.RECAPTCHA_SITE_KEY || null,
     // for showing prices in euros (users who chose EUR)
     fx: { eur: await eurRate() },
     // where the page views go (null = no statistics)
@@ -100,14 +125,15 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/register', async (req, reply) => {
     if (!config.registrationOpen) return reply.code(403).send({ error: 'Registracija trenutno nije otvorena.' });
     const body = credentials
-      .extend({ password: z.string().min(8).max(200), name: z.string().max(80).optional() })
+      .extend({ password: z.string().min(8).max(200), name: z.string().max(80).optional(), recaptcha: recaptchaField })
       .safeParse(req.body);
     if (!body.success) {
       const emailBad = body.error.issues.some((i) => i.path[0] === 'email');
       return reply.code(400).send({ error: emailBad ? 'Unesi ispravnu e-mail adresu.' : 'Lozinka mora imati bar 8 karaktera.' });
     }
-    if (limits.registerIp.hit(req.ip)) return reply.code(429).send({ error: TOO_MANY });
     const email = normalizeEmail(body.data.email);
+    if (!(await botGuard(req, reply, email, body.data.recaptcha, 'register'))) return;
+    if (limits.registerIp.hit(req.ip)) return reply.code(429).send({ error: TOO_MANY });
     const name = body.data.name?.trim() ?? '';
     const passwordHash = await hashPassword(body.data.password);
     const existing = await one<{ id: number; accepted_at: string | null }>('SELECT id, accepted_at FROM users WHERE email = $1', [email]);
@@ -142,6 +168,7 @@ export async function authRoutes(app: FastifyInstance) {
     const body = emailOnly.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Unesi ispravnu e-mail adresu.' });
     const email = normalizeEmail(body.data.email);
+    if (!(await botGuard(req, reply, email, body.data.recaptcha, 'resend'))) return;
     if (mailLimited(req.ip, email, reply)) return;
     const u = await one<{ id: number }>('SELECT id FROM users WHERE email = $1 AND accepted_at IS NULL', [email]);
     if (u && !(await linkSentRecently(u.id, 'verify'))) {
@@ -155,6 +182,7 @@ export async function authRoutes(app: FastifyInstance) {
     const body = emailOnly.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Unesi ispravnu e-mail adresu.' });
     const email = normalizeEmail(body.data.email);
+    if (!(await botGuard(req, reply, email, body.data.recaptcha, 'forgot'))) return;
     if (mailLimited(req.ip, email, reply)) return;
     const u = await one<{ id: number }>('SELECT id FROM users WHERE email = $1', [email]);
     if (u && !(await linkSentRecently(u.id, 'reset'))) {

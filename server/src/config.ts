@@ -34,6 +34,15 @@ const schema = z.object({
   // where the app's pages come from (iOS, Android): these may call the API from another origin
   APP_ORIGINS: z.string().default('capacitor://localhost,https://localhost'),
 
+  // Google reCAPTCHA v3 on sign-up, new-password and confirmation-mail requests. Without the secret the
+  // check is off (local development); the site key is public and goes to the browser via /api/auth/me.
+  RECAPTCHA_SITE_KEY: z.string().optional(),
+  RECAPTCHA_SECRET_KEY: z.string().optional(),
+  // refuse sign-up addresses whose domain has no mail server (DNS lookup); off for offline tests
+  MAIL_DOMAIN_CHECK: bool(true),
+  // 0 = bot, 1 = human; below this score the request is refused
+  RECAPTCHA_MIN_SCORE: z.coerce.number().min(0).max(1).default(0.5),
+
   // Visitor statistics (Umami, self-hosted, no cookies): both set = the site and the apps report page views
   UMAMI_URL: z.string().optional(),
   UMAMI_WEBSITE_ID: z.string().optional(),

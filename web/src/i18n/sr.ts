@@ -238,6 +238,7 @@ export const sr = {
   'register.password': 'Lozinka (bar 8 karaktera)',
   'register.privacy': 'Registracijom prihvataš',
   'register.privacyLink': 'politiku privatnosti',
+  'register.recaptcha': 'Sajt je zaštićen reCAPTCHA-om. Primenjuju se Google politika privatnosti i uslovi korišćenja.',
   'login.forgot': 'Zaboravio si lozinku?',
   'login.resend': 'Pošalji ponovo link za potvrdu',
   'forgot.title': 'Zaboravljena lozinka',
@@ -647,7 +648,7 @@ export const sr = {
   'privacy.why.4': 'Za zaštitu sajta od zloupotrebe, na osnovu legitimnog interesa.',
   'privacy.cookies.h': 'Kolačići',
   'privacy.cookies.1':
-    'Koristimo jedan neophodan kolačić (kl_session), koji te drži prijavljenim. Nema reklamnih ni analitičkih kolačića, pa ne tražimo ni pristanak za njih.',
+    'Koristimo jedan neophodan kolačić (kl_session), koji te drži prijavljenim. Nema reklamnih ni analitičkih kolačića. Na stranicama za registraciju i zaboravljenu lozinku Google reCAPTCHA može da postavi svoje tehničke kolačiće za zaštitu od botova.',
   'privacy.cookies.2': 'U aplikaciji umesto kolačića koristimo token za prijavu, sačuvan na telefonu. Važi godinu dana ili dok se ne odjaviš.',
   'privacy.where.h': 'Gde su podaci i ko im ima pristup',
   'privacy.where.1': 'Podatke ne prodajemo i ne dajemo ih drugima za marketing.',

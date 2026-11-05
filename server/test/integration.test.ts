@@ -62,6 +62,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await migrate(log);
     mock = await startMockShops();
+    config.MAIL_DOMAIN_CHECK = false; // the sandbox has no DNS; example.com addresses are fine here
     config.LSTORE_BASE_URL = mock.base;
     config.KOCKARIUM_BASE_URL = mock.base;
     config.ANANAS_BASE_URL = mock.base;

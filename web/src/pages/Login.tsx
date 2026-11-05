@@ -6,6 +6,7 @@ import { Button } from '../components/ui';
 import { t } from '../i18n';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { recaptchaToken } from '../lib/recaptcha';
 import { usePageTitle } from '../lib/title';
 
 export function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
@@ -48,11 +49,13 @@ function modeFor(pathname: string): Mode {
 
 /** "Check your inbox" after signing up or asking for a new password, with a resend button. */
 function CheckInbox({ kind, email, onBack }: { kind: 'signup' | 'forgot'; email: string; onBack: () => void }) {
+  const { recaptchaSiteKey } = useAuth();
   const [state, setState] = useState<'idle' | 'busy' | 'sent' | string>('idle');
   async function resend() {
     setState('busy');
     try {
-      await api(kind === 'signup' ? '/api/auth/resend' : '/api/auth/forgot', { method: 'POST', json: { email } });
+      const recaptcha = await recaptchaToken(recaptchaSiteKey, kind === 'signup' ? 'resend' : 'forgot');
+      await api(kind === 'signup' ? '/api/auth/resend' : '/api/auth/forgot', { method: 'POST', json: { email, recaptcha } });
       setState('sent');
     } catch (err) {
       setState((err as Error).message);
@@ -82,7 +85,7 @@ function CheckInbox({ kind, email, onBack }: { kind: 'signup' | 'forgot'; email:
 }
 
 export default function LoginPage() {
-  const { refresh, registrationOpen } = useAuth();
+  const { refresh, registrationOpen, recaptchaSiteKey } = useAuth();
   const loc = useLocation();
   const navigate = useNavigate();
   const mode = modeFor(loc.pathname);
@@ -110,11 +113,13 @@ export default function LoginPage() {
         await api('/api/auth/login', { method: 'POST', json: { email, password } });
         await refresh(); // LoginRoute then redirects to where the user was going
       } else if (mode === 'register') {
-        await api('/api/auth/register', { method: 'POST', json: { email, password, name } });
+        const recaptcha = await recaptchaToken(recaptchaSiteKey, 'register');
+        await api('/api/auth/register', { method: 'POST', json: { email, password, name, recaptcha } });
         trackEvent('registracija');
         setSent({ kind: 'signup', email: email.trim() });
       } else {
-        await api('/api/auth/forgot', { method: 'POST', json: { email } });
+        const recaptcha = await recaptchaToken(recaptchaSiteKey, 'forgot');
+        await api('/api/auth/forgot', { method: 'POST', json: { email, recaptcha } });
         setSent({ kind: 'forgot', email: email.trim() });
       }
     } catch (err) {
@@ -127,7 +132,8 @@ export default function LoginPage() {
   async function resendConfirmation() {
     setBusy(true);
     try {
-      await api('/api/auth/resend', { method: 'POST', json: { email } });
+      const recaptcha = await recaptchaToken(recaptchaSiteKey, 'resend');
+      await api('/api/auth/resend', { method: 'POST', json: { email, recaptcha } });
       setSent({ kind: 'signup', email: email.trim() });
     } catch (err) {
       setError({ message: (err as Error).message });
@@ -214,6 +220,7 @@ export default function LoginPage() {
               {t('register.privacyLink')}
             </Link>
             .
+            {recaptchaSiteKey && <> {t('register.recaptcha')}</>}
           </p>
         )}
       </form>
