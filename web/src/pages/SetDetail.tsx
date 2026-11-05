@@ -155,7 +155,7 @@ export default function SetDetail() {
           </div>
 
           <dl className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-            <Stat label={t('set.rrp')} value={rrp ? money(rrp) : '—'} hint={rrp ? undefined : t('set.rrp.unknown')} />
+            <Stat label={t('set.rrp')} value={rrp ? money(rrp) : '—'} hint={rrp ? t('set.rrp.where') : t('set.rrp.unknown')} />
             <Stat label={t('set.lowest30')} value={money(stats?.lowest_30d)} />
             <Stat label={t('set.lowestEver')} value={money(stats?.lowest_ever)} hint={stats?.tracked_since ? t('set.trackedSince', { date: dateLong(stats.tracked_since) }) : undefined} />
           </dl>

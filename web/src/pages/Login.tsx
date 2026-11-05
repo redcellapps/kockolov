@@ -105,6 +105,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhoneVal] = useState('');
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<{ kind: 'signup' | 'forgot'; email: string } | null>(null);
@@ -127,7 +128,10 @@ export default function LoginPage() {
         await refresh(); // LoginRoute then redirects to where the user was going
       } else if (mode === 'register') {
         const recaptcha = await recaptchaToken(recaptchaSiteKey, 'register');
-        await api('/api/auth/register', { method: 'POST', json: { email, password, name, recaptcha } });
+        await api('/api/auth/register', {
+          method: 'POST',
+          json: { email, password, name, ...(phone.trim() ? { phone: phone.trim() } : {}), recaptcha },
+        });
         trackEvent('registracija');
         setSent({ kind: 'signup', email: email.trim() });
       } else {
@@ -229,6 +233,12 @@ export default function LoginPage() {
                 {t('login.forgot')}
               </button>
             )}
+          </div>
+        )}
+        {mode === 'register' && (
+          <div>
+            <Field label={t('register.phone')} value={phone} onChange={(e) => setPhoneVal(e.target.value)} autoComplete="tel" inputMode="tel" maxLength={24} />
+            <p className="mt-1.5 text-xs text-ink-3">{t('register.phoneHint')}</p>
           </div>
         )}
         {error && (

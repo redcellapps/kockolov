@@ -103,6 +103,10 @@ const schema = z.object({
   // account key (Project settings → Service accounts → Generate new private key) as a file path,
   // or its JSON / base64 JSON. Empty = the apps get no notifications (the site's still work).
   FCM_SERVICE_ACCOUNT: z.string().optional(),
+  // Android App Links: SHA-256 of the app's signing certificate(s), comma-separated, from Play Console →
+  // Test and release → App integrity → App signing (both the "App signing key" and the "Upload key").
+  // Empty = /.well-known/assetlinks.json is 404 and kockolov.rs links open in the browser as before.
+  ANDROID_CERT_SHA256: z.string().optional(),
   // LEGO Store product pages read per crawl to learn the box barcodes (for scanning in the app); 0 = off
   EAN_PER_RUN: z.coerce.number().default(400),
 
@@ -117,6 +121,11 @@ const schema = z.object({
 
   // Link-preview images (and the product photos in them) kept on disk — a Docker volume in
   // production — so a shared link shows its picture at once, also right after a deploy
+  // Oglasi (classifieds): off = hidden, admins = only administrators (testing on the live site), on = every signed-in user
+  LISTINGS_MODE: z.enum(['off', 'admins', 'on']).default('off'),
+  // daily: reminders before an ad expires, expiring, deleting ads that stayed expired for 30 days
+  LISTINGS_CRON: z.string().default('0 9 * * *'),
+  LISTINGS_DIR: z.string().default(fileURLToPath(new URL('../../data/listings', import.meta.url))),
   OG_CACHE_DIR: z.string().default(fileURLToPath(new URL('../../cache/og', import.meta.url))),
   // minutes between rounds that prepare every public set's preview image ahead of time; 0 = off
   OG_WARM_MINUTES: z.coerce.number().default(20),

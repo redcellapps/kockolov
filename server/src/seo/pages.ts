@@ -24,7 +24,7 @@ export interface PageMeta {
   path: string;
   canonical?: string;
   robots?: string;
-  image?: { url: string; alt: string };
+  image?: { url: string; alt: string; width?: number; height?: number };
   type?: 'website' | 'product' | 'article';
   product?: { price: number; availability: 'instock' | 'oos' };
   article?: { published: string; author: string };
@@ -145,7 +145,7 @@ export async function loadCollection(kind: 'home' | 'deals' | 'theme', slug?: st
     return {
       title: 'LEGO ponude dana',
       subtitle: st.max_pct
-        ? `${count(st.deals, 'najisplativija kupovina', 'najisplativije kupovine', 'najisplativijih kupovina')} danas, do${NB}−${st.max_pct}% u odnosu na LEGO® Store.`
+        ? `${count(st.deals, 'najisplativija kupovina', 'najisplativije kupovine', 'najisplativijih kupovina')} danas, do${NB}−${st.max_pct}% u odnosu na redovnu cenu u LEGO® Store-u.`
         : 'Najisplativije LEGO kupovine u srpskim prodavnicama, svakog jutra.',
       items,
     };
@@ -169,17 +169,22 @@ const DEFAULT: Omit<PageMeta, 'path'> = {
   type: 'website',
 };
 
-const PRIVATE_PATHS = ['/prijava', '/registracija', '/zaboravljena-lozinka', '/nalog', '/pracenje', '/admin', '/tv'];
-const PRIVATE_PREFIXES = ['/poziv/', '/potvrda/', '/odjava/'];
+const PRIVATE_PATHS = ['/prijava', '/registracija', '/zaboravljena-lozinka', '/nalog', '/pracenje', '/admin', '/tv', '/poruke', '/moji-oglasi', '/oglasi/novi'];
+const PRIVATE_PREFIXES = ['/poziv/', '/potvrda/', '/odjava/', '/poruke/', '/admin/'];
+const PRIVATE_AD_PATH = /^\/oglasi\/[^/]+\/izmeni$/;
 
 export async function pageMeta(rawPath: string, params: URLSearchParams): Promise<PageMeta> {
   const p = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
   // closed testing: nothing gets indexed or previewed in detail
   if (!config.PUBLIC_MODE) return { ...DEFAULT, path: p, robots: 'noindex, nofollow' };
 
-  if (PRIVATE_PATHS.includes(p) || PRIVATE_PREFIXES.some((x) => p.startsWith(x))) {
+  if (PRIVATE_PATHS.includes(p) || PRIVATE_PREFIXES.some((x) => p.startsWith(x)) || PRIVATE_AD_PATH.test(p)) {
     return { ...DEFAULT, path: p, robots: 'noindex, follow' };
   }
+
+  if (p === '/oglasi') return adsListPage();
+  const adMatch = /^\/oglasi\/(\d+)$/.exec(p);
+  if (adMatch) return adPage(adMatch[1]);
 
   const setMatch = /^\/set\/([^/]+)$/.exec(p);
   if (setMatch) return setPage(decodeURIComponent(setMatch[1]));
@@ -212,7 +217,7 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
       canonical: p,
       title: day ? `LEGO ponude dana, ${day} | ${SITE}` : `LEGO ponude dana | ${SITE}`,
       description: st.max_pct
-        ? `Najisplativije LEGO kupovine danas u srpskim prodavnicama: ${st.deals} ponuda, do −${st.max_pct}% u odnosu na LEGO Store. Lista se osvežava svakog jutra.`
+        ? `Najisplativije LEGO kupovine danas u srpskim prodavnicama: ${st.deals} ponuda, do −${st.max_pct}% u odnosu na redovnu cenu u LEGO Store-u. Lista se osvežava svakog jutra.`
         : 'Najisplativije LEGO kupovine u srpskim prodavnicama. Lista se osvežava svakog jutra.',
       image: { url: `/og/deals.jpg?v=${version(st.deals, st.max_pct, items[0]?.best_price)}`, alt: 'LEGO ponude dana na Kockolovu' },
       body: await dealsBody(),
@@ -350,6 +355,71 @@ async function themePage(slug: string): Promise<PageMeta> {
   };
 }
 
+const CONDITION: Record<string, string> = {
+  like_new: 'kao novo',
+  used_complete: 'korišćeno, kompletno',
+  used_incomplete: 'korišćeno, nekompletno',
+  parts: 'za delove',
+};
+
+/** Classifieds are only indexed when they are public: LISTINGS_MODE=on (and the site itself public, checked by the caller) */
+async function adsListPage(): Promise<PageMeta> {
+  const path = '/oglasi';
+  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow' };
+  const n = (await one<{ n: number }>("SELECT count(*)::int AS n FROM listings WHERE status = 'active' AND expires_at > now()"))?.n ?? 0;
+  return {
+    ...DEFAULT,
+    path,
+    canonical: path,
+    title: `LEGO oglasi: polovni setovi od privatnih lica | ${SITE}`,
+    description: `Polovni LEGO setovi od privatnih lica u Srbiji${n ? `: ${count(n, 'aktivan oglas', 'aktivna oglasa', 'aktivnih oglasa')}` : ''}. Uporedi sa cenama u prodavnicama i kontaktiraj prodavca.`.replace(/\u00a0/g, ' '),
+  };
+}
+
+async function adPage(id: string): Promise<PageMeta> {
+  const path = `/oglasi/${id}`;
+  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow' };
+  const a = await one<{ title: string; description: string; condition: string; price_rsd: number; city: string; status: string; set_num: string | null; image: string | null; expired: boolean }>(
+    `SELECT l.title, l.description, l.condition, l.price_rsd, l.city, l.status, l.set_num, l.expires_at <= now() AS expired,
+            (SELECT '/media/oglasi/' || i.file FROM listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1) AS image
+       FROM listings l WHERE l.id = $1`,
+    [Number(id)],
+  );
+  if (!a || a.status === 'removed') return { ...DEFAULT, status: 404, path, title: `Oglas nije pronađen | ${SITE}`, robots: 'noindex' };
+  const live = a.status === 'active' && !a.expired;
+  const cond = CONDITION[a.condition] ?? '';
+  const description = `${a.title}, ${cond}, ${rsd(a.price_rsd)}, ${a.city}. ${a.description.replace(/\s+/g, ' ').slice(0, 120)}`.trim();
+  return {
+    status: 200,
+    path,
+    canonical: path,
+    // sold, paused and expired ads stay reachable for the owner but are kept out of the index
+    robots: live ? undefined : 'noindex, follow',
+    title: `${a.title}, ${rsd(a.price_rsd)} | Oglasi | ${SITE}`,
+    description,
+    type: 'product',
+    product: { price: a.price_rsd, availability: live ? 'instock' : 'oos' },
+    image: a.image ? { url: a.image, alt: a.title, width: 1200, height: 900 } : undefined,
+    jsonLd: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: a.title,
+        description,
+        ...(a.image ? { image: `${site()}${a.image}` } : {}),
+        itemCondition: 'https://schema.org/UsedCondition',
+        offers: {
+          '@type': 'Offer',
+          priceCurrency: 'RSD',
+          price: a.price_rsd,
+          availability: live ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
+          url: `${site()}${path}`,
+        },
+      },
+    ],
+  };
+}
+
 async function setPage(setNum: string): Promise<PageMeta> {
   const s = await loadSet(setNum);
   const path = `/set/${encodeURIComponent(setNum)}`;
@@ -364,7 +434,7 @@ async function setPage(setNum: string): Promise<PageMeta> {
   const title = s.best_price ? `${label} – od ${rsd(s.best_price)} | ${SITE}` : `${label}: cena i dostupnost | ${SITE}`;
   const description = s.best_price
     ? `Uporedi cene za LEGO ${theme}${s.set_num} ${s.name}. Najjeftinije danas: ${rsd(s.best_price)} (${shop})` +
-      (pct >= 3 ? `, ${pct}% manje nego u LEGO Store-u.` : '.') +
+      (pct >= 3 ? `, ${pct}% ispod redovne cene u LEGO Store-u.` : '.') +
       ` Cene iz ${fromShops(Math.max(s.shops_in_stock, 1)).replace(NB, ' ')} i istorija cena.`
     : `LEGO ${theme}${s.set_num} ${s.name} trenutno nije na stanju u srpskim prodavnicama. Prati set na Kockolovu i saznaj kad se pojavi i po kojoj ceni.`;
 
@@ -451,8 +521,8 @@ export function injectHead(template: string, m: PageMeta): string {
       ? [
           `<meta property="og:image" content="${attr(image.url)}" />`,
           `<meta property="og:image:type" content="image/jpeg" />`,
-          `<meta property="og:image:width" content="${OG_WIDTH}" />`,
-          `<meta property="og:image:height" content="${OG_HEIGHT}" />`,
+          `<meta property="og:image:width" content="${m.image?.width ?? OG_WIDTH}" />`,
+          `<meta property="og:image:height" content="${m.image?.height ?? OG_HEIGHT}" />`,
           `<meta property="og:image:alt" content="${attr(image.alt)}" />`,
         ]
       : []),

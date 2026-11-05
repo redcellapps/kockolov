@@ -264,6 +264,37 @@ cat > /etc/cron.d/kockolov-backup <<'EOF'
 EOF
 ```
 
+The pictures of Oglasi live in the `listings` Docker volume (`/app/data/listings`). Back them up too, e.g. a nightly copy
+next to the database dump (`docker run --rm -v kockolov_listings:/d -v /backup/kockolov:/b alpine tar czf /b/listings-$(date +%F).tgz -C /d .`
+and delete old ones the same way). The volume name starts with the compose project name (`docker volume ls | grep listings`).
+
+## Catalog of all sets (for Oglasi)
+
+The ad form fills in name, theme, year and pieces for any LEGO set from `web/public/lego-catalog.json`.
+It is made once from Rebrickable's free CSV files and committed to the repository, so it ends up in the Docker image:
+
+1. On your computer, download `sets.csv.gz` and `themes.csv.gz` from https://rebrickable.com/downloads/
+2. In the repository: `npm run catalog -w web -- path/to/sets.csv.gz path/to/themes.csv.gz`
+3. `git add web/public/lego-catalog.json && git commit -m "Katalog setova" && git push`, then update as usual (below).
+
+Without the file the form still works, but only suggests sets that Kockolov tracks. Refresh it a few times a year.
+
+## Oglasi (classifieds)
+
+Life of an ad: 30 days; e-mail reminders 7, 3 and 1 day before the end (`LISTINGS_CRON`, daily at 09:00); an expired ad stays in
+the owner's account for 30 days (can be renewed), then it is deleted with its pictures and the owner gets an e-mail.
+Conversations are never deleted on a timer. The job needs SMTP (`SMTP_HOST`), otherwise reminders are skipped and logged.
+
+Off until you switch it on. In `/opt/kockolov/.env`: `LISTINGS_MODE=admins` shows it to administrators only (test it on the live
+site first), `LISTINGS_MODE=on` to every signed-in user, then `docker compose up -d`. nginx must allow photo uploads
+(`client_max_body_size 14m` in `kockolov.stpl`; re-apply the template after updating it). Reports and removals: Administracija → Oglasi.
+
+Phone notifications (app 1.2 and the site's notifications): a new message, a followed ad that got cheaper or was sold,
+a new ad for a set on someone's watchlist (once per ad), and the owner's own ad running out (with the 7/3/1 reminders),
+expired or removed. Each kind can be switched off under Nalog → Kockolov na telefonu. Users can block each other
+(ad page or conversation): no messages either way, no phone, the blocker no longer sees the other's ads; the list is on
+the Nalog page. Android App Links: `ANDROID_CERT_SHA256` (mobile/store/google-play.md §4g).
+
 ## If something is off
 
 - **Logs:** `docker compose logs -f app` / `docker compose logs -f worker`.

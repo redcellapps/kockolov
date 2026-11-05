@@ -17,10 +17,17 @@ import SearchPage from './pages/Search';
 import SetDetail from './pages/SetDetail';
 import UnsubscribePage from './pages/Unsubscribe';
 import TvPage from './pages/Tv';
+import ListingDetail from './ads/ListingDetail';
+import ListingsPage from './ads/ListingsPage';
+import MyListings from './ads/MyListings';
+import MessagesPage from './ads/MessagesPage';
+import NewListing from './ads/NewListing';
+import AdminListings from './pages/AdminListings';
+import TermsPage from './pages/Terms';
 
 /** While the site is private, every page except login needs a session. */
-function Gate({ children, needUser, needAdmin }: { children: ReactNode; needUser?: boolean; needAdmin?: boolean }) {
-  const { user, publicMode, loading } = useAuth();
+function Gate({ children, needUser, needAdmin, needAds }: { children: ReactNode; needUser?: boolean; needAdmin?: boolean; needAds?: boolean }) {
+  const { user, publicMode, loading, listings } = useAuth();
   const loc = useLocation();
   if (loading) {
     return (
@@ -33,6 +40,7 @@ function Gate({ children, needUser, needAdmin }: { children: ReactNode; needUser
     return <Navigate to="/prijava" replace state={{ from: loc.pathname + loc.search }} />;
   }
   if (needAdmin && user?.role !== 'admin') return <Navigate to="/" replace />;
+  if (needAds && !listings) return <Navigate to="/" replace />; // Oglasi are off (LISTINGS_MODE) or not for this user yet
   return <>{children}</>;
 }
 
@@ -58,10 +66,19 @@ export default function App() {
         <Route path="/potvrda/:token" element={<InvitePage />} />
         <Route path="/odjava/:token" element={<UnsubscribePage />} />
         <Route path="/privatnost" element={<PrivacyPage />} />
+        <Route path="/uslovi" element={<TermsPage />} />
         <Route path="/brisanje-naloga" element={<DeleteAccountPage />} />
         <Route path="/blog" element={<Gate><BlogListPage /></Gate>} />
         <Route path="/blog/:slug" element={<Gate><BlogPostPage /></Gate>} />
         <Route path="/" element={<Gate><Home /></Gate>} />
+        <Route path="/admin/oglasi" element={<Gate needAds needAdmin><AdminListings /></Gate>} />
+        <Route path="/oglasi" element={<Gate needAds><ListingsPage /></Gate>} />
+        <Route path="/oglasi/novi" element={<Gate needAds needUser><NewListing /></Gate>} />
+        <Route path="/oglasi/:id" element={<Gate needAds><ListingDetail /></Gate>} />
+        <Route path="/poruke" element={<Gate needAds needUser><MessagesPage /></Gate>} />
+        <Route path="/poruke/:id" element={<Gate needAds needUser><MessagesPage /></Gate>} />
+        <Route path="/oglasi/:id/izmeni" element={<Gate needAds needUser><NewListing /></Gate>} />
+        <Route path="/moji-oglasi" element={<Gate needAds needUser><MyListings /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />
         <Route path="/teme" element={<Gate><ThemesPage /></Gate>} />

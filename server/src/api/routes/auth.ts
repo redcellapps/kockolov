@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { config } from '../../config.js';
 import { one, query, tx } from '../../db.js';
 import { eurRate } from '../../fx.js';
+import { cleanPhone, listingsEnabledFor } from '../../listings/service.js';
 import { randomBytes } from 'node:crypto';
 import { accountFrom, mailConfigured } from '../../mail/mailer.js';
 import { hashToken, linkSentRecently, sendLink, validLink } from '../invites.js';
@@ -90,6 +91,8 @@ export async function authRoutes(app: FastifyInstance) {
   app.get('/api/auth/me', async (req) => ({
     user: req.user ?? null,
     publicMode: config.PUBLIC_MODE,
+    // Oglasi (classifieds) are shown only while LISTINGS_MODE allows this user
+    listings: listingsEnabledFor(req.user ?? null),
     registrationOpen: config.registrationOpen,
     // public key for the bot check on sign-up and password requests (null = check off)
     recaptchaSiteKey: config.RECAPTCHA_SITE_KEY || null,
@@ -143,7 +146,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/register', async (req, reply) => {
     if (!config.registrationOpen) return reply.code(403).send({ error: 'Registracija trenutno nije otvorena.' });
     const body = credentials
-      .extend({ password: z.string().min(8).max(200), name: z.string().max(80).optional() })
+      .extend({ password: z.string().min(8).max(200), name: z.string().max(80).optional(), phone: z.string().max(40).optional() })
       .safeParse(req.body);
     if (!body.success) {
       const emailBad = body.error.issues.some((i) => i.path[0] === 'email');
@@ -152,6 +155,12 @@ export async function authRoutes(app: FastifyInstance) {
     const email = normalizeEmail(body.data.email);
     if (!(await botGuard(req, reply, email, body.data.recaptcha, 'register'))) return;
     if (limits.registerIp.hit(req.ip)) return reply.code(429).send({ error: TOO_MANY });
+    let phone: string | null;
+    try {
+      phone = cleanPhone(body.data.phone);
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
     const name = body.data.name?.trim() ?? '';
     const passwordHash = await hashPassword(body.data.password);
     const existing = await one<{ id: number; accepted_at: string | null }>('SELECT id, accepted_at FROM users WHERE email = $1', [email]);
@@ -162,14 +171,14 @@ export async function authRoutes(app: FastifyInstance) {
     if (existing) {
       // nobody has confirmed this address yet, so the newest sign-up wins
       await query(
-        `UPDATE users SET password_hash = $2, name = coalesce(nullif($3, ''), name), self_signup = true WHERE id = $1`,
-        [existing.id, passwordHash, name],
+        `UPDATE users SET password_hash = $2, name = coalesce(nullif($3, ''), name), self_signup = true, phone = coalesce($4, phone) WHERE id = $1`,
+        [existing.id, passwordHash, name, phone],
       );
       userId = existing.id;
     } else {
       const u = await one<{ id: number }>(
-        `INSERT INTO users (email, name, password_hash, self_signup) VALUES ($1, $2, $3, true) RETURNING id`,
-        [email, name, passwordHash],
+        `INSERT INTO users (email, name, password_hash, self_signup, phone) VALUES ($1, $2, $3, true, $4) RETURNING id`,
+        [email, name, passwordHash, phone],
       );
       userId = u!.id;
     }

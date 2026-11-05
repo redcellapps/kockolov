@@ -38,7 +38,8 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 }
 
 export type Reason =
-  | { type: 'vs_rrp'; pct: number; amount: number }
+  /** sale = the LEGO Store itself has the set below its regular price */
+  | { type: 'vs_rrp'; pct: number; amount: number; sale?: true }
   | { type: 'vs_next'; pct: number; amount: number; shop: string; seller: string }
   | { type: 'shop_sale'; pct: number }
   | { type: 'new_low'; days: number }
@@ -66,12 +67,20 @@ export interface SetSummary {
   deal_rank: number | null;
 }
 
+/** Name and picture of a set that is sold by members-only shops only */
+export interface LockedSet {
+  name: string;
+  image_url: string | null;
+}
+
 export interface SearchResponse {
   total: number;
   page: number;
   size: number;
   sort: string;
   items: SetSummary[];
+  /** anonymous visitors only: sets that exist only in members-only shops (name and picture only) */
+  locked?: { total: number; items: LockedSet[] };
   facets: { themes: { slug: string | null; count: number }[]; shops: { id: string; count: number }[] };
 }
 
@@ -186,12 +195,21 @@ export interface User {
   digest_enabled: boolean;
   news_enabled?: boolean;
   currency?: 'RSD' | 'EUR';
+  phone?: string | null;
+  msg_email_enabled?: boolean;
+  /** phone notifications switched off per kind; a missing key means on */
+  push_prefs?: Partial<Record<PushKind, boolean>>;
 }
+
+/** Kinds of phone notifications the account page can switch on and off (server: push/notify.ts) */
+export type PushKind = 'prices' | 'messages' | 'watched_ads' | 'my_ads' | 'new_ads';
 
 export interface MeResponse {
   user: User | null;
   publicMode: boolean;
   registrationOpen: boolean;
+  /** Oglasi (classifieds) are on for this user */
+  listings?: boolean;
   /** reCAPTCHA v3 site key; null = the bot check is off */
   recaptchaSiteKey?: string | null;
   /** Google OAuth client ID; null = the Google button is off */

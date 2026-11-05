@@ -7,6 +7,8 @@ COPY web/package.json web/
 RUN npm ci --no-audit --no-fund
 COPY server server
 COPY web web
+# web/public/lego-catalog.json (optional, see deploy/myvesta/README.md) is part of the web build
+RUN test -f web/public/lego-catalog.json || echo 'NOTE: web/public/lego-catalog.json missing - classifieds only suggest sets that Kockolov tracks'
 RUN npm run build -w server && npm run build -w web
 
 # ---- runtime ----
@@ -23,8 +25,8 @@ COPY server/migrations server/migrations
 COPY server/assets server/assets
 COPY server/content server/content
 COPY --from=build /app/web/dist web/dist
-# link-preview images kept between restarts (a volume in docker-compose.yml)
-RUN mkdir -p /app/cache/og && chown -R node:node /app/cache
+# link-preview images and pictures of ads, kept between restarts (volumes in docker-compose.yml)
+RUN mkdir -p /app/cache/og /app/data/listings && chown -R node:node /app/cache /app/data
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD wget -qO- http://127.0.0.1:8080/api/health || exit 1

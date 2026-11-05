@@ -5,6 +5,7 @@ import { refineSuperHeroes, themeFromList, themeFromRaw } from '../src/lib/theme
 import { isMerch, linkDoubts, matchOffer, buildNameIndex } from '../src/crawler/matching.js';
 import { htmlToText, parseFrontmatter, parsePost, readingMinutes } from '../src/blog/posts.js';
 import { keyPart } from '../src/seo/cards.js';
+import { deriveSet } from '../src/crawler/refresh.js';
 
 describe('normalizeText', () => {
   it('strips diacritics, trademarks and punctuation', () => {
@@ -256,5 +257,39 @@ describe('Excel export', () => {
     expect(sheet).toContain('<t>Š &amp; &lt;Ž&gt;</t>');
     expect(sheet).not.toContain('r="C3"'); // empty cells are left out
     expect(sheet).toContain('<autoFilter ref="A1:C3"/>');
+  });
+});
+
+describe('reference price of a set', () => {
+  const set = {
+    set_num: '10280',
+    name: 'Buket cveća',
+    name_en: null,
+    theme_slug: 'botanicals',
+    theme_locked: false,
+    image_url: null,
+    age_min: null,
+    rrp_rsd: null,
+    search_text: '',
+  };
+  const offer = (shop: string, price: number, regular: number | null, inStock = true) => ({
+    set_num: '10280',
+    shop_id: shop,
+    title: 'Buket cveća',
+    image_url: null,
+    price_rsd: price,
+    regular_price_rsd: regular,
+    in_stock: inStock,
+    theme_raw: [],
+    age_min: null,
+  });
+  it("is the LEGO Store's regular price, also while the LEGO Store has the set on sale", () => {
+    expect(deriveSet(set, [offer('lstore', 7799, null), offer('kockarium', 6999, null)]).rrp_rsd).toBe(7799);
+    expect(deriveSet(set, [offer('lstore', 5459, 7799)]).rrp_rsd).toBe(7799);
+    expect(deriveSet({ ...set, rrp_rsd: 7799 }, [offer('lstore', 5459, 7799)]).rrp_rsd).toBeUndefined(); // unchanged
+    // out of stock at the LEGO Store: still its price
+    expect(deriveSet(set, [offer('lstore', 6999, 7799, false), offer('kockarium', 6499, null)]).rrp_rsd).toBe(7799);
+    // without a LEGO Store offer there is no reference; other shops' "old prices" don't count
+    expect(deriveSet(set, [offer('kockarium', 6999, 7999)]).rrp_rsd).toBeUndefined();
   });
 });

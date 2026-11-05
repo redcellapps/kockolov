@@ -9,3 +9,6 @@ web/dist-demo/
 web/src/demo/snapshot.json
 cache/
 web/dist-app/
+
+# classifieds pictures made during local development
+data/

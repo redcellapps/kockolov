@@ -1,0 +1,223 @@
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { Button, EmptyState, Spinner } from '../components/ui';
+import { t } from '../i18n';
+import { ApiError, api, type SetDetail } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { dateLong, money } from '../lib/format';
+import { serverUrl } from '../lib/platform';
+import { usePageTitle } from '../lib/title';
+import { ShareButton } from '../components/ShareButton';
+import { AdCard, CondBadge, adAgo } from './AdCard';
+import { priceChange, useAd, useAdActions, useAds } from './store';
+
+export default function ListingDetail() {
+  const { id } = useParams();
+  const ad = useAd(id);
+  const l = ad.data;
+  const all = useAds().data ?? [];
+  const { user } = useAuth();
+  const actions = useAdActions();
+  const nav = useNavigate();
+  const loc = useLocation();
+  usePageTitle(l?.title ?? t('ads.detail.notFound'));
+  const [img, setImg] = useState(0);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<'closed' | 'open' | 'done'>('closed');
+  const [reason, setReason] = useState('');
+  const [blockAsk, setBlockAsk] = useState(false);
+  const following = !!l?.watched;
+  const fail = (e: unknown) => setErr(e instanceof ApiError ? e.message : t('ads.detail.errorGeneric'));
+  /** contacting and following need an account */
+  const needLogin = () => {
+    if (user) return false;
+    nav('/prijava', { state: { from: loc.pathname } });
+    return true;
+  };
+
+  const set = useQuery({
+    queryKey: ['set', l?.set_num],
+    queryFn: () => api<SetDetail>(`/api/sets/${encodeURIComponent(l!.set_num!)}`),
+    enabled: !!l?.set_num,
+    retry: false,
+  });
+  const shopMin = set.data?.offers.filter((o) => o.in_stock).reduce<number | null>((m, o) => (m === null || o.price_rsd < m ? o.price_rsd : m), null) ?? null;
+
+  if (ad.isLoading) return <div className="grid min-h-[40vh] place-items-center"><Spinner className="h-8 w-8" /></div>;
+  if (!l) return <div className="mx-auto max-w-3xl px-4 py-12"><EmptyState title={t('ads.detail.notFound')} action={<Link to="/oglasi" className="font-bold underline">{t('ads.detail.back')}</Link>} /></div>;
+
+  const cmp = shopMin ? Math.round((1 - l.price_rsd / shopMin) * 100) : null;
+  const more = all.filter((x) => x.id !== l.id && x.status === 'active' && (x.theme_slug === l.theme_slug || x.seller === l.seller)).slice(0, 4);
+  const row = (k: string, v: React.ReactNode) => (
+    <div className="flex justify-between gap-4 border-b border-line py-2.5 text-sm last:border-0">
+      <dt className="text-ink-3">{k}</dt>
+      <dd className="text-right font-semibold">{v}</dd>
+    </div>
+  );
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      {l.mine && l.status === 'removed' && <p className="mb-4 rounded-2xl bg-deal-soft px-4 py-3 text-sm font-semibold text-deal">{t('ads.detail.removed', { reason: l.removed_reason ?? '' })}</p>}
+      {l.mine && l.status === 'expired' && (
+        <p className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-surface-2 px-4 py-3 text-sm font-semibold">
+          {t('ads.detail.expired')}
+          <Button size="sm" onClick={() => void actions.renew(l.id)}>{t('ads.mine.renew')}</Button>
+        </p>
+      )}
+      {l.status === 'sold' && <p className="mb-4 rounded-2xl bg-surface-2 px-4 py-3 text-sm font-semibold">{t('ads.detail.soldNote')}</p>}
+      <Link to="/oglasi" className="text-sm font-bold text-ink-2 hover:text-ink">← {t('ads.detail.back')}</Link>
+      <div className="mt-4 grid gap-8 lg:grid-cols-[1.15fr_1fr]">
+        <div>
+          <div className="relative overflow-hidden rounded-3xl border border-line bg-surface-2">
+            <img src={l.images[img] ? serverUrl(l.images[img]) : undefined} alt={l.title} className="aspect-[4/3] w-full object-cover" />
+            <CondBadge c={l.condition} className="absolute left-4 top-4 shadow-sm" />
+          </div>
+          {l.images.length > 1 && (
+            <div className="mt-3 flex gap-2 overflow-x-auto">
+              {l.images.map((src, i) => (
+                <button key={i} onClick={() => setImg(i)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${i === img ? 'border-ink' : 'border-transparent opacity-70'}`}>
+                  <img src={serverUrl(src)} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+          <h2 className="mt-8 text-lg font-extrabold">{t('ads.detail.description')}</h2>
+          <p className="mt-2 whitespace-pre-line text-ink-2">{l.description || '—'}</p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-line bg-surface p-6">
+            <p className="text-xs font-semibold text-ink-3">{t('ads.detail.posted', { when: adAgo(l.created_at) })} · {t('ads.detail.views', { n: l.views })}</p>
+            <h1 className="mt-1 text-2xl font-extrabold leading-tight">{l.title}</h1>
+            <div className="mt-3 flex items-baseline gap-3">
+              <span className="tabular text-3xl font-extrabold">{money(l.price_rsd)}</span>
+              {priceChange(l) && <span className="tabular text-base font-bold text-ink-3 line-through">{money(priceChange(l))}</span>}
+            </div>
+            <p className="text-sm font-semibold text-ink-3">{l.negotiable ? t('ads.negotiable') : t('ads.fixed')}</p>
+            {priceChange(l) && <p className="mt-2 inline-block rounded-lg bg-save-soft px-2.5 py-1 text-xs font-extrabold text-save">{t('ads.detail.priceDrop', { price: money(priceChange(l)) })}</p>}
+            <Button variant={following ? 'dark' : 'outline'} size="sm" className="mt-3 w-full" disabled={l.mine || l.status !== 'active' && !following} onClick={() => { if (!needLogin()) void actions.watch(l.id, !following).catch(fail); }}>
+              {following ? '♥ ' + t('ads.detail.following') : '♡ ' + t('ads.detail.follow')}
+            </Button>
+            {l.status === 'active' && (
+              <ShareButton path={`/oglasi/${l.id}`} title={l.title} text={t('ads.share.text', { title: l.title, price: money(l.price_rsd) })} className="mt-2 w-full" dialogTitle={t('ads.share.title')} />
+            )}
+            {cmp !== null && shopMin && (
+              <p className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold ${cmp > 0 ? 'bg-save-soft text-save' : 'bg-surface-2 text-ink-2'}`}>
+                {cmp > 0 ? t('ads.cheaperThanShops', { pct: cmp }) : t('ads.pricierThanShops')} · {t('ads.shopsFrom', { price: money(shopMin) })}
+              </p>
+            )}
+            <dl className="mt-4">
+              {l.set_num && row(t('ads.detail.set'), <Link className="underline" to={`/set/${l.set_num}`}>{l.set_num}</Link>)}
+              {row(t('ads.detail.condition'), t(`cond.${l.condition}`))}
+              {row(t('ads.detail.box'), l.has_box ? t('ads.detail.yes') : t('ads.detail.no'))}
+              {row(t('ads.detail.manual'), l.has_manual ? t('ads.detail.yes') : t('ads.detail.no'))}
+              {l.theme_name && row(t('ads.detail.theme'), l.theme_name)}
+              {l.year && row(t('ads.detail.year'), l.year)}
+              {l.pieces && row(t('ads.detail.pieces'), l.pieces.toLocaleString('sr-RS'))}
+              {l.minifigs !== null && row(t('ads.detail.minifigs'), l.minifigs)}
+              {row(t('ads.detail.city'), l.city)}
+              {row(t('ads.detail.shipping'), t(`ship.${l.shipping}`))}
+            </dl>
+          </div>
+
+          <div className="rounded-3xl border border-line bg-surface p-6">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-full bg-brand text-lg font-extrabold">{l.seller[0]}</span>
+              <div>
+                <div className="font-extrabold">{l.seller}</div>
+                <div className="text-xs text-ink-3">{t('ads.detail.memberSince', { date: dateLong(l.seller_since) })}</div>
+              </div>
+            </div>
+            {l.blocked && (
+              <div className="mt-4 rounded-2xl bg-surface-2 p-3 text-sm">
+                <p className="font-semibold">{t('block.youBlocked')}</p>
+                <p className="mt-0.5 text-xs text-ink-3">{t('block.youBlockedText')}</p>
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => void actions.block({ listing_id: l.id }, false).catch(fail)}>{t('block.unblock')}</Button>
+              </div>
+            )}
+            <div className={`mt-4 grid gap-2 ${l.blocked ? 'hidden' : ''}`}>
+              {l.has_phone && l.status === 'active' ? (
+                phone ? (
+                  <a href={`tel:${phone.replace(/\s/g, '')}`} className="flex h-11 items-center justify-center rounded-xl bg-ink text-[15px] font-bold text-bg">📞 {phone}</a>
+                ) : (
+                  <Button variant="dark" onClick={() => { if (!needLogin()) void actions.phone(l.id).then(setPhone).catch(fail); }}>📞 {t('ads.detail.showPhone')}</Button>
+                )
+              ) : l.has_phone ? null : (
+                <p className="text-sm text-ink-3">{t('ads.detail.noPhone')}</p>
+              )}
+              {l.mine ? (
+                <>
+                  <Link to={`/oglasi/${l.id}/izmeni`} className="flex h-11 items-center justify-center rounded-xl bg-brand text-[15px] font-extrabold hover:brightness-95">{t('ads.edit.link')}</Link>
+                  <Link to="/poruke" className="flex h-11 items-center justify-center rounded-xl border border-line text-[15px] font-bold hover:border-ink-3">{t('msg.myAdInbox')}</Link>
+                </>
+              ) : l.status === 'active' ? (
+                <>
+                  <textarea rows={3} maxLength={1000} className="w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-ink" placeholder={t('ads.detail.messagePlaceholder')} value={msg} onChange={(e) => setMsg(e.target.value)} />
+                  <Button
+                    disabled={!msg.trim() || busy}
+                    onClick={() => {
+                      if (needLogin()) return;
+                      setBusy(true);
+                      setErr(null);
+                      actions.message(l.id, msg.trim()).then((cid) => nav(`/poruke/${cid}`)).catch(fail).finally(() => setBusy(false));
+                    }}
+                  >
+                    {busy ? <Spinner className="h-4 w-4" /> : t('ads.detail.message')}
+                  </Button>
+                </>
+              ) : null}
+              {err && <p role="alert" className="rounded-xl bg-deal-soft px-3 py-2 text-sm font-semibold text-deal">{err}</p>}
+            </div>
+            <p className="mt-4 text-xs leading-relaxed text-ink-3">{t('ads.detail.safety')}</p>
+            <div className="mt-3 flex gap-4 text-xs font-bold">
+              {!l.mine && (
+                <button className="text-ink-2 underline" disabled={reporting === 'done'} onClick={() => !needLogin() && setReporting('open')}>
+                  {reporting === 'done' ? t('ads.detail.reported') : t('ads.detail.report')}
+                </button>
+              )}
+              {!l.mine && !l.blocked && (
+                <button className="text-ink-2 underline" onClick={() => !needLogin() && setBlockAsk(true)}>
+                  {t('block.seller')}
+                </button>
+              )}
+            </div>
+            {blockAsk && !l.blocked && (
+              <div className="mt-3 rounded-2xl border border-line p-3 text-sm">
+                <p className="font-semibold">{t('block.confirm', { name: l.seller })}</p>
+                <p className="mt-0.5 text-xs text-ink-3">{t('block.confirmText')}</p>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="dark" onClick={() => void actions.block({ listing_id: l.id }, true).then(() => setBlockAsk(false)).catch(fail)}>{t('block.yes')}</Button>
+                  <Button size="sm" variant="outline" onClick={() => setBlockAsk(false)}>{t('block.cancel')}</Button>
+                </div>
+              </div>
+            )}
+            {reporting === 'open' && (
+              <div className="mt-3 grid gap-2">
+                <textarea rows={2} maxLength={500} className="w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-ink" placeholder={t('ads.detail.reportReason')} value={reason} onChange={(e) => setReason(e.target.value)} />
+                <Button size="sm" variant="outline" disabled={reason.trim().length < 3} onClick={() => void actions.report(l.id, reason.trim()).then(() => setReporting('done')).catch(fail)}>{t('ads.detail.reportSend')}</Button>
+              </div>
+            )}
+          </div>
+
+          {l.set_num && shopMin && (
+            <div className="rounded-3xl border border-line bg-surface-2 p-6">
+              <h3 className="font-extrabold">{t('ads.detail.compare')}</h3>
+              <p className="mt-1 text-sm text-ink-2">{t('ads.detail.compareText', { price: money(shopMin) })}</p>
+              <Link className="mt-2 inline-block text-sm font-bold underline" to={`/set/${l.set_num}`}>{t('ads.detail.compareLink')} →</Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {more.length > 0 && (
+        <div className="mt-12 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {more.map((x) => <AdCard key={x.id} l={x} />)}
+        </div>
+      )}
+    </div>
+  );
+}

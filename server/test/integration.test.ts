@@ -162,7 +162,8 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
   it('returns a set page with all offers and history', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/sets/10280', headers: { cookie } });
     const body = r.json();
-    expect(body.set).toMatchObject({ set_num: '10280', name: 'Buket cveća', theme_name: 'Botanicals', rrp_rsd: 8999 });
+    // the LEGO Store sells it for 8.999 on sale (regular 9.999): the reference is the regular price
+    expect(body.set).toMatchObject({ set_num: '10280', name: 'Buket cveća', theme_name: 'Botanicals', rrp_rsd: 9999 });
     expect(body.offers.map((o: { shop_id: string }) => o.shop_id)).toEqual(['ananas', 'lstore']);
     expect(body.history.length).toBe(2);
     expect(body.deal.reasons[0]).toMatchObject({ type: 'vs_rrp' });
@@ -377,6 +378,8 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       // Google draws the pages with JavaScript, so it may fetch the API; the API's answers are noindex
       expect(robots).not.toContain('Disallow: /api');
       expect(robots).toContain('Disallow: /admin');
+      for (const path of ['/poruke', '/moji-oglasi', '/oglasi/novi', '/oglasi/*/izmeni']) expect(robots).toContain(`Disallow: ${path}`);
+      expect(robots).not.toMatch(/Disallow: \/oglasi\n/);
       expect(robots).toContain('Sitemap: ');
       const api = await app.inject({ method: 'GET', url: '/api/sets?q=10280' });
       expect(api.headers['x-robots-tag']).toBe('noindex');

@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { t, tn } from '../i18n';
-import { api } from '../lib/api';
+import { api, type PushKind } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { useProfileMutation } from '../ads/store';
 import { isApp } from '../lib/platform';
 import { disablePush, enablePush, installApp, pushAddress, pushStatus, usePwa, type PushStatus } from '../lib/pwa';
 import { BellIcon, XIcon } from './icons';
@@ -30,6 +32,34 @@ function IosSteps({ text }: { text: string }) {
         <path d="M6 11H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1" />
       </svg>
       <p>{text}</p>
+    </div>
+  );
+}
+
+/** Which notifications the account wants (on every device): watched sets always, the Oglasi kinds while Oglasi are on */
+function PushKinds() {
+  const { user, listings } = useAuth();
+  const save = useProfileMutation();
+  const [local, setLocal] = useState<Partial<Record<PushKind, boolean>>>({});
+  if (!user) return null;
+  const kinds: PushKind[] = listings ? ['prices', 'new_ads', 'messages', 'watched_ads', 'my_ads'] : ['prices'];
+  const on = (k: PushKind) => (local[k] ?? user.push_prefs?.[k]) !== false;
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <p className="mb-1 text-sm font-bold text-ink-2">{t('phone.kinds')}</p>
+      {kinds.map((k) => (
+        <div key={k}>
+          <Toggle
+            checked={on(k)}
+            onChange={(v) => {
+              setLocal((x) => ({ ...x, [k]: v }));
+              save.mutate({ pushPrefs: { [k]: v } });
+            }}
+            label={t(`phone.kind.${k}`)}
+          />
+          <p className="-mt-1 mb-1 text-xs text-ink-3">{t(`phone.kind.${k}.hint`)}</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -94,6 +124,7 @@ export function PhoneCard() {
       ) : null}
 
       {push.devices > 0 && <p className="mt-3 text-sm text-ink-3">{tn('phone.push.devices', push.devices)}</p>}
+      {(push.status === 'on' || push.devices > 0) && <PushKinds />}
       {pwa.standalone && !isApp && <p className="mt-1 text-sm text-ink-3">{t('phone.installed')}</p>}
     </section>
   );

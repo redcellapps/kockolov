@@ -19,13 +19,18 @@ export async function startNativeApp(open: (path: string) => void): Promise<void
     else void App.exitApp();
   });
   // a kockolov.rs link opened with the app (https://kockolov.rs/set/75192) shows that page
-  await App.addListener('appUrlOpen', ({ url }) => {
+  const openLink = (url: string | undefined) => {
     try {
-      const u = new URL(url);
-      if (/(^|\.)kockolov\.rs$/.test(u.hostname)) open(`${u.pathname}${u.search}`);
+      const u = new URL(url ?? '');
+      if (/(^|\.)kockolov\.rs$/.test(u.hostname) && u.pathname !== '/') open(`${u.pathname}${u.search}`);
     } catch {
       /* not a web address */
     }
-  });
+  };
+  await App.addListener('appUrlOpen', ({ url }) => openLink(url));
+  // the app was started by the link itself (it wasn't running yet)
+  void App.getLaunchUrl()
+    .then((r) => openLink(r?.url))
+    .catch(() => undefined);
   await startNativePush(open);
 }

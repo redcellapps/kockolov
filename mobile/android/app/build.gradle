@@ -35,8 +35,11 @@ android {
     buildTypes {
         release {
             if (uploadKeystore) signingConfig signingConfigs.upload
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8 since 1.2: smaller app and the code optimization Google Play asks for (at least 25% obfuscated);
+            // the mapping file goes inside the .aab, so Play shows readable crash reports by itself
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }

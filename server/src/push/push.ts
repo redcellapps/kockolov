@@ -13,6 +13,8 @@ export interface PushMessage {
   tag?: string;
   /** picture next to the text (Android, Windows); iPhone always shows the app icon */
   icon?: string;
+  /** Android notification channel (each has its own switch in the phone's settings); default "cene" */
+  channel?: 'cene' | 'poruke' | 'oglasi';
 }
 
 export interface PushSubscriptionRow {

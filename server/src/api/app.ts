@@ -12,6 +12,10 @@ import { adminRoutes } from './routes/admin.js';
 import { blogRoutes } from './routes/blog.js';
 import { publicRoutes } from './routes/public.js';
 import { tvRoutes } from './routes/tv.js';
+import { listingRoutes } from './routes/listings.js';
+import { messageRoutes } from './routes/messages.js';
+import { listingAdminRoutes } from './routes/listings-admin.js';
+import { blockRoutes } from './routes/blocks.js';
 import { pushRoutes } from './routes/push.js';
 import { injectHead, pageMeta } from '../seo/pages.js';
 import { authRoutes } from './routes/auth.js';
@@ -25,6 +29,8 @@ declare module 'fastify' {
 }
 
 const OPEN_PATHS = ['/api/auth/', '/api/health', '/api/unsubscribe/', '/api/tv/pair'];
+// ad pictures are <img> tags: they carry the session cookie, but must also load for the app's webview
+
 
 export function webDistDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -77,6 +83,15 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     return reply.code(status).send({ error: status >= 500 ? 'Greška na serveru.' : (err as Error).message });
   });
 
+  // Android App Links: kockolov.rs links (set, ad, message pages; links in e-mails) open in the app when it is installed.
+  // Google checks this file against the app's signing certificate (Play Console → App integrity → App signing).
+  app.get('/.well-known/assetlinks.json', async (_req, reply) => {
+    const prints = (config.ANDROID_CERT_SHA256 ?? '').split(',').map((s) => s.trim().toUpperCase()).filter((s) => /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(s));
+    if (!prints.length) return reply.code(404).send({ error: 'Nije pronađeno.' });
+    reply.header('Cache-Control', 'public, max-age=3600');
+    return [{ relation: ['delegate_permission/common.handle_all_urls'], target: { namespace: 'android_app', package_name: 'rs.kockolov.app', sha256_cert_fingerprints: prints } }];
+  });
+
   app.get('/api/health', async () => {
     await pool.query('SELECT 1');
     return { ok: true };
@@ -90,6 +105,10 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(blogRoutes);
   await app.register(pushRoutes);
   await app.register(tvRoutes);
+  await app.register(listingRoutes);
+  await app.register(messageRoutes);
+  await app.register(listingAdminRoutes);
+  await app.register(blockRoutes);
 
   const dist = webDistDir();
   if (existsSync(dist)) {

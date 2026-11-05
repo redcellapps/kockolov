@@ -31,7 +31,7 @@ export function escapeHtml(s: string): string {
 }
 
 export type Reason =
-  | { type: 'vs_rrp'; pct: number; amount: number }
+  | { type: 'vs_rrp'; pct: number; amount: number; sale?: true }
   | { type: 'vs_next'; pct: number; amount: number; shop: string; seller: string }
   | { type: 'shop_sale'; pct: number }
   | { type: 'new_low'; days: number }
@@ -40,7 +40,9 @@ export type Reason =
 export function reasonText(r: Reason, money: (n: number) => string = rsd): string {
   switch (r.type) {
     case 'vs_rrp':
-      return `${r.pct}% jeftinije nego u LEGO® Store-u (ušteda ${money(r.amount)})`;
+      return r.sale
+        ? `Akcija u LEGO® Store-u: −${r.pct}% (ušteda ${money(r.amount)})`
+        : `${r.pct}% jeftinije od redovne cene u LEGO® Store-u (ušteda ${money(r.amount)})`;
     case 'vs_next':
       return `${money(r.amount)} jeftinije od sledeće ponude (${shopLabel(r.shop, r.seller)})`;
     case 'shop_sale':

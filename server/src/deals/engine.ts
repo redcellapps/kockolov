@@ -3,7 +3,8 @@ import { todayLocal } from '../lib/time.js';
 import { offersFor, type Audience } from '../api/audience.js';
 
 export type DealReason =
-  | { type: 'vs_rrp'; pct: number; amount: number }
+  /** below the LEGO Store's regular price; sale = the LEGO Store itself has the set on sale */
+  | { type: 'vs_rrp'; pct: number; amount: number; sale?: true }
   | { type: 'vs_next'; pct: number; amount: number; shop: string; seller: string }
   | { type: 'shop_sale'; pct: number }
   | { type: 'new_low'; days: number }
@@ -54,7 +55,12 @@ export function scoreSet(set: SetInfo, offers: OfferRow[]): DealCandidate | null
 
   if (rrp && best.price_rsd < rrp) {
     const pct = (rrp - best.price_rsd) / rrp;
-    reasons.push({ type: 'vs_rrp', pct: Math.round(pct * 100), amount: rrp - best.price_rsd });
+    reasons.push({
+      type: 'vs_rrp',
+      pct: Math.round(pct * 100),
+      amount: rrp - best.price_rsd,
+      ...(best.shop_id === 'lstore' ? { sale: true as const } : {}),
+    });
     score += Math.min(pct, 0.6) * 100;
   } else if (!rrp && best.regular_price_rsd && best.regular_price_rsd > best.price_rsd) {
     const pct = (best.regular_price_rsd - best.price_rsd) / best.regular_price_rsd;

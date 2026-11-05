@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
+import { isApp } from '../lib/platform';
+import { InAppNotice } from './InAppNotice';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
+import { useAdsStatus } from '../ads/store';
 import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -14,7 +17,7 @@ import { SearchBox } from './SearchBox';
 import { buttonClasses, cx } from './ui';
 
 function UserMenu() {
-  const { user, logout, registrationOpen } = useAuth();
+  const { user, logout, registrationOpen, listings } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -58,6 +61,7 @@ function UserMenu() {
           <div className="my-1 h-px bg-line" />
           {[
             ['/pracenje', t('nav.watchlist')],
+            ...(listings ? [['/poruke', t('nav.messages')], ['/moji-oglasi', t('nav.myAds')]] : []),
             ['/nalog', t('nav.account')],
             ...(user.role === 'admin' ? [['/admin', t('nav.admin')]] : []),
           ].map(([to, label]) => (
@@ -82,7 +86,7 @@ function UserMenu() {
 
 function Header() {
   const { pathname } = useLocation();
-  const { user } = useAuth();
+  const { user, listings } = useAuth();
   const isHome = pathname === '/';
   const link = ({ isActive }: { isActive: boolean }) =>
     cx('rounded-xl px-3 py-2 text-sm font-bold transition', isActive ? 'bg-surface-2 text-ink' : 'text-ink-2 hover:text-ink');
@@ -102,6 +106,11 @@ function Header() {
           <NavLink to="/teme" className={link}>
             {t('nav.themes')}
           </NavLink>
+          {listings && (
+            <NavLink to="/oglasi" className={link}>
+              {t('nav.ads')}
+            </NavLink>
+          )}
           <NavLink to="/blog" className={link}>
             {t('nav.blog')}
           </NavLink>
@@ -112,6 +121,7 @@ function Header() {
             <HeartIcon size={18} /> {t('nav.watchlist')}
           </NavLink>
         )}
+        {user && listings && <MessagesLink />}
         <ScanButton className="hidden md:grid" />
         <UserMenu />
       </div>
@@ -128,6 +138,11 @@ function Header() {
             <NavLink to="/teme" className={link}>
               {t('nav.themes')}
             </NavLink>
+            {listings && (
+              <NavLink to="/oglasi" className={link}>
+                {t('nav.ads')}
+              </NavLink>
+            )}
             <NavLink to="/blog" className={link}>
               {t('nav.blog')}
             </NavLink>
@@ -179,6 +194,9 @@ function Footer() {
             <Link to="/privatnost" className="text-ink-2 hover:text-ink hover:underline">
               {t('footer.privacy')}
             </Link>
+            <Link to="/uslovi" className="text-ink-2 hover:text-ink hover:underline">
+              {t('footer.terms')}
+            </Link>
             <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink-2 hover:text-ink hover:underline">
               {t('footer.contact')}: {CONTACT_EMAIL}
             </a>
@@ -223,11 +241,26 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [pathname]);
   return (
     <div className="flex min-h-screen flex-col">
+      {isApp && <InAppNotice />}
       <Header />
       <main className="flex-1">
         <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
       </main>
       <Footer />
     </div>
+  );
+}
+
+/** Envelope with the number of unread messages (classifieds prototype) */
+function MessagesLink() {
+  const unread = useAdsStatus().unread;
+  return (
+    <NavLink to="/poruke" aria-label={t('nav.messages')} className="relative grid h-10 w-10 place-items-center rounded-xl text-ink-2 hover:bg-surface-2 hover:text-ink">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="m4 7 8 6 8-6" />
+      </svg>
+      {unread > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-deal px-1 text-[10px] font-extrabold leading-none text-white">{unread}</span>}
+    </NavLink>
   );
 }

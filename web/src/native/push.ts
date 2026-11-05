@@ -2,6 +2,7 @@ import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { api } from '../lib/api';
 import { appPlatform } from '../lib/platform';
 import type { PushStatus } from '../lib/pwa';
+import { IN_APP_PUSH, type InAppPush } from '../lib/inAppPush';
 
 /*
  * Notifications in the Android/iOS app, through Firebase Cloud Messaging. Loaded only inside the app.
@@ -87,10 +88,19 @@ export async function startNativePush(open: (path: string) => void): Promise<voi
   try {
     // Android: the notifications' own entry in the phone's settings, named in Serbian
     if (appPlatform === 'android') {
-      await FirebaseMessaging.createChannel({ id: 'cene', name: 'Cene setova koje pratiš', description: 'Kad set pojeftini ili se vrati na stanje', importance: 4 }).catch(
-        () => undefined,
-      );
+      const channels = [
+        { id: 'cene', name: 'Cene setova koje pratiš', description: 'Kad set pojeftini ili se vrati na stanje' },
+        { id: 'poruke', name: 'Poruke', description: 'Kad ti neko piše povodom oglasa' },
+        { id: 'oglasi', name: 'Oglasi', description: 'Novi oglasi za setove koje pratiš, praćeni i tvoji oglasi' },
+      ];
+      for (const c of channels) await FirebaseMessaging.createChannel({ ...c, importance: 4 }).catch(() => undefined);
     }
+    // while the app is open the phone shows nothing itself: the app shows a small banner (components/InAppNotice)
+    await FirebaseMessaging.addListener('notificationReceived', (e) => {
+      const n = e.notification;
+      const url = (n.data as { url?: string } | undefined)?.url;
+      window.dispatchEvent(new CustomEvent<InAppPush>(IN_APP_PUSH, { detail: { title: n.title ?? '', body: n.body ?? '', url: url && url.startsWith('/') ? url : undefined } }));
+    });
     await FirebaseMessaging.addListener('notificationActionPerformed', (e) => {
       const url = (e.notification.data as { url?: string } | undefined)?.url;
       if (url && url.startsWith('/')) open(url);

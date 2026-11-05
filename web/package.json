@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "catalog": "node scripts/build-catalog.mjs",
     "build:demo": "tsc -p tsconfig.demo.json --noEmit && vite build --mode demo",
     "build:app": "tsc -p tsconfig.json --noEmit && vite build --mode app"
   },
