@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { eurRate } from '../fx.js';
 import { xlsx, type XlsxCell } from '../lib/xlsx.js';
-import { catalogFile, kpContext, loadCatalog } from './catalog.js';
+import { catalogFile, kpContext, loadCatalog, ourSetsFromCsv } from './catalog.js';
 import { classifyAd, type KpCondition, type KpDecision, type ReviewReason, type SkipReason } from './classify.js';
 import { listingFromKp, type KpListing } from './parse.js';
 
@@ -27,11 +27,17 @@ const REVIEW: Record<ReviewReason, string> = {
   more_numbers: 'U opisu i drugi setovi',
   number_in_text: 'Broj seta samo u opisu',
   name_only: 'Samo naziv seta, bez broja',
+  name_partial: 'Delimično poklapanje naziva',
 };
 const CONDITION: Record<KpCondition, string> = { novo: 'Novo', nekorisceno: 'Nekorišćeno', korisceno: 'Korišćeno', osteceno: 'Oštećeno' };
 const ORDER = { show: 0, review: 1, skip: 2 } as const;
 
-export async function kpReport(file: string, out: string, log: (m: string) => void = console.log): Promise<Record<string, number>> {
+export async function kpReport(
+  file: string,
+  out: string,
+  opts: { ourSetsCsv?: string; log?: (m: string) => void } = {},
+): Promise<Record<string, number>> {
+  const log = opts.log ?? console.log;
   const ads: KpListing[] = readFileSync(file, 'utf8')
     .split(/\r?\n/)
     .filter((l) => l.trim())
@@ -39,7 +45,9 @@ export async function kpReport(file: string, out: string, log: (m: string) => vo
   const catFile = catalogFile();
   const catalog = loadCatalog(catFile);
   log(catFile ? `katalog: ${catalog.size} setova (${catFile})` : 'katalog nije nađen: poznati su samo naši setovi');
-  const ctx = await kpContext(catalog, (await eurRate()).rate);
+  const ours = opts.ourSetsCsv ? ourSetsFromCsv(opts.ourSetsCsv) : undefined;
+  if (ours) log(`naši setovi: ${ours.size} (${opts.ourSetsCsv})`);
+  const ctx = await kpContext(catalog, (await eurRate()).rate, ours);
   const known = ctx.known;
 
   const rows = ads.map((a) => ({ a, d: classifyAd(a, ctx) as KpDecision }));

@@ -64,7 +64,8 @@ export type ReviewReason =
   | 'price' // far from the LEGO Store price, or not believable
   | 'more_numbers' // one set in the title, other set numbers in the description
   | 'number_in_text' // the number is only in the description
-  | 'name_only'; // no number, and the set's name is short or common
+  | 'name_only' // no number, and the set's name is short, or only in the description
+  | 'name_partial'; // no number, most words of one set's name ("The Bowser Quick… Bowser Express vlak")
 
 export type KpDecision =
   | { kind: 'show'; setNum: string; priceRsd: number; price: KpPrice }
@@ -224,12 +225,25 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
   } else if (inText.length > 1) {
     return { kind: 'skip', why: 'multi', setNums: inText };
   } else {
-    // no number: the set's own name in the title ("LEGO Avatar: The Way of Water Payakan The Tulkun & Crabsuit")
-    const hit = !merch && ctx.names ? setByName(title, ctx.names) : null;
+    // no number: the set's own name in the title ("LEGO Avatar: The Way of Water Payakan The Tulkun & Crabsuit"),
+    // else in the description, else most of one set's name (those two wait for the admin)
+    const names = !merch ? ctx.names : undefined;
+    let hit = names ? setByName(title, names) : null;
     if (hit === 'ambiguous') return { kind: 'skip', why: 'multi' };
+    if (!hit && names) {
+      const inDesc = setByName(ad.snippet, names);
+      if (inDesc && inDesc !== 'ambiguous') (hit = inDesc), (doubt = 'name_only');
+    }
+    if (!hit && names) {
+      const partial = setByPartialName(`${title} ${ad.snippet}`, names);
+      if (partial) (hit = partial), (doubt = 'name_partial');
+    }
     if (!hit) return { kind: 'skip', why: merch ? 'not_a_set' : 'no_number' };
     setNum = hit.num;
-    if (!distinctiveName(hit.name)) doubt = 'name_only';
+    // without a number, only a name with three words of its own is shown at once ("Payakan the Tulkun &
+    // Crabsuit", "Old Trafford – Manchester United"); a shorter one can be a movie title or a minifigure
+    // ("Chamber of Secrets", "Golden Dragon") and waits for the admin
+    if (!doubt && hit.words.length < 3) doubt = 'name_only';
   }
 
   const set = ctx.known(setNum)!;
@@ -247,84 +261,111 @@ export function classifyAd(ad: KpAd, ctx: KpContext): KpDecision {
 
 // ---- set names, for ads without a number ----
 
-/**
- * exact: first word of a normalized name -> the names starting with it and their set;
- * bags: a name's own words in any order (three or more), keyed by its first one
- */
-export interface NameIndex {
-  exact: Map<string, { name: string; num: string }[]>;
-  bags: Map<string, { name: string; num: string; words: string[] }[]>;
+/** One letter words dropped and a plural -s cut, so "Bowser's", "Bowsers" and "Bowser" are one word */
+const stem = (w: string) => (w.length >= 5 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
+const tokens = (text: string) => normalizeText(text).split(' ').filter((t) => t.length > 1).map(stem);
+
+interface NamedSet {
+  /** the name as stemmed words */
+  name: string;
+  num: string;
+  /** its own words (no theme, brand or filler), stemmed */
+  words: string[];
 }
 
 /**
- * Names that belong to exactly one set (our Serbian names and the catalog's English ones) and still
- * say something without the theme: "Harry Potter: Hogwarts" or "Sonic the Hedgehog" is just the theme,
- * and a name several sets share ("Millennium Falcon", "Police Station") is left out, so it can never
- * pick one of them.
+ * exact: first word of a name -> the names starting with it;
+ * byWord: each own word of a name of three or more own words -> those names (any order, partial)
+ */
+export interface NameIndex {
+  exact: Map<string, NamedSet[]>;
+  byWord: Map<string, NamedSet[]>;
+}
+
+/**
+ * Names that belong to exactly one set (our names from every shop, Serbian and English, and the
+ * catalog's) and still say something without the theme: "Harry Potter: Hogwarts" or "Sonic the
+ * Hedgehog" is just the theme, and a name several sets share ("Millennium Falcon", "Police Station")
+ * is left out, so it can never pick one of them.
  */
 export function buildNameIndex(rows: { num: string; names: string[] }[]): NameIndex {
-  const owner = new Map<string, string | null>();
-  const bagOwner = new Map<string, { num: string | null; name: string; words: string[] }>();
-  const claim = <T extends { num: string | null }>(map: Map<string, T>, key: string, value: T) => {
+  const owner = new Map<string, NamedSet | null>();
+  const bagOwner = new Map<string, NamedSet | null>();
+  const claim = (map: Map<string, NamedSet | null>, key: string, v: NamedSet) => {
     const prev = map.get(key);
-    map.set(key, prev === undefined || prev.num === value.num ? value : { ...prev, num: null });
+    map.set(key, prev === undefined || prev?.num === v.num ? (prev ?? v) : null);
   };
   for (const r of rows) {
     for (const raw of r.names) {
-      const n = normalizeText(cleanTitle(raw, r.num));
-      const words = [...nameWords(n)];
-      if (n.length < 10 || n.split(' ').length < 2 || words.length < 2) continue;
-      const prev = owner.get(n);
-      owner.set(n, prev === undefined || prev === r.num ? r.num : null);
-      if (words.length >= 3) claim(bagOwner, [...words].sort().join(' '), { num: r.num, name: n, words });
+      const clean = cleanTitle(raw, r.num);
+      const name = tokens(clean).join(' ');
+      const words = [...new Set([...nameWords(clean)].map(stem))];
+      if (name.length < 10 || !name.includes(' ') || words.length < 2) continue;
+      const v = { name, num: r.num, words };
+      claim(owner, name, v);
+      if (words.length >= 3) claim(bagOwner, [...words].sort().join(' '), v);
     }
   }
-  const idx: NameIndex = { exact: new Map(), bags: new Map() };
-  for (const [name, num] of owner) {
-    if (!num) continue;
-    const first = name.split(' ')[0];
-    if (!idx.exact.has(first)) idx.exact.set(first, []);
-    idx.exact.get(first)!.push({ name, num });
-  }
-  for (const { num, name, words } of bagOwner.values()) {
-    if (!num) continue;
-    if (!idx.bags.has(words[0])) idx.bags.set(words[0], []);
-    idx.bags.get(words[0])!.push({ name, num, words });
-  }
+  const idx: NameIndex = { exact: new Map(), byWord: new Map() };
+  const add = (map: Map<string, NamedSet[]>, key: string, v: NamedSet) => {
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(v);
+  };
+  for (const v of owner.values()) if (v) add(idx.exact, v.name.split(' ')[0], v);
+  for (const v of bagOwner.values()) if (v) for (const w of v.words) add(idx.byWord, w, v);
   return idx;
 }
 
 /**
- * The one set whose name is in the title; the longest name wins over a shorter one inside it. Then,
- * in any word order, a name of three or more words of its own ("Gardens of Ninjago City" for
- * "Ninjago City Gardens", "The Pirate Ship Going Merry" for "Going Merry Pirate Ship").
+ * The one set whose name is in the text; the longest name wins over a shorter one inside it. Then, in
+ * any word order, a name of three or more own words ("Gardens of Ninjago City" for "Ninjago City
+ * Gardens", "The Pirate Ship Going Merry" for "Going Merry Pirate Ship").
  */
-export function setByName(title: string, idx: NameIndex): { name: string; num: string } | 'ambiguous' | null {
-  const padded = ` ${normalizeText(title)} `;
-  const titleWords = new Set(padded.trim().split(' '));
-  const hits: { name: string; num: string }[] = [];
-  for (const word of titleWords) {
-    for (const c of idx.exact.get(word) ?? []) if (padded.includes(` ${c.name} `)) hits.push(c);
-  }
+export function setByName(text: string, idx: NameIndex): NamedSet | 'ambiguous' | null {
+  const toks = tokens(text);
+  const padded = ` ${toks.join(' ')} `;
+  const present = new Set(toks);
+  const hits: NamedSet[] = [];
+  for (const t of present) for (const c of idx.exact.get(t) ?? []) if (padded.includes(` ${c.name} `)) hits.push(c);
   hits.sort((a, b) => b.name.length - a.name.length);
-  const kept: { name: string; num: string }[] = [];
+  const kept: NamedSet[] = [];
   for (const h of hits) if (!kept.some((k) => k.name.includes(h.name))) kept.push(h);
   if (new Set(kept.map((k) => k.num)).size > 1) return 'ambiguous';
   if (kept[0]) return kept[0];
 
-  const bagHits = [...titleWords].flatMap((w) => (idx.bags.get(w) ?? []).filter((c) => c.words.every((x) => titleWords.has(x))));
-  if (!bagHits.length) return null;
-  const most = Math.max(...bagHits.map((h) => h.words.length));
-  const best = bagHits.filter((h) => h.words.length === most);
-  if (new Set(best.map((h) => h.num)).size > 1) return 'ambiguous';
-  return { name: best[0].name, num: best[0].num };
+  const bag = new Set<NamedSet>();
+  for (const t of present) for (const c of idx.byWord.get(t) ?? []) if (c.words.every((w) => present.has(w))) bag.add(c);
+  return pickOne([...bag], (c) => c.words.length);
 }
 
+/** a word in at most this many set names is telling ("bowser", "express"); "mini", "figure", "racing" are not */
+const RARE = 15;
+
 /**
- * Without a number, only a name with three words of its own is shown at once ("Payakan the Tulkun &
- * Crabsuit", "Old Trafford – Manchester United"); a shorter one can be a movie title or a minifigure
- * ("Chamber of Secrets", "Golden Dragon") and waits for the admin.
+ * Two thirds of one set's own words, at least two of them telling ones, and no other set as close:
+ * for the admin to check. Not for minifigure ads, whose words match all sorts of small sets.
  */
-function distinctiveName(name: string): boolean {
-  return nameWords(name).size >= 3;
+export function setByPartialName(text: string, idx: NameIndex): NamedSet | null {
+  if (/figur|minifig/i.test(normalizeText(text))) return null;
+  const present = new Set(tokens(text));
+  const count = new Map<NamedSet, number>();
+  const rare = new Map<NamedSet, number>();
+  for (const t of present) {
+    const names = idx.byWord.get(t) ?? [];
+    for (const c of names) {
+      count.set(c, (count.get(c) ?? 0) + 1);
+      if (names.length <= RARE) rare.set(c, (rare.get(c) ?? 0) + 1);
+    }
+  }
+  const close = [...count].filter(([c, n]) => (rare.get(c) ?? 0) >= 2 && n / c.words.length >= 2 / 3).map(([c]) => c);
+  const hit = pickOne(close, (c) => count.get(c)!);
+  return hit === 'ambiguous' ? null : hit;
+}
+
+/** The best by score; two different sets with the same best score = ambiguous */
+function pickOne(cands: NamedSet[], score: (c: NamedSet) => number): NamedSet | 'ambiguous' | null {
+  if (!cands.length) return null;
+  const top = Math.max(...cands.map(score));
+  const best = cands.filter((c) => score(c) === top);
+  return new Set(best.map((c) => c.num)).size > 1 ? 'ambiguous' : best[0];
 }

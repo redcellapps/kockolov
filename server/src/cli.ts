@@ -29,7 +29,7 @@ const HELP = `Kockolov CLI
   push [--dry-run]                         pošalji obaveštenja o praćenim setovima (inače uz jutarnji pregled)
   push:test --email x@y.rs                 probno obaveštenje na sve uređaje tog korisnika
   ean [broj]                               preuzmi bar-kodove kutija iz LEGO Store-a (podrazumevano 400)
-  kp:izvestaj kp-oglasi.jsonl [--out x.xlsx]   probni izveštaj o KP oglasima (ništa se ne upisuje)
+  kp:izvestaj kp-oglasi.jsonl [--out x.xlsx] [--baza nazivi.csv]   probni izveštaj o KP oglasima (ništa se ne upisuje)
   user:create --email x@y.rs [--name Ime] [--admin] [--password tajna]
   user:invite --email x@y.rs [--name Ime] [--admin]   (e-mail sa linkom za postavljanje lozinke)
   user:password --email x@y.rs [--password tajna]
@@ -49,6 +49,7 @@ async function main() {
       'dry-run': { type: 'boolean', default: false },
       preview: { type: 'string' },
       out: { type: 'string' },
+      baza: { type: 'string' },
     },
   });
   if (!cmd || cmd === 'help' || cmd === '--help') {
@@ -97,7 +98,7 @@ async function main() {
       break;
     case 'kp:izvestaj': {
       if (!positionals[0]) throw new Error('Navedi fajl kp-oglasi.jsonl (kp-agent.mjs --sve)');
-      const counts = await kpReport(positionals[0], values.out ?? 'kp-izvestaj.xlsx');
+      const counts = await kpReport(positionals[0], values.out ?? 'kp-izvestaj.xlsx', { ourSetsCsv: values.baza });
       console.table(Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([odluka, broj]) => ({ odluka, broj })));
       break;
     }

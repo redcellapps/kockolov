@@ -143,6 +143,9 @@ describe('KP ads that are one set we can show', () => {
       { num: '76454', names: ['Hogwarts Castle: The Main Tower'] },
       { num: '40613', names: ['Mini Disney Palace of Agrabah'] },
       { num: '75639', names: ['The Going Merry Pirate Ship'] },
+      { num: '71437', names: ['The Bowser Express Train'] },
+      { num: '71391', names: ["Bowser's Airship Expansion Set"] },
+      { num: '76286', names: ['The Milano Spaceship', 'Guardians of the Galaxy: The Milano', 'Čuvari galaksije: Milano'] },
     ]);
     const more: Record<string, KnownSet> = {
       ...SETS,
@@ -150,6 +153,9 @@ describe('KP ads that are one set we can show', () => {
       '4730': { names: ['Chamber of Secrets'], theme: 'harry-potter', rrp: null },
       '76454': { names: ['Hogwarts Castle: The Main Tower'], theme: 'harry-potter', rrp: 22999 },
       '40613': { names: ['Mini Disney Palace of Agrabah'], theme: 'disney', rrp: null },
+      '71437': { names: ['The Bowser Express Train'], theme: 'super-mario', rrp: null },
+      '71391': { names: ["Bowser's Airship Expansion Set"], theme: 'super-mario', rrp: null },
+      '76286': { names: ['Guardians of the Galaxy: The Milano'], theme: 'marvel', rrp: 21999 },
     };
     const c = { known: (n: string) => more[n] ?? null, names, eurRate: 117.2 };
     const k = (title: string, price: string) => classifyAd(ad(title, price), c);
@@ -157,6 +163,16 @@ describe('KP ads that are one set we can show', () => {
     expect(k('LEGO Harry Potter Hogwarts Castle: The Main Tower - Toy with figures', '208 €')).toMatchObject({ kind: 'show', setNum: '76454' });
     // two words of its own could be a movie title: the admin decides
     expect(k('LEGO Harry Potter and The Chamber of Secrets Hogwarts', '153 €')).toMatchObject({ kind: 'review', setNum: '4730', why: 'name_only' });
+    // a name our shops use (the catalog calls 76286 "The Milano Spaceship")
+    expect(k('LEGO Marvel Guardians of The Galaxy: The Milano', '285 €')).toMatchObject({ kind: 'show', setNum: '76286' });
+    // "Bowsers" is "Bowser's"
+    expect(k('LEGO Super Mario Bowsers Airship Expansion Set', '223 €')).toMatchObject({ kind: 'show', setNum: '71391' });
+    // only part of the name, the rest in the description ("vlak" is not "train"): the admin checks
+    expect(classifyAd(ad('LEGO Super Mario The Bowser Quick', '137 €', 'LEGO Super Mario The Bowser Quick Bowser Express vlak'), c)).toMatchObject({
+      kind: 'review',
+      setNum: '71437',
+      why: 'name_partial',
+    });
     // the same words in another order
     expect(setByName('LEGO ONE PIECE - The Pirate Ship Going Merry - Playset', names)).toMatchObject({ num: '75639' });
     expect(setByName('LEGO Harry Potter Hogwarts Express', names)).toBeNull();
@@ -246,5 +262,28 @@ describe('KP search page', () => {
     expect(d(titled(/Saturn V/))).toMatchObject({ kind: 'show', setNum: '21309' }); // number only in the description
     expect(d(titled(/yeti 7412/))).toMatchObject({ kind: 'skip', why: 'multi' });
     expect(d(titled(/njo0009/))).toMatchObject({ kind: 'skip' }); // a minifigure code
+  });
+});
+
+describe('our sets from a CSV export of the live database', () => {
+  it('reads names from every shop, the theme and the LEGO Store regular price', async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { ourSetsFromCsv } = await import('../src/kp/catalog.js');
+    const file = join(mkdtempSync(join(tmpdir(), 'kp-')), 'nazivi.csv');
+    writeFileSync(
+      file,
+      'set_num,name,theme,rrp_rsd,titles\n' +
+        '76286,Čuvari galaksije: Milano,marvel,21999,"LEGO Marvel 76286 Čuvari galaksije: Milano || LEGO Guardians of the Galaxy: The Milano, ""Infinity Saga"""\n' +
+        '10280,Buket cveća,botanicals,,\n',
+    );
+    const ours = ourSetsFromCsv(file);
+    expect(ours.get('76286')).toEqual({
+      names: ['Čuvari galaksije: Milano', 'LEGO Marvel 76286 Čuvari galaksije: Milano', 'LEGO Guardians of the Galaxy: The Milano, "Infinity Saga"'],
+      theme: 'marvel',
+      rrp: 21999,
+    });
+    expect(ours.get('10280')).toEqual({ names: ['Buket cveća'], theme: 'botanicals', rrp: null });
   });
 });
