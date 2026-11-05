@@ -139,6 +139,11 @@ export function createLimiter(max: number, windowMs: number) {
       a.count++;
       return a.count > max;
     },
+    /** Hits counted in the current window, without counting a new one. */
+    peek(key: string): number {
+      const a = hits.get(key);
+      return a && a.until >= Date.now() ? a.count : 0;
+    },
     reset(key: string) {
       hits.delete(key);
     },
@@ -156,3 +161,5 @@ export function loginRateLimited(key: string): boolean {
 export function resetLoginAttempts(key: string) {
   loginLimiter.reset(key);
 }
+// wrong passwords per address (whatever the IP): from the third one, sign-in also needs the bot check
+export const failedLogins = createLimiter(3, 15 * 60_000);

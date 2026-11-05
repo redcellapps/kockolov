@@ -1,11 +1,13 @@
 import { trackEvent } from '../lib/analytics';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { LogoMark } from '../components/Logo';
 import { Button } from '../components/ui';
 import { t } from '../i18n';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { recaptchaToken } from '../lib/recaptcha';
+import { renderGoogleButton } from '../lib/google';
 import { usePageTitle } from '../lib/title';
 
 export function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
@@ -37,6 +39,17 @@ export function AuthCard({ children }: { children: ReactNode }) {
   );
 }
 
+/** Google's sign-in button; the callback is kept in a ref, so the button isn't redrawn on every render. */
+function GoogleSignIn({ clientId, onCredential }: { clientId: string; onCredential: (credential: string) => void }) {
+  const el = useRef<HTMLDivElement>(null);
+  const latest = useRef(onCredential);
+  latest.current = onCredential;
+  useEffect(() => {
+    if (el.current) renderGoogleButton(el.current, clientId, (c) => latest.current(c)).catch(() => undefined);
+  }, [clientId]);
+  return <div ref={el} className="flex min-h-[44px] justify-center" />;
+}
+
 type Mode = 'login' | 'register' | 'forgot';
 const PATHS: Record<Mode, string> = { login: '/prijava', register: '/registracija', forgot: '/zaboravljena-lozinka' };
 
@@ -48,11 +61,13 @@ function modeFor(pathname: string): Mode {
 
 /** "Check your inbox" after signing up or asking for a new password, with a resend button. */
 function CheckInbox({ kind, email, onBack }: { kind: 'signup' | 'forgot'; email: string; onBack: () => void }) {
+  const { recaptchaSiteKey } = useAuth();
   const [state, setState] = useState<'idle' | 'busy' | 'sent' | string>('idle');
   async function resend() {
     setState('busy');
     try {
-      await api(kind === 'signup' ? '/api/auth/resend' : '/api/auth/forgot', { method: 'POST', json: { email } });
+      const recaptcha = await recaptchaToken(recaptchaSiteKey, kind === 'signup' ? 'resend' : 'forgot');
+      await api(kind === 'signup' ? '/api/auth/resend' : '/api/auth/forgot', { method: 'POST', json: { email, recaptcha } });
       setState('sent');
     } catch (err) {
       setState((err as Error).message);
@@ -82,7 +97,7 @@ function CheckInbox({ kind, email, onBack }: { kind: 'signup' | 'forgot'; email:
 }
 
 export default function LoginPage() {
-  const { refresh, registrationOpen } = useAuth();
+  const { refresh, registrationOpen, recaptchaSiteKey, googleClientId } = useAuth();
   const loc = useLocation();
   const navigate = useNavigate();
   const mode = modeFor(loc.pathname);
@@ -108,14 +123,20 @@ export default function LoginPage() {
     setError(null);
     try {
       if (mode === 'login') {
-        await api('/api/auth/login', { method: 'POST', json: { email, password } });
+        const recaptcha = await recaptchaToken(recaptchaSiteKey, 'login');
+        await api('/api/auth/login', { method: 'POST', json: { email, password, recaptcha } });
         await refresh(); // LoginRoute then redirects to where the user was going
       } else if (mode === 'register') {
-        await api('/api/auth/register', { method: 'POST', json: { email, password, name, ...(phone.trim() ? { phone: phone.trim() } : {}) } });
+        const recaptcha = await recaptchaToken(recaptchaSiteKey, 'register');
+        await api('/api/auth/register', {
+          method: 'POST',
+          json: { email, password, name, ...(phone.trim() ? { phone: phone.trim() } : {}), recaptcha },
+        });
         trackEvent('registracija');
         setSent({ kind: 'signup', email: email.trim() });
       } else {
-        await api('/api/auth/forgot', { method: 'POST', json: { email } });
+        const recaptcha = await recaptchaToken(recaptchaSiteKey, 'forgot');
+        await api('/api/auth/forgot', { method: 'POST', json: { email, recaptcha } });
         setSent({ kind: 'forgot', email: email.trim() });
       }
     } catch (err) {
@@ -125,10 +146,24 @@ export default function LoginPage() {
     }
   }
 
+  async function signInWithGoogle(credential: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api('/api/auth/google', { method: 'POST', json: { credential } });
+      await refresh();
+    } catch (err) {
+      setError({ message: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function resendConfirmation() {
     setBusy(true);
     try {
-      await api('/api/auth/resend', { method: 'POST', json: { email } });
+      const recaptcha = await recaptchaToken(recaptchaSiteKey, 'resend');
+      await api('/api/auth/resend', { method: 'POST', json: { email, recaptcha } });
       setSent({ kind: 'signup', email: email.trim() });
     } catch (err) {
       setError({ message: (err as Error).message });
@@ -159,6 +194,16 @@ export default function LoginPage() {
     <AuthCard>
       <h1 className="mt-6 text-2xl font-extrabold">{title}</h1>
       {subtitle && <p className="mt-1 text-ink-2">{subtitle}</p>}
+      {googleClientId && mode !== 'forgot' && (
+        <div className="mt-6">
+          <GoogleSignIn clientId={googleClientId} onCredential={signInWithGoogle} />
+          <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase text-ink-3">
+            <span className="h-px flex-1 bg-line" />
+            {t('login.or')}
+            <span className="h-px flex-1 bg-line" />
+          </div>
+        </div>
+      )}
       <form onSubmit={submit} className="mt-6 space-y-4">
         {mode === 'register' && (
           <Field label={t('register.name')} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={80} />
@@ -221,6 +266,7 @@ export default function LoginPage() {
               {t('register.privacyLink')}
             </Link>
             .
+            {recaptchaSiteKey && <> {t('register.recaptcha')}</>}
           </p>
         )}
       </form>

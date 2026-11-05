@@ -1,15 +1,20 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { config } from '../../config.js';
 import { one, query, tx } from '../../db.js';
 import { eurRate } from '../../fx.js';
 import { cleanPhone, listingsEnabledFor } from '../../listings/service.js';
+import { randomBytes } from 'node:crypto';
 import { accountFrom, mailConfigured } from '../../mail/mailer.js';
 import { hashToken, linkSentRecently, sendLink, validLink } from '../invites.js';
+import { verifyRecaptcha } from '../captcha.js';
+import { googleIdentity } from '../google.js';
+import { domainAcceptsMail, isDisposableEmail } from '../disposable.js';
 import {
   createLimiter,
   createSession,
   destroySession,
+  failedLogins,
   hashPassword,
   loginRateLimited,
   normalizeEmail,
@@ -20,8 +25,11 @@ import {
 const credentials = z.object({
   email: z.string().email().max(200),
   password: z.string().min(1).max(200),
+  recaptcha: z.string().max(4000).optional(),
 });
-const emailOnly = z.object({ email: z.string().email().max(200) });
+// the sign-in check starts after this many wrong passwords for an address
+const LOGIN_CHECK_AFTER = 3;
+const emailOnly = z.object({ email: z.string().email().max(200), recaptcha: z.string().max(4000).optional() });
 
 // abuse protection for the public forms (per client IP, and per address for anything that sends mail)
 export const limits = {
@@ -30,6 +38,7 @@ export const limits = {
   mailAddress: createLimiter(5, 60 * 60_000),
 };
 const TOO_MANY = 'Previše pokušaja. Pokušaj ponovo malo kasnije.';
+const NOT_HUMAN = 'Nismo uspeli da potvrdimo da nisi robot. Osveži stranicu i pokušaj ponovo.';
 const MAIL_FAILED = 'Nismo uspeli da pošaljemo e-mail. Pokušaj ponovo za nekoliko minuta.';
 
 export async function authRoutes(app: FastifyInstance) {
@@ -52,6 +61,25 @@ export async function authRoutes(app: FastifyInstance) {
     return false;
   }
 
+  /** Sign-up and mail requests: throwaway or undeliverable addresses, then the bot check. Sends the refusal itself. */
+  async function botGuard(req: FastifyRequest, reply: FastifyReply, email: string, token: string | undefined, action: string): Promise<boolean> {
+    if (isDisposableEmail(email)) {
+      reply.code(400).send({ error: 'Ova adresa nije dozvoljena. Unesi svoju pravu e-mail adresu.' });
+      return false;
+    }
+    if (!(await domainAcceptsMail(email))) {
+      reply.code(400).send({ error: 'Domen ove adrese ne prima e-mail. Proveri adresu.' });
+      return false;
+    }
+    const v = await verifyRecaptcha(token, req.ip, action);
+    if (!v.ok) {
+      req.log.warn({ action, reason: v.reason }, 'reCAPTCHA odbila zahtev');
+      reply.code(403).send({ error: NOT_HUMAN });
+      return false;
+    }
+    return true;
+  }
+
   function mailLimited(ip: string, email: string, reply: FastifyReply): boolean {
     if (limits.mailIp.hit(ip) || limits.mailAddress.hit(email)) {
       reply.code(429).send({ error: TOO_MANY });
@@ -66,6 +94,10 @@ export async function authRoutes(app: FastifyInstance) {
     // Oglasi (classifieds) are shown only while LISTINGS_MODE allows this user
     listings: listingsEnabledFor(req.user ?? null),
     registrationOpen: config.registrationOpen,
+    // public key for the bot check on sign-up and password requests (null = check off)
+    recaptchaSiteKey: config.RECAPTCHA_SITE_KEY || null,
+    // sign-in with Google (null = the button is off)
+    googleClientId: config.GOOGLE_CLIENT_ID || null,
     // for showing prices in euros (users who chose EUR)
     fx: { eur: await eurRate() },
     // where the page views go (null = no statistics)
@@ -79,13 +111,24 @@ export async function authRoutes(app: FastifyInstance) {
     const email = normalizeEmail(body.data.email);
     const key = `${req.ip}|${email}`;
     if (loginRateLimited(key)) return reply.code(429).send({ error: 'Previše pokušaja. Pokušajte ponovo za 10 minuta.' });
+    if (failedLogins.peek(email) >= LOGIN_CHECK_AFTER) {
+      const v = await verifyRecaptcha(body.data.recaptcha, req.ip, 'login');
+      if (!v.ok) {
+        req.log.warn({ reason: v.reason }, 'reCAPTCHA odbila prijavu');
+        return reply.code(403).send({ error: NOT_HUMAN, code: 'captcha' });
+      }
+    }
     const user = await one<{ id: number; password_hash: string; accepted_at: string | null }>(
       'SELECT id, password_hash, accepted_at FROM users WHERE email = $1',
       [email],
     );
     const ok = user ? await verifyPassword(body.data.password, user.password_hash) : await verifyPassword('x', 'scrypt$16384$AAAA$AAAA');
-    if (!user || !ok) return reply.code(401).send({ error: 'Pogrešan e-mail ili lozinka.' });
+    if (!user || !ok) {
+      failedLogins.hit(email);
+      return reply.code(401).send({ error: 'Pogrešan e-mail ili lozinka.' });
+    }
     resetLoginAttempts(key);
+    failedLogins.reset(email);
     if (!user.accepted_at) {
       // right password, but the address hasn't been confirmed yet
       return reply.code(403).send({ error: 'Prvo potvrdi e-mail adresu: otvori link koji smo ti poslali.', code: 'unconfirmed' });
@@ -109,6 +152,8 @@ export async function authRoutes(app: FastifyInstance) {
       const emailBad = body.error.issues.some((i) => i.path[0] === 'email');
       return reply.code(400).send({ error: emailBad ? 'Unesi ispravnu e-mail adresu.' : 'Lozinka mora imati bar 8 karaktera.' });
     }
+    const email = normalizeEmail(body.data.email);
+    if (!(await botGuard(req, reply, email, body.data.recaptcha, 'register'))) return;
     if (limits.registerIp.hit(req.ip)) return reply.code(429).send({ error: TOO_MANY });
     let phone: string | null;
     try {
@@ -116,7 +161,6 @@ export async function authRoutes(app: FastifyInstance) {
     } catch (e) {
       return reply.code(400).send({ error: (e as Error).message });
     }
-    const email = normalizeEmail(body.data.email);
     const name = body.data.name?.trim() ?? '';
     const passwordHash = await hashPassword(body.data.password);
     const existing = await one<{ id: number; accepted_at: string | null }>('SELECT id, accepted_at FROM users WHERE email = $1', [email]);
@@ -146,11 +190,51 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true, email };
   });
 
+  /**
+   * Sign-in with Google. Google has already checked the address, so no bot check here. A new address
+   * gets an account (when sign-up is open); an existing one is confirmed, and if nobody had confirmed it
+   * yet, the password set on it is replaced, since whoever set it may not own that mailbox.
+   */
+  app.post('/api/auth/google', async (req, reply) => {
+    if (!config.GOOGLE_CLIENT_ID) return reply.code(404).send({ error: 'Prijava preko Google-a nije uključena.' });
+    const body = z.object({ credential: z.string().min(20).max(4000) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Prijava preko Google-a nije uspela. Pokušaj ponovo.' });
+    const who = await googleIdentity(body.data.credential, config.GOOGLE_CLIENT_ID);
+    if (!who) return reply.code(401).send({ error: 'Google nije potvrdio nalog. Pokušaj ponovo.' });
+    const email = normalizeEmail(who.email);
+    const existing = await one<{ id: number; accepted_at: string | null }>('SELECT id, accepted_at FROM users WHERE email = $1', [email]);
+    let userId: number;
+    if (existing) {
+      if (!existing.accepted_at) {
+        await query(
+          `UPDATE users SET accepted_at = now(), password_hash = $2,
+                  name = CASE WHEN name = '' THEN $3 ELSE name END
+            WHERE id = $1`,
+          [existing.id, await hashPassword(randomBytes(32).toString('base64url')), who.name],
+        );
+      } else {
+        await query("UPDATE users SET name = CASE WHEN name = '' THEN $2 ELSE name END WHERE id = $1", [existing.id, who.name]);
+      }
+      userId = existing.id;
+    } else {
+      if (!config.registrationOpen) return reply.code(403).send({ error: 'Registracija trenutno nije otvorena.' });
+      if (limits.registerIp.hit(req.ip)) return reply.code(429).send({ error: TOO_MANY });
+      const u = await one<{ id: number }>(
+        `INSERT INTO users (email, name, password_hash, self_signup, accepted_at) VALUES ($1, $2, $3, true, now()) RETURNING id`,
+        [email, who.name, await hashPassword(randomBytes(32).toString('base64url'))],
+      );
+      userId = u!.id;
+    }
+    await createSession(reply, userId);
+    return { ok: true };
+  });
+
   /** New confirmation e-mail. Always answers the same, so it can't reveal who has an account. */
   app.post('/api/auth/resend', async (req, reply) => {
     const body = emailOnly.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Unesi ispravnu e-mail adresu.' });
     const email = normalizeEmail(body.data.email);
+    if (!(await botGuard(req, reply, email, body.data.recaptcha, 'resend'))) return;
     if (mailLimited(req.ip, email, reply)) return;
     const u = await one<{ id: number }>('SELECT id FROM users WHERE email = $1 AND accepted_at IS NULL', [email]);
     if (u && !(await linkSentRecently(u.id, 'verify'))) {
@@ -164,6 +248,7 @@ export async function authRoutes(app: FastifyInstance) {
     const body = emailOnly.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'Unesi ispravnu e-mail adresu.' });
     const email = normalizeEmail(body.data.email);
+    if (!(await botGuard(req, reply, email, body.data.recaptcha, 'forgot'))) return;
     if (mailLimited(req.ip, email, reply)) return;
     const u = await one<{ id: number }>('SELECT id FROM users WHERE email = $1', [email]);
     if (u && !(await linkSentRecently(u.id, 'reset'))) {
