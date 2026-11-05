@@ -92,6 +92,10 @@ const schema = z.object({
   // account key (Project settings → Service accounts → Generate new private key) as a file path,
   // or its JSON / base64 JSON. Empty = the apps get no notifications (the site's still work).
   FCM_SERVICE_ACCOUNT: z.string().optional(),
+  // Android App Links: SHA-256 of the app's signing certificate(s), comma-separated, from Play Console →
+  // Test and release → App integrity → App signing (both the "App signing key" and the "Upload key").
+  // Empty = /.well-known/assetlinks.json is 404 and kockolov.rs links open in the browser as before.
+  ANDROID_CERT_SHA256: z.string().optional(),
   // LEGO Store product pages read per crawl to learn the box barcodes (for scanning in the app); 0 = off
   EAN_PER_RUN: z.coerce.number().default(400),
 

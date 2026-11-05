@@ -289,6 +289,12 @@ Off until you switch it on. In `/opt/kockolov/.env`: `LISTINGS_MODE=admins` show
 site first), `LISTINGS_MODE=on` to every signed-in user, then `docker compose up -d`. nginx must allow photo uploads
 (`client_max_body_size 14m` in `kockolov.stpl`; re-apply the template after updating it). Reports and removals: Administracija → Oglasi.
 
+Phone notifications (app 1.2 and the site's notifications): a new message, a followed ad that got cheaper or was sold,
+a new ad for a set on someone's watchlist (once per ad), and the owner's own ad running out (with the 7/3/1 reminders),
+expired or removed. Each kind can be switched off under Nalog → Kockolov na telefonu. Users can block each other
+(ad page or conversation): no messages either way, no phone, the blocker no longer sees the other's ads; the list is on
+the Nalog page. Android App Links: `ANDROID_CERT_SHA256` (mobile/store/google-play.md §4g).
+
 ## If something is off
 
 - **Logs:** `docker compose logs -f app` / `docker compose logs -f worker`.

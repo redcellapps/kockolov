@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { isApp } from '../lib/platform';
+import { InAppNotice } from './InAppNotice';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { useAdsStatus } from '../ads/store';
@@ -239,6 +241,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [pathname]);
   return (
     <div className="flex min-h-screen flex-col">
+      {isApp && <InAppNotice />}
       <Header />
       <main className="flex-1">
         <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>

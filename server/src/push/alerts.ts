@@ -93,6 +93,7 @@ export async function sendWatchAlerts(opts: { log?: (m: string) => void; dryRun?
   const users = byUser.size
     ? await query<{ id: number; currency: 'RSD' | 'EUR' }>(
         `SELECT u.id, u.currency FROM users u WHERE u.id = ANY($1::bigint[])
+            AND coalesce((u.push_prefs->>'prices')::boolean, true)
             AND EXISTS (SELECT 1 FROM push_subscriptions p WHERE p.user_id = u.id)`,
         [[...byUser.keys()]],
       )

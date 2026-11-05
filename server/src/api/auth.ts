@@ -34,6 +34,8 @@ export interface SessionUser {
   currency: 'RSD' | 'EUR';
   phone: string | null;
   msg_email_enabled: boolean;
+  /** notifications switched off per kind (push/notify.ts); a missing key means on */
+  push_prefs: Record<string, boolean>;
 }
 
 /** Header the Android/iOS app sends with every request; it signs in with a token instead of a cookie */
@@ -102,7 +104,7 @@ export async function userFromRequest(req: FastifyRequest): Promise<SessionUser 
   if (!token) return null;
   const hash = hashToken(token);
   const user = await one<SessionUser>(
-    `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.news_enabled, u.currency, u.phone, u.msg_email_enabled
+    `SELECT u.id, u.email, u.name, u.role, u.digest_enabled, u.news_enabled, u.currency, u.phone, u.msg_email_enabled, u.push_prefs
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()`,
     [hash],

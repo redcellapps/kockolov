@@ -197,7 +197,12 @@ export interface User {
   currency?: 'RSD' | 'EUR';
   phone?: string | null;
   msg_email_enabled?: boolean;
+  /** phone notifications switched off per kind; a missing key means on */
+  push_prefs?: Partial<Record<PushKind, boolean>>;
 }
+
+/** Kinds of phone notifications the account page can switch on and off (server: push/notify.ts) */
+export type PushKind = 'prices' | 'messages' | 'watched_ads' | 'my_ads' | 'new_ads';
 
 export interface MeResponse {
   user: User | null;

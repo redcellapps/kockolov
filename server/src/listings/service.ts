@@ -2,6 +2,7 @@ import { config } from '../config.js';
 import { one, pool, query, tx, type Queryable } from '../db.js';
 import { renderListingMail } from '../mail/listing.js';
 import { isImageName, removeImage } from './images.js';
+import { notifyOwner } from '../push/notify.js';
 
 export const MAX_IMAGES = 8;
 export const AD_DAYS = 30;
@@ -67,6 +68,8 @@ export interface ListingRow {
   image_ids: number[];
   price_history: { price: number; at: string }[];
   watched: boolean;
+  /** the viewer blocked this seller */
+  blocked: boolean;
 }
 
 /** $1 is always the viewer's user id (or null), so `watched` and `mine` can be answered in one query */
@@ -75,12 +78,13 @@ export const LISTING_SELECT = `
          coalesce((SELECT json_agg('/media/oglasi/' || i.file ORDER BY i.position, i.id) FROM listing_images i WHERE i.listing_id = l.id), '[]'::json) AS images,
          coalesce((SELECT json_agg(i.id ORDER BY i.position, i.id) FROM listing_images i WHERE i.listing_id = l.id), '[]'::json) AS image_ids,
          coalesce((SELECT json_agg(json_build_object('price', p.price_rsd, 'at', p.changed_at) ORDER BY p.changed_at, p.id) FROM listing_prices p WHERE p.listing_id = l.id), '[]'::json) AS price_history,
-         EXISTS (SELECT 1 FROM listing_watches w WHERE w.listing_id = l.id AND w.user_id = $1::bigint) AS watched
+         EXISTS (SELECT 1 FROM listing_watches w WHERE w.listing_id = l.id AND w.user_id = $1::bigint) AS watched,
+         EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id = $1::bigint AND b.blocked_id = l.user_id) AS blocked
     FROM listings l JOIN users u ON u.id = l.user_id`;
 
 /** What the web app gets: no user id of the seller, no e-mail, no phone */
 export function present(l: ListingRow, viewerId: number | null) {
-  const { user_id, removed_reason, expires_at, expired_at, notified_stage, updated_at, seller_name, ...rest } = l;
+  const { user_id, removed_reason, expires_at, expired_at, notified_stage, updated_at, seller_name, set_alerted: _a, ...rest } = l as ListingRow & { set_alerted?: boolean };
   const mine = viewerId !== null && user_id === viewerId;
   return {
     ...rest,
@@ -101,7 +105,13 @@ export async function loadListing(id: number, viewerId: number | null, db: Query
 /** Active ads for the public list (newest first). The web app filters them itself, which is fine up to a few thousand ads. */
 export const LIST_LIMIT = 2000;
 export async function activeListings(viewerId: number | null) {
-  return query<ListingRow>(`${LISTING_SELECT} WHERE l.status = 'active' AND l.expires_at > now() ORDER BY l.created_at DESC LIMIT ${LIST_LIMIT}`, [viewerId]);
+  // ads of sellers the viewer blocked are left out
+  return query<ListingRow>(
+    `${LISTING_SELECT} WHERE l.status = 'active' AND l.expires_at > now()
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id = $1::bigint AND b.blocked_id = l.user_id)
+      ORDER BY l.created_at DESC LIMIT ${LIST_LIMIT}`,
+    [viewerId],
+  );
 }
 
 /** Deletes the ad's picture files (rows go with the ad) */
@@ -118,6 +128,8 @@ export async function expireListings(): Promise<number> {
   const r = await query<{ id: number }>(
     "UPDATE listings SET status = 'expired', expired_at = now(), updated_at = now() WHERE status IN ('active', 'paused') AND expires_at < now() RETURNING id",
   );
+  // the owners hear about it on the phone (the e-mails warned them 7, 3 and 1 day before)
+  for (const { id } of r) await notifyOwner(id, { kind: 'expired' }).catch((e: unknown) => console.warn(`obaveštenja: ${(e as Error).message}`));
   return r.length;
 }
 
@@ -147,6 +159,8 @@ export async function sendExpiryReminders(send: Mailer, log: (m: string) => void
       const m = renderListingMail({ kind: 'expiring', name: r.name, title: r.title, daysLeft: REMINDER_DAYS[stage - 1], expiresAt: r.expires_at });
       await send({ to: r.email, subject: m.subject, html: m.html, text: m.text });
       sent++;
+      // and on the phone (a failed notification must not undo the reminder)
+      await notifyOwner(r.id, { kind: 'expiring', daysLeft: REMINDER_DAYS[stage - 1] }).catch((e: unknown) => log(`oglasi: obaveštenje za oglas ${r.id}: ${(e as Error).message}`));
     } catch (err) {
       log(`oglasi: podsetnik za oglas ${r.id} nije poslat: ${(err as Error).message}`);
       await query('UPDATE listings SET notified_stage = $2 WHERE id = $1 AND notified_stage = $3', [r.id, r.notified_stage, stage]);

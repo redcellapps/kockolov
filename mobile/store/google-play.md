@@ -184,12 +184,54 @@ Tipovi podataka (sve: **Collected**, **not shared**, **optional** – korisnik b
 | App activity → **App interactions** (koje stranice se otvaraju, statistika posetilaca, Umami) | Analytics |
 | Location → **Approximate location** (država i grad iz statistike posetilaca; IP se ne čuva) | Analytics |
 | Device or other IDs → **Device or other IDs** (Firebase token za obaveštenja) | App functionality |
+| Personal info → **Phone number** (od 1.2, Oglasi: telefon na profilu, nije obavezan) | App functionality |
+| Photos and videos → **Photos** (od 1.2, Oglasi: slike oglasa) | App functionality |
+| Messages → **Other in-app messages** (od 1.2, poruke između kupca i prodavca) | App functionality |
+| App activity → **Other user-generated content** (od 1.2, tekst oglasa) | App functionality |
 
 Ne prikupljamo: tačnu lokaciju, kontakte, fotografije (skener obrađuje sliku na telefonu, serveru ide samo pročitani
 broj), istoriju pretrage (reči iz pretrage se ne šalju ni u statistiku), reklamni ID. Statistika posetilaca (Umami, na
 našem serveru, bez kolačića i bez trećih strana) je od verzije sa analitikom: kad je uključiš na serveru, u Data
 safety dodaj poslednja dva reda iz tabele. Firebase Cloud Messaging je obrađivač koji radi za nas, pa se
 po Google-ovim pravilima to ne računa kao „sharing”.
+
+Od verzije 1.2 (Oglasi): poslednja četiri reda dodaj pre slanja 1.2 na pregled. Telefon, slike i tekst oglasa
+korisnik sam objavljuje drugim korisnicima, poruke šalje drugom korisniku. To je funkcija aplikacije, ne „sharing” sa
+trećom stranom. Kod **Phone number** i **Photos** izaberi *optional*, kod poruka i oglasa takođe *optional* (bez oglasa
+aplikacija radi).
+
+### 4f. Sadržaj korisnika (od 1.2)
+
+App content → **User-generated content** (ako ga Play traži uz Oglase): da, korisnici objavljuju oglase i šalju poruke.
+Mere koje postoje u aplikaciji: Uslovi korišćenja (`/uslovi`) koje korisnik prihvata pri postavljanju oglasa, **Prijavi**
+na oglasu i u razgovoru, **Blokiraj** korisnika (oglas i razgovor; lista i Odblokiraj na stranici Nalog), uklanjanje
+oglasa iz administracije sa razlogom, koji vlasnik vidi.
+
+## 4g. Verzija 1.2 (Oglasi)
+
+1. **Server prvo**: deploy `main`, pa u `.env` (ako već nije): `LISTINGS_MODE=on` kad želiš Oglase za sve. Do tada
+   aplikacija 1.2 radi kao 1.1, a Oglasi se pojave sami čim ih uključiš (bez novog builda).
+2. **App Links** (linkovi kockolov.rs/set/…, /oglasi/…, /poruke/… i linkovi iz mejlova otvaraju aplikaciju umesto
+   browsera): Play Console → Test and release → **App integrity → App signing** → kopiraj **SHA-256** za *App signing key*
+   i za *Upload key*, upiši ih u `.env` kao `ANDROID_CERT_SHA256=AA:BB:…,CC:DD:…` i restartuj. Provera:
+   `https://kockolov.rs/.well-known/assetlinks.json` vraća JSON sa oba otiska. Bez toga sve radi, samo se linkovi otvaraju
+   u browseru.
+3. **Probna verzija sa R8**: posle svakog builda na `main`, Releases → android-test → `kockolov-test-r8.apk` je tačno onaj
+   kod koji ide na Play (R8 uključen). Proveri na telefonu: prijava, skener, obaveštenja (probno obaveštenje iz Naloga),
+   Podeli, Oglasi (postavljanje sa slikom iz galerije i sa kamerom, poruka, blokiranje). Potpisana je privremenim ključem:
+   na telefonu sa Play verzijom prvo nju ukloni (ili koristi drugi telefon).
+4. Actions → Mobile apps → Run workflow (`main`) → **Verzija za Google Play** → `kockolov-1.2.0-<kod>.aab`.
+5. Data safety (4e) i User-generated content (4f), pa **Production → Create new release**. Release notes (sr):
+
+```
+Novo u verziji 1.2:
+• Oglasi: prodaj svoje LEGO setove ili pronađi korišćene, sa slikama i porukama u aplikaciji
+• Obaveštenja za poruke, oglase koje pratiš i nove oglase za setove sa tvoje liste
+• Za svaku vrstu obaveštenja biraš da li je želiš (Nalog → Kockolov na telefonu)
+• Blokiranje korisnika i prijava oglasa
+• Linkovi sa kockolov.rs otvaraju se u aplikaciji
+• Manja i brža aplikacija
+```
 
 ## 5. Zatvoreni test
 

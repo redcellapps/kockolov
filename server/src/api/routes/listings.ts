@@ -14,6 +14,7 @@ import {
   present,
   type ListingRow,
 } from '../../listings/service.js';
+import { notifyAdFollowers, notifySafely, notifySetWatchers } from '../../push/notify.js';
 import { createLimiter } from '../auth.js';
 import { requireUser } from './me.js';
 
@@ -124,8 +125,9 @@ export async function listingRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/api/oglasi/:id/telefon', { preHandler: [gate, requireUser] }, async (req, reply) => {
     if (limits.phone.hit(String(req.user!.id))) return reply.code(429).send({ error: 'Previše zahteva. Pokušaj malo kasnije.' });
     const r = await one<{ phone: string | null }>(
-      `SELECT u.phone FROM listings l JOIN users u ON u.id = l.user_id WHERE l.id = $1 AND l.status = 'active'`,
-      [Number(req.params.id) || 0],
+      `SELECT u.phone FROM listings l JOIN users u ON u.id = l.user_id WHERE l.id = $1 AND l.status = 'active'
+          AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = l.user_id AND b.blocked_id = $2) OR (b.blocker_id = $2 AND b.blocked_id = l.user_id))`,
+      [Number(req.params.id) || 0, req.user!.id],
     );
     if (!r?.phone) return reply.code(404).send({ error: 'Prodavac nije ostavio telefon.' });
     return { phone: r.phone };
@@ -154,6 +156,7 @@ export async function listingRoutes(app: FastifyInstance) {
       await setImages(c, userId, r!.id, b.images);
       return r!.id;
     });
+    notifySafely(() => notifySetWatchers(id), (e) => req.log.error(e));
     return { id: String(id) };
   });
 
@@ -180,6 +183,9 @@ export async function listingRoutes(app: FastifyInstance) {
       return setImages(c, req.user!.id, l.id, b.images);
     });
     await dropFiles(gone);
+    if (b.price_rsd < l.price_rsd) notifySafely(() => notifyAdFollowers(l.id, 'price'), (e) => req.log.error(e));
+    // a set number added later still tells the set's watchers (once)
+    notifySafely(() => notifySetWatchers(l.id), (e) => req.log.error(e));
     return { id: String(l.id) };
   });
 
@@ -193,6 +199,7 @@ export async function listingRoutes(app: FastifyInstance) {
         await query('UPDATE listings SET price_rsd = $2, updated_at = now() WHERE id = $1', [l.id, price_rsd], c);
       });
     }
+    if (price_rsd < l.price_rsd) notifySafely(() => notifyAdFollowers(l.id, 'price'), (e) => req.log.error(e));
     return { ok: true };
   });
 
@@ -209,6 +216,8 @@ export async function listingRoutes(app: FastifyInstance) {
         WHERE id = $1`,
       [l.id, status, AD_DAYS],
     );
+    if (status === 'sold' && l.status !== 'sold') notifySafely(() => notifyAdFollowers(l.id, 'sold'), (e) => req.log.error(e));
+    if (status === 'active') notifySafely(() => notifySetWatchers(l.id), (e) => req.log.error(e));
     return { ok: true };
   });
 

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { notifyOwner, notifySafely } from '../../push/notify.js';
 import { one, query } from '../../db.js';
 
 /** Moderation of Oglasi: open reports, taking an ad down (with a reason the owner sees) and putting it back. Admin only (see the hook in admin.ts: /api/admin). */
@@ -57,6 +58,7 @@ export async function listingAdminRoutes(app: FastifyInstance) {
     const r = await one("UPDATE listings SET status = 'removed', removed_reason = $2, updated_at = now() WHERE id = $1 RETURNING id", [id, reason]);
     if (!r) return reply.code(404).send({ error: 'Oglas nije pronađen.' });
     await query('UPDATE listing_reports SET resolved_at = now() WHERE listing_id = $1 AND resolved_at IS NULL', [id]);
+    notifySafely(() => notifyOwner(id, { kind: 'removed', reason }), (e) => req.log.error(e));
     return { ok: true };
   });
 

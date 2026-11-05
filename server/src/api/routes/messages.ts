@@ -4,6 +4,7 @@ import { one, query } from '../../db.js';
 import { createLimiter } from '../auth.js';
 import { mailConfigured, sendAccountMail } from '../../mail/mailer.js';
 import { renderMessageMail } from '../../mail/message.js';
+import { blockedEitherWay, notifyNewMessage, notifySafely } from '../../push/notify.js';
 import { gate } from './listings.js';
 import { requireUser } from './me.js';
 
@@ -11,6 +12,8 @@ const limits = { send: createLimiter(30, 10 * 60_000), newConv: createLimiter(15
 /** At most one "you have a message" e-mail per conversation and recipient in this time */
 export const MAIL_EVERY_MIN = 15;
 const body = z.object({ text: z.string().trim().min(1).max(1000) });
+/** The same answer whichever side blocked: the blocked person is never told who did it */
+const BLOCKED = 'Ne možeš da pošalješ poruku ovom korisniku.';
 
 interface Conv {
   id: number;
@@ -27,6 +30,8 @@ export async function sendMessage(conv: Conv, senderId: number, senderName: stri
   const toSeller = senderId === conv.buyer_id;
   const recipientId = toSeller ? conv.seller_id : conv.buyer_id;
   const col = toSeller ? 'seller_mailed_at' : 'buyer_mailed_at';
+  // on the phone every message (a newer one replaces the older on the screen); the e-mail below stays throttled
+  notifySafely(() => notifyNewMessage({ conversationId: conv.id, recipientId, senderId, from: senderName, adTitle: conv.title, text }), log);
   try {
     if (!mailConfigured()) return msg;
     // the claim is atomic: only one request wins the right to send within the window
@@ -65,7 +70,8 @@ export async function messageRoutes(app: FastifyInstance) {
               (c.seller_id = $1) AS my_ad,
               coalesce(nullif(o.name, ''), 'Korisnik') AS other,
               (SELECT json_build_object('text', m.body, 'at', m.created_at, 'mine', m.sender_id = $1) FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last,
-              (SELECT count(*)::int FROM messages m WHERE m.conversation_id = c.id AND m.read_at IS NULL AND m.sender_id <> $1) AS unread
+              (SELECT count(*)::int FROM messages m WHERE m.conversation_id = c.id AND m.read_at IS NULL AND m.sender_id <> $1) AS unread,
+              EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id = $1 AND b.blocked_id = o.id) AS blocked
          FROM conversations c
          LEFT JOIN listings l ON l.id = c.listing_id
          JOIN users o ON o.id = CASE WHEN c.seller_id = $1 THEN c.buyer_id ELSE c.seller_id END
@@ -95,6 +101,7 @@ export async function messageRoutes(app: FastifyInstance) {
     const { text } = body.parse(req.body);
     const c = await myConversation(Number(req.params.id) || 0, me.id);
     if (!c) return reply.code(404).send({ error: 'Razgovor nije pronađen.' });
+    if (await blockedEitherWay(c.buyer_id, c.seller_id)) return reply.code(403).send({ error: BLOCKED });
     if (limits.send.hit(String(me.id))) return reply.code(429).send({ error: 'Šalješ prebrzo. Sačekaj malo.' });
     const m = await sendMessage(c, me.id, me.name, text, (e) => req.log.error(e));
     return { ok: true, id: m?.id };
@@ -107,6 +114,7 @@ export async function messageRoutes(app: FastifyInstance) {
     const l = await one<{ id: number; user_id: number; title: string }>("SELECT id, user_id, title FROM listings WHERE id = $1 AND status = 'active'", [Number(req.params.id) || 0]);
     if (!l) return reply.code(404).send({ error: 'Oglas nije pronađen.' });
     if (l.user_id === me.id) return reply.code(400).send({ error: 'Ovo je tvoj oglas.' });
+    if (await blockedEitherWay(l.user_id, me.id)) return reply.code(403).send({ error: BLOCKED });
     if (limits.send.hit(String(me.id))) return reply.code(429).send({ error: 'Šalješ prebrzo. Sačekaj malo.' });
     let c = await one<Conv>('SELECT id, listing_id, buyer_id, seller_id, $3::text AS title FROM conversations WHERE listing_id = $1 AND buyer_id = $2', [l.id, me.id, l.title]);
     if (!c) {

@@ -4,6 +4,7 @@ import { one, query } from '../../db.js';
 import { destroySession, hashPassword, verifyPassword } from '../auth.js';
 import { buildSearch } from '../search.js';
 import { cleanPhone, dropFiles, filesOfUser, PhoneError } from '../../listings/service.js';
+import { PUSH_KINDS } from '../../push/notify.js';
 
 export async function requireUser(req: FastifyRequest, reply: FastifyReply) {
   if (!req.user) return reply.code(401).send({ error: 'Potrebna je prijava.' });
@@ -19,6 +20,8 @@ export async function meRoutes(app: FastifyInstance) {
         currency: z.enum(['RSD', 'EUR']).optional(),
         phone: z.string().max(40).optional(), // '' removes it
         msgEmailEnabled: z.boolean().optional(),
+        // only the kinds that change: {"messages": false}
+        pushPrefs: z.partialRecord(z.enum(PUSH_KINDS), z.boolean()).optional(),
       })
       .parse(req.body);
     let phone: string | null | undefined;
@@ -32,9 +35,10 @@ export async function meRoutes(app: FastifyInstance) {
       `UPDATE users SET name = coalesce($2, name), digest_enabled = coalesce($3, digest_enabled), currency = coalesce($4, currency),
                         news_enabled = coalesce($5, news_enabled),
                         phone = CASE WHEN $6::boolean THEN $7 ELSE phone END,
-                        msg_email_enabled = coalesce($8, msg_email_enabled)
+                        msg_email_enabled = coalesce($8, msg_email_enabled),
+                        push_prefs = push_prefs || coalesce($9::jsonb, '{}'::jsonb)
         WHERE id = $1`,
-      [req.user!.id, body.name ?? null, body.digestEnabled ?? null, body.currency ?? null, body.newsEnabled ?? null, phone !== undefined, phone ?? null, body.msgEmailEnabled ?? null],
+      [req.user!.id, body.name ?? null, body.digestEnabled ?? null, body.currency ?? null, body.newsEnabled ?? null, phone !== undefined, phone ?? null, body.msgEmailEnabled ?? null, body.pushPrefs ? JSON.stringify(body.pushPrefs) : null],
     );
     return { ok: true };
   });

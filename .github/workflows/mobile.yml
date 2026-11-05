@@ -138,8 +138,21 @@ jobs:
             exit 1
           fi
           jarsigner -verify app/build/outputs/bundle/release/app-release.aab | grep -q 'jar verified'
+          # since 1.2 the release build goes through R8: an installable copy of exactly that code, for checking on a
+          # phone before Play (throwaway key: uninstall the Play version first, or use a second phone)
+          if [ "$PLAY" != "true" ]; then
+            ./gradlew assembleRelease --no-daemon --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/kockolov-test-r8.apk"
+          fi
           rm -f "$KOCKOLOV_KEYSTORE"
         working-directory: mobile/android
+        env:
+          PLAY: ${{ github.event_name == 'workflow_dispatch' && inputs.play }}
+      - name: R8 test APK as a download
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.play) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload android-test "$RUNNER_TEMP/kockolov-test-r8.apk" --clobber
       - name: AAB as a download
         if: github.event_name == 'workflow_dispatch' && inputs.play
         env:

@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { t } from '../i18n';
 import { ago, money } from '../lib/format';
 import { cx } from '../components/ui';
+import { serverUrl } from '../lib/platform';
 import { AdWatchHeart } from './WatchButton';
 import { priceChange, type Listing } from './store';
 
@@ -21,7 +22,7 @@ export function AdCard({ l, footer }: { l: Listing; footer?: React.ReactNode }) 
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-0.5 hover:shadow-lift">
       <Link to={`/oglasi/${l.id}`} className="flex flex-1 flex-col" aria-label={l.title}>
         <div className="relative aspect-[4/3] bg-surface-2">
-          <img src={l.images[0]} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
+          <img src={l.images[0] ? serverUrl(l.images[0]) : undefined} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
           <CondBadge c={l.condition} className="absolute left-3 top-3 shadow-sm" />
           <AdWatchHeart l={l} className="absolute right-3 top-3" />
           {l.status !== 'active' && (
