@@ -99,3 +99,17 @@ describe('expired promotions are never proposed', () => {
     expect(extractPromos(['Poklon uz porudžbine preko 10.000 RSD važi do 30. novembra.'], opt)).toHaveLength(1);
   });
 });
+
+describe('promotions the shop itself marks as over', () => {
+  const opt = { sourceUrl: 'https://x.test/', now: new Date('2026-11-07T08:00:00Z') };
+  it('skips a passage that says it expired, even without any date', () => {
+    expect(extractPromos(['Ova promocija je istekla. Jednostavno potrošite preko 30.000 RSD i izaberite set za samo 1 RSD.'], opt)).toHaveLength(0);
+    expect(extractPromos(['Akcija je završena. Poklon uz porudžbine preko 10.000 RSD.'], opt)).toHaveLength(0);
+    expect(extractPromos(['Poklon uz porudžbine preko 10.000 RSD, akcija traje.'], opt)).toHaveLength(1);
+  });
+  it('recognises the notice on a whole page', async () => {
+    const { isOverText, pageText } = await import('../src/crawler/promos/extract.js');
+    expect(isOverText(pageText('<body><div>Ova promocija je istekla.</div><p>Potrošite preko 30.000 RSD</p></body>'))).toBe(true);
+    expect(isOverText(pageText('<body><p>Potrošite preko 30.000 RSD i dobijate poklon</p></body>'))).toBe(false);
+  });
+});

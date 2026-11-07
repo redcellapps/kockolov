@@ -1,6 +1,6 @@
 import { query } from '../../db.js';
 import { PoliteFetcher } from '../../lib/http.js';
-import { extractPromos, parseAtomFeed, passagesFromHtml, type PromoCandidate } from './extract.js';
+import { extractPromos, isOverText, pageText, parseAtomFeed, passagesFromHtml, type PromoCandidate } from './extract.js';
 import { upsertCandidate } from './store.js';
 
 export interface PromoSource {
@@ -48,6 +48,38 @@ export async function runPromoCrawl(
   // proposals that ran out since the last read are not worth anyone's attention
   await query(`DELETE FROM promos WHERE source = 'crawler' AND status = 'pending' AND valid_until < current_date`);
 
+  // Every promotion has its own page, and that page is the one that says whether it is over ("Ova promocija je istekla.").
+  // Pages are fetched once per run; a failed fetch decides nothing.
+  const verdicts = new Map<string, boolean | null>();
+  const listingUrls = new Set((opts.sources ?? PROMO_SOURCES).map((x) => x.url));
+  const isOver = async (url: string): Promise<boolean | null> => {
+    if (verdicts.has(url)) return verdicts.get(url)!;
+    let v: boolean | null = null;
+    try {
+      const res = await http.get(url);
+      if (res.status === 410) v = true; // gone for good; a 404 may be a hiccup and decides nothing
+      else if (res.status === 200) v = isOverText(pageText(res.text));
+    } catch {
+      v = null;
+    }
+    verdicts.set(url, v);
+    return v;
+  };
+
+  // already stored (crawler) promotions that are still shown or waiting: ask their pages again
+  const stored = await query<{ id: number; status: string; source_url: string }>(
+    `SELECT id, status, source_url FROM promos
+      WHERE source = 'crawler' AND status IN ('pending', 'approved') AND (valid_until IS NULL OR valid_until >= current_date)`,
+  );
+  let ended = 0;
+  for (const r of stored) {
+    if (listingUrls.has(r.source_url) || !(await isOver(r.source_url))) continue;
+    ended++;
+    if (r.status === 'pending') await query('DELETE FROM promos WHERE id = $1', [r.id]);
+    else await query('UPDATE promos SET valid_until = current_date - 1, changed = true WHERE id = $1', [r.id]);
+  }
+  if (ended) log(`akcije: ${ended} više nije aktivno (stranica kaže da je istekla)`);
+
   for (const s of sources) {
     const row: PromoRunRow = { source: s.url, found: 0, added: 0, changed: 0 };
     rows.push(row);
@@ -68,6 +100,14 @@ export async function runPromoCrawl(
       } else {
         found.push(...extractPromos(passagesFromHtml(res.text), { sourceUrl: s.url, themes, now, legoOnly: s.legoOnly }));
       }
+      // a promotion on its own page (blog post...) is only as live as that page says
+      const live: PromoCandidate[] = [];
+      for (const c of found) {
+        if (c.sourceUrl !== s.url && (await isOver(c.sourceUrl))) continue;
+        live.push(c);
+      }
+      found.length = 0;
+      found.push(...live);
       row.found = found.length;
       for (const c of found) {
         const r = await upsertCandidate(s.shopId, c);

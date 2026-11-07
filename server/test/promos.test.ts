@@ -32,6 +32,7 @@ describe.skipIf(!dbAvailable)('promotions: crawler proposes, admin decides', asy
   const pages: Record<string, string> = {
     'https://lstore.rs/blogs/vesti.atom': fx('lstore.atom'),
     'https://lstore.rs/': fx('lstore-home.html'),
+    'https://lstore.rs/blogs/vesti/poklon-icons': '<html><body><p>Poklon za LEGO Icons kupce, porudžbine preko 20.000 RSD.</p></body></html>',
     'https://www.kockarium.rs/lego-kocke-akcija/': fx('kockarium-akcija.html'),
     'https://www.dexy.co.rs/akcije-i-snizenja': fx('dexy-akcije.html'),
   };
@@ -48,6 +49,24 @@ describe.skipIf(!dbAvailable)('promotions: crawler proposes, admin decides', asy
     expect(all.some((p) => p.shop_id === 'lstore' && p.min_basket_rsd === 20000)).toBe(true); // from the feed
     expect(all.some((p) => p.min_basket_rsd === 9000)).toBe(false); // old blog post skipped
     expect(all.some((p) => /bebe/i.test(p.title))).toBe(false); // Dexy: not LEGO
+  });
+
+  it('checks each promotion on its own page: an entry whose page says it expired is dropped, and stored ones are closed', async () => {
+    const expiredPage = '<html><body><div>Ova promocija je istekla.</div><p>Potrošite preko 20.000 RSD i dobijate poklon.</p></body></html>';
+    const gone = { get: async (url: string) => (url === 'https://lstore.rs/blogs/vesti/poklon-icons' ? { status: 200, text: expiredPage } : http.get(url)) };
+    await query('DELETE FROM promos');
+    await runPromoCrawl({ http: gone, now });
+    expect((await query(`SELECT 1 FROM promos WHERE source_url = 'https://lstore.rs/blogs/vesti/poklon-icons'`)).length).toBe(0);
+
+    // the same promotion was stored (and approved) earlier, while its page was still alive
+    await runPromoCrawl({ http, now });
+    const row = await one<{ id: number }>(`SELECT id FROM promos WHERE source_url = 'https://lstore.rs/blogs/vesti/poklon-icons'`);
+    await query(`UPDATE promos SET status = 'approved' WHERE id = $1`, [row!.id]);
+    await runPromoCrawl({ http: gone, now });
+    const after = await one<{ over: boolean }>('SELECT valid_until < current_date AS over FROM promos WHERE id = $1', [row!.id]);
+    expect(after!.over).toBe(true);
+    await query('DELETE FROM promos');
+    await runPromoCrawl({ http, now });
   });
 
   it('running again changes nothing', async () => {

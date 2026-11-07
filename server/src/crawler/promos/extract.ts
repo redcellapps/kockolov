@@ -154,6 +154,19 @@ function matchThemes(f: string, themes: { slug: string; name: string }[]): strin
 }
 
 /** Text blocks worth reading: paragraphs, list items, headings and small banner elements. Navigation, footers and scripts are dropped. */
+/** "Ova promocija je istekla.", "Akcija je završena", "više ne važi": the shop itself says it is over. */
+const OVER = /(promocij\w*|akcij\w*|ponud\w*|popust\w*|kampanj\w*)\s+(je\s+)?(istekl\w*|zavrsen\w*|prestal\w*|gotov\w*)|istekl[aeo]\s+(je|su)|vise\s+(nije|nisu|ne\s+vaz\w*)\s*(aktiv\w*)?|nije\s+vise\s+aktiv\w*|\bistekla\b|\bisteklo\b/;
+export function isOverText(text: string): boolean {
+  return OVER.test(fold(text));
+}
+
+/** All visible text of a page, for checks that look at the page as a whole */
+export function pageText(html: string): string {
+  const $ = cheerio.load(html);
+  $('script, style, noscript, template').remove();
+  return $('body').text().replace(/\s+/g, ' ').trim();
+}
+
 export function passagesFromHtml(html: string): string[] {
   const $ = cheerio.load(html);
   $('script,style,noscript,svg,nav,footer,header,form,iframe,template').remove();
@@ -182,6 +195,7 @@ export function extractPromos(passages: string[], opt: ExtractOptions): PromoCan
   for (const raw of passages) {
     const f = fold(raw);
     if (!KEYWORD.test(f)) continue;
+    if (isOverText(raw)) continue; // the shop marks it as over, with or without a date
     if (opt.legoOnly && !f.includes('lego') && !opt.sourceUrl.toLowerCase().includes('lego')) continue;
 
     const minBasketRsd = parseThreshold(raw);
