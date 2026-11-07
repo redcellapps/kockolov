@@ -6,6 +6,7 @@ import { PriceHistoryChart } from '../components/PriceHistoryChart';
 import { ProductImage, SetCard } from '../components/SetCard';
 import { EmptyState, ErrorState, ShopDot, Skeleton, buttonClasses, cx } from '../components/ui';
 import { WatchButton } from '../components/WatchButton';
+import { promoFacts, usePromos, type Promo } from '../lib/promos';
 import { t, tn } from '../i18n';
 import { trackEvent } from '../lib/analytics';
 import { api, ApiError, type SetDetail as SetDetailData } from '../lib/api';
@@ -47,6 +48,10 @@ export default function SetDetail() {
   const hidden = q.data.hidden_offers ?? 0;
   const hiddenShops = q.data.hidden_shops ?? 0;
   const inStock = offers.filter((o) => o.in_stock);
+  const promos = usePromos().data?.items ?? [];
+  // a promotion tied to themes only shows on sets of those themes
+  const promosFor = (shopId: string): Promo[] =>
+    promos.filter((p) => p.shop_id === shopId && (!p.themes.length || (set.theme_name && p.themes.some((x) => x.toLowerCase() === set.theme_name!.toLowerCase()))));
   const best = inStock[0] ?? null;
   const rrp = set.rrp_rsd;
   const saving = best && rrp && rrp > best.price_rsd ? rrp - best.price_rsd : 0;
@@ -206,6 +211,12 @@ export default function SetDetail() {
                               )}
                             </div>
                             {o.seller && <div className="truncate text-sm text-ink-2">{o.seller}</div>}
+                            {promosFor(o.shop_id).map((p) => (
+                              <Link key={p.id} to="/akcije" className="mt-1 block text-xs font-bold text-accent hover:underline">
+                                {t(`promo.kind.${p.kind}`)}: {p.title}
+                                {promoFacts(p)[0] ? ` (${promoFacts(p)[0]})` : ''}
+                              </Link>
+                            ))}
                             <div className="text-xs text-ink-3 sm:hidden">
                               {o.in_stock ? t('set.offers.inStock') : t('set.offers.outOfStock')} · {ago(o.last_seen)}
                             </div>

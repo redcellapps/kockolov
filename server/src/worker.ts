@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { config } from './config.js';
 import { migrate, query } from './db.js';
 import { runCrawl } from './crawler/pipeline.js';
+import { runPromoCrawl } from './crawler/promos/run.js';
 import { seedReferenceData } from './crawler/seed.js';
 import { alertOnCrawlProblems } from './jobs/alerts.js';
 import { refreshEurRate } from './fx.js';
@@ -19,6 +20,14 @@ async function crawlJob() {
     await refreshEurRate(log);
     const res = await runCrawl({ log });
     await alertOnCrawlProblems(res, log);
+    if (config.PROMOS_CRAWL) {
+      try {
+        const promos = await runPromoCrawl({ log });
+        log(`akcije: predloženo ${promos.reduce((n, r) => n + r.added, 0)}, izmenjeno ${promos.reduce((n, r) => n + r.changed, 0)}`);
+      } catch (err) {
+        log(`akcije: čitanje nije uspelo: ${(err as Error).message}`);
+      }
+    }
     await query('DELETE FROM sessions WHERE expires_at < now()');
     // sign-ups nobody confirmed within 30 days, and old one-time links
     await query("DELETE FROM users WHERE self_signup AND accepted_at IS NULL AND created_at < now() - interval '30 days'");

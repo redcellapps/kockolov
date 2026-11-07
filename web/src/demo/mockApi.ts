@@ -215,6 +215,7 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
   const catalog = catalogs[audience];
   if (path === '/api/stats') return ok(snap.stats[audience]);
   if (path === '/api/shops') return ok(snap.shops[audience]);
+  if (path === '/api/akcije') return ok({ items: [] });
   if (path === '/api/themes') return ok(snap.themes[audience]);
   if (path === '/api/deals') {
     const limit = Math.min(Number(p.get('limit') ?? 40) || 40, 40);

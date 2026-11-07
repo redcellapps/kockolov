@@ -19,6 +19,9 @@ export function AdminNav() {
       <NavLink to="/admin/ponude" className={tab}>
         {t('admin.nav.offers')}
       </NavLink>
+      <NavLink to="/admin/akcije" className={tab}>
+        {t('admin.nav.promos')}
+      </NavLink>
       {listings && (
         <NavLink to="/admin/oglasi" className={tab}>
           {t('admin.nav.ads')}

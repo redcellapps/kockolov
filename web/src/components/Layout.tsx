@@ -100,6 +100,9 @@ function Header() {
           <NavLink to="/ponude" className={link}>
             {t('nav.deals')}
           </NavLink>
+          <NavLink to="/akcije" className={link}>
+            {t('nav.promos')}
+          </NavLink>
           <NavLink to="/pretraga" className={link}>
             {t('nav.search')}
           </NavLink>
@@ -131,6 +134,9 @@ function Header() {
           <nav className="scrollbar-none flex min-w-0 flex-1 gap-1 overflow-x-auto px-3 py-1.5 [&>a]:shrink-0 [&>a]:whitespace-nowrap">
             <NavLink to="/ponude" className={link}>
               {t('nav.deals')}
+            </NavLink>
+            <NavLink to="/akcije" className={link}>
+              {t('nav.promos')}
             </NavLink>
             <NavLink to="/pretraga" className={link}>
               {t('nav.search')}

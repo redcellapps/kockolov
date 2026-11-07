@@ -1,0 +1,94 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import pg from 'pg';
+import { describe, expect, it } from 'vitest';
+
+const fx = (p: string) => readFileSync(path.join(__dirname, 'fixtures', 'promos', p), 'utf8');
+
+const dbAvailable = await (async () => {
+  const c = new pg.Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 1500 });
+  try {
+    await c.connect();
+    await c.end();
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+describe.skipIf(!dbAvailable)('promotions: crawler proposes, admin decides', async () => {
+  const { pool, migrate, query, one } = await import('../src/db.js');
+  const { runPromoCrawl } = await import('../src/crawler/promos/run.js');
+  const { upsertCandidate } = await import('../src/crawler/promos/store.js');
+  await migrate();
+  for (const [id, name, members] of [['lstore', 'LEGO® Store', false], ['kockarium', 'Kockarium', false], ['dexy', 'Dexy Co', true]] as const) {
+    await query(
+      `INSERT INTO shops (id, name, url, kind, members_only) VALUES ($1, $2, $3, 'shop', $4) ON CONFLICT (id) DO UPDATE SET members_only = $4`,
+      [id, name, `https://${id}.example`, members],
+    );
+  }
+  await query('DELETE FROM promos');
+
+  const pages: Record<string, string> = {
+    'https://lstore.rs/blogs/vesti.atom': fx('lstore.atom'),
+    'https://lstore.rs/': fx('lstore-home.html'),
+    'https://www.kockarium.rs/lego-kocke-akcija/': fx('kockarium-akcija.html'),
+    'https://www.dexy.co.rs/akcije-i-snizenja': fx('dexy-akcije.html'),
+  };
+  const http = { get: async (url: string) => (url in pages ? { status: 200, text: pages[url] } : { status: 404, text: '' }) };
+  const now = new Date('2026-11-07T08:00:00Z');
+
+  it('stores what it reads as pending, never approved, and tolerates a failing page', async () => {
+    const rows = await runPromoCrawl({ http, now });
+    expect(rows.find((r) => r.source.endsWith('/lego-kocke'))?.error).toMatch(/404/);
+    expect(rows.reduce((n, r) => n + r.added, 0)).toBeGreaterThanOrEqual(3);
+    const all = await query<{ status: string; shop_id: string; title: string; min_basket_rsd: number | null }>('SELECT * FROM promos');
+    expect(all.every((p) => p.status === 'pending')).toBe(true);
+    expect(all.some((p) => p.shop_id === 'lstore' && p.min_basket_rsd === 15000)).toBe(true);
+    expect(all.some((p) => p.shop_id === 'lstore' && p.min_basket_rsd === 20000)).toBe(true); // from the feed
+    expect(all.some((p) => p.min_basket_rsd === 9000)).toBe(false); // old blog post skipped
+    expect(all.some((p) => /bebe/i.test(p.title))).toBe(false); // Dexy: not LEGO
+  });
+
+  it('running again changes nothing', async () => {
+    const before = (await one<{ n: number }>('SELECT count(*)::int AS n FROM promos'))!.n;
+    const rows = await runPromoCrawl({ http, now });
+    expect(rows.reduce((n, r) => n + r.added + r.changed, 0)).toBe(0);
+    expect((await one<{ n: number }>('SELECT count(*)::int AS n FROM promos'))!.n).toBe(before);
+  });
+
+  it('an approved promotion whose text changes goes back to pending; a rejected one stays rejected', async () => {
+    const [a, b] = await query<{ id: number; shop_id: string; kind: string; title: string; source_url: string; details: string }>(
+      `SELECT * FROM promos WHERE shop_id = 'lstore' ORDER BY id LIMIT 2`,
+    );
+    await query(`UPDATE promos SET status = 'approved' WHERE id = $1`, [a.id]);
+    await query(`UPDATE promos SET status = 'rejected' WHERE id = $1`, [b.id]);
+    const cand = (p: typeof a, details: string) => ({
+      kind: p.kind as 'gift', title: p.title, details, minBasketRsd: null, discountPct: null, themes: [],
+      validFrom: null, validUntil: null, sourceUrl: p.source_url, signals: 1,
+    });
+    expect((await upsertCandidate('lstore', cand(a, a.details + ' Nova pravila.'))).action).toBe('changed');
+    expect((await upsertCandidate('lstore', cand(b, b.details + ' Nova pravila.'))).action).toBe('seen');
+    const after = await query<{ id: number; status: string; changed: boolean }>('SELECT id, status, changed FROM promos WHERE id = ANY($1)', [[a.id, b.id]]);
+    expect(after.find((p) => p.id === a.id)).toMatchObject({ status: 'pending', changed: true });
+    expect(after.find((p) => p.id === b.id)).toMatchObject({ status: 'rejected' });
+  });
+
+  it('visitors see only approved, valid promotions, and members-only shops stay hidden', async () => {
+    const { buildApp } = await import('../src/api/app.js');
+    const { config } = await import('../src/config.js');
+    config.PUBLIC_MODE = true; // open to visitors, like the live site
+    const app = await buildApp();
+    await query(`UPDATE promos SET status = 'pending'`);
+    await query(`UPDATE promos SET status = 'approved' WHERE id IN (SELECT id FROM promos WHERE shop_id = 'lstore' LIMIT 1)`);
+    await query(`UPDATE promos SET status = 'approved' WHERE id IN (SELECT id FROM promos WHERE shop_id = 'dexy' LIMIT 1)`);
+    await query(`UPDATE promos SET status = 'approved', valid_until = current_date - 1 WHERE id IN (SELECT id FROM promos WHERE shop_id = 'kockarium' LIMIT 1)`);
+    const res = await app.inject({ method: 'GET', url: '/api/akcije' });
+    expect(res.statusCode, res.body).toBe(200);
+    const items = res.json().items as { shop_id: string }[];
+    expect(items.map((i) => i.shop_id)).toEqual(['lstore']);
+    expect((await app.inject({ method: 'GET', url: '/api/admin/akcije' })).statusCode).toBe(401);
+    await app.close();
+    await pool.end();
+  });
+});
