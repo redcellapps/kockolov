@@ -203,6 +203,23 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
     };
   }
 
+  if (p === '/akcije') {
+    // promotions an admin approved and that are in force now, from shops visitors can see
+    const n =
+      (await one<{ n: number }>(
+        `SELECT count(*)::int AS n FROM promos p JOIN shops sh ON sh.id = p.shop_id
+          WHERE p.status = 'approved' AND sh.enabled AND NOT sh.members_only
+            AND (p.valid_from IS NULL OR p.valid_from <= current_date) AND (p.valid_until IS NULL OR p.valid_until >= current_date)`,
+      ))?.n ?? 0;
+    return {
+      ...DEFAULT,
+      path: p,
+      canonical: p,
+      title: `Akcije LEGO prodavnica u Srbiji | ${SITE}`,
+      description: `Poklon uz kupovinu, popust samo online i popust za više setova u srpskim LEGO prodavnicama${n ? `: ${count(n, 'aktuelna akcija', 'aktuelne akcije', 'aktuelnih akcija')}` : ''}. Svaku akciju proveravamo pre objave.`.replace(/\u00a0/g, ' '),
+    };
+  }
+
   if (p === '/ponude') {
     const st = await siteStats();
     const items = await topDeals(1);
