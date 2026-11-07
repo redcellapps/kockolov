@@ -300,6 +300,54 @@ export async function renderSetCard(c: SetCard, alternatives: string[] = []): Pr
   );
 }
 
+// ---- ad card (link preview of a second-hand ad) ----
+export interface ListingCard {
+  title: string;
+  conditionLabel: string;
+  city: string;
+  priceRsd: number;
+  setNum: string | null;
+  /** the ad's own first photo, read from disk */
+  photo: Buffer | null;
+}
+
+async function photoData(buf: Buffer | null, size: number): Promise<string | null> {
+  if (!buf) return null;
+  try {
+    const jpg = await sharp(buf).flatten({ background: '#ffffff' }).resize(size, size, { fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+    return `data:image/jpeg;base64,${jpg.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
+export async function renderListingCard(c: ListingCard): Promise<Buffer> {
+  const pic = await photoData(c.photo, 900);
+  const titleSize = c.title.length > 60 ? 40 : c.title.length > 34 ? 46 : 54;
+  const len = rsd(c.priceRsd).length;
+  const priceSize = len <= 8 ? 88 : len <= 10 ? 76 : 64; // one line in the 518 px column
+  return render(
+    background(
+      tile(pic, 510, { position: 'absolute', left: 56, top: 52 }),
+      h(
+        'div',
+        { position: 'absolute', left: 626, top: 52, width: 518, height: 526, flexDirection: 'column' },
+        h(
+          'div',
+          { alignItems: 'center', gap: 16 },
+          h('div', { backgroundColor: C.red, color: '#fff', fontSize: 26, fontWeight: 800, padding: '7px 16px', borderRadius: 999 }, 'POLOVAN'),
+          c.setNum ? h('div', { fontSize: 26, fontWeight: 700, color: C.muted }, `LEGO® ${c.setNum}`) : null,
+        ),
+        h('div', { marginTop: 22, fontSize: titleSize, fontWeight: 800, lineHeight: 1.06, letterSpacing: -1.5, lineClamp: 3, display: 'block' }, c.title),
+        h('div', { flexGrow: 1 }),
+        h('div', { fontSize: priceSize, fontWeight: 800, letterSpacing: -3, lineHeight: 1, whiteSpace: 'nowrap' }, rsd(c.priceRsd)),
+        h('div', { fontSize: 28, fontWeight: 500, color: C.muted, marginTop: 18 }, `${c.conditionLabel} · ${c.city}`),
+        h('div', { marginTop: 34, alignItems: 'center' }, brand(40)),
+      ),
+    ),
+  );
+}
+
 // ---- Instagram "set dana" (1080×1350, the tallest a feed post shows) ----
 export const IG_WIDTH = 1080;
 export const IG_HEIGHT = 1350;

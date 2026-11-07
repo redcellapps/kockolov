@@ -220,6 +220,24 @@ async function main() {
      ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
     [pw],
   );
+  // a few second-hand ads (shown when LISTINGS_MODE=on): two on a set the shops sell, one on a set no shop has in stock
+  await query(
+    `INSERT INTO listings (user_id, title, description, set_num, condition, price_rsd, city, negotiable)
+     SELECT u.id, v.title, 'Primer oglasa iz demo podataka.', v.set_num, v.cond, v.price, v.city, v.negotiable
+       FROM users u, (VALUES
+         ('Probni oglas: kompletan sa kutijom', '10280', 'used_complete', 5900, 'Niš', true),
+         ('Probni oglas: kao novo', '10280', 'like_new', 7400, 'Beograd', false)
+       ) AS v(title, set_num, cond, price, city, negotiable)
+      WHERE u.email = 'demo@kockolov.local' AND EXISTS (SELECT 1 FROM sets WHERE set_num = v.set_num)
+        AND NOT EXISTS (SELECT 1 FROM listings l WHERE l.title = v.title)`,
+  );
+  await query(
+    `INSERT INTO listings (user_id, title, description, set_num, condition, price_rsd, city)
+     SELECT u.id, 'Probni oglas: set kog nema u prodavnicama', 'Primer oglasa iz demo podataka.', s.set_num, 'used_complete', 3900, 'Kragujevac'
+       FROM users u, (SELECT set_num FROM sets s WHERE NOT EXISTS (SELECT 1 FROM offers o WHERE o.set_num = s.set_num AND o.active AND o.in_stock) ORDER BY set_num DESC LIMIT 1) s
+      WHERE u.email = 'demo@kockolov.local' AND NOT EXISTS (SELECT 1 FROM listings l WHERE l.title = 'Probni oglas: set kog nema u prodavnicama')`,
+  );
+
   // a few approved promotions, so the set pages and /akcije have something to show (the real ones come from `npm run promos`)
   await query(
     `INSERT INTO promos (shop_id, kind, title, details, min_basket_rsd, discount_pct, themes, valid_until, source_url, source, status, reviewed_at)

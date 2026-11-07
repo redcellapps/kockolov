@@ -339,7 +339,7 @@ describe.skipIf(!dbAvailable)('Oglasi: ads, pictures, following, messages, moder
       expect(m.status).toBe(200);
       expect(m.robots).toBeUndefined();
       expect(m.title).toContain('Millennium Falcon');
-      expect(m.image?.url).toMatch(/^\/media\/oglasi\//);
+      expect(m.image?.url).toMatch(/^\/og\/oglas\/\d+\.jpg\?v=/);
       expect((await pageMeta('/oglasi', new URLSearchParams())).robots).toBeUndefined();
       for (const p of ['/poruke', '/poruke/5', '/moji-oglasi', '/oglasi/novi', `/oglasi/${adId}/izmeni`]) {
         expect((await pageMeta(p, new URLSearchParams())).robots).toBe('noindex, follow');

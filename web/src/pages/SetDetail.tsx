@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Fragment } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, CheckIcon, ExternalIcon, LockIcon, TrendDown } from '../components/icons';
 import { ShareButton } from '../components/ShareButton';
@@ -10,7 +11,7 @@ import { PromoCard } from '../components/PromoCard';
 import { usePromos, type Promo } from '../lib/promos';
 import { t, tn } from '../i18n';
 import { trackEvent } from '../lib/analytics';
-import { api, ApiError, type SetDetail as SetDetailData } from '../lib/api';
+import { api, ApiError, type SetDetail as SetDetailData, type UsedAd } from '../lib/api';
 import { ageLabel, ago, dateLong, displayCurrency, money, rateText, reasonText, shopName } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { usePageTitle } from '../lib/title';
@@ -47,6 +48,17 @@ export default function SetDetail() {
   if (q.isError || !q.data) return <div className="mx-auto max-w-3xl px-4 py-16"><ErrorState onRetry={() => q.refetch()} /></div>;
 
   const { set, offers, history, stats, deal, related } = q.data;
+  const used = q.data.used ?? [];
+  // second-hand ads sit among the in-stock offers by price, so new and used compare at a glance
+  const inStockOffers = offers.filter((o) => o.in_stock);
+  const usedBefore = new Map<number, UsedAd[]>();
+  const usedTail: UsedAd[] = [];
+  for (const u of used) {
+    const at = inStockOffers.find((o) => o.price_rsd >= u.price_rsd);
+    if (at) usedBefore.set(at.id, [...(usedBefore.get(at.id) ?? []), u]);
+    else usedTail.push(u);
+  }
+  const lastInStock = inStockOffers[inStockOffers.length - 1];
   const hidden = q.data.hidden_offers ?? 0;
   const hiddenShops = q.data.hidden_shops ?? 0;
   const inStock = offers.filter((o) => o.in_stock);
@@ -180,7 +192,7 @@ export default function SetDetail() {
             </Link>
           )}
         </div>
-        {offers.length > 0 && (
+        {(offers.length > 0 || used.length > 0) && (
           // overflow-x-auto: if a very narrow screen or large system text still doesn't fit, the row scrolls
           // instead of hiding the "Kupi" buttons
           <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
@@ -197,7 +209,11 @@ export default function SetDetail() {
                 {offers.map((o) => {
                   const isBest = best?.id === o.id;
                   return (
-                    <tr key={o.id} className={cx('border-b border-line last:border-0', isBest && 'bg-save-soft/60', !o.in_stock && 'opacity-60')}>
+                    <Fragment key={o.id}>
+                    {(usedBefore.get(o.id) ?? []).map((u) => (
+                      <UsedRow key={`used-${u.id}`} u={u} />
+                    ))}
+                    <tr className={cx('border-b border-line last:border-0', isBest && 'bg-save-soft/60', !o.in_stock && 'opacity-60')}>
                       {/* phones: w-full + max-w-0, so the shop column takes what the price and the button leave and the
                           seller name truncates instead of widening the table */}
                       <td className="py-4 pr-2 pl-4 max-sm:w-full max-sm:max-w-0 sm:px-5">
@@ -265,8 +281,11 @@ export default function SetDetail() {
                         </a>
                       </td>
                     </tr>
+                    {o === lastInStock && usedTail.map((u) => <UsedRow key={`used-${u.id}`} u={u} />)}
+                    </Fragment>
                   );
                 })}
+                {inStockOffers.length === 0 && used.map((u) => <UsedRow key={`used-${u.id}`} u={u} />)}
               </tbody>
             </table>
           </div>
@@ -377,5 +396,41 @@ function DetailSkeleton() {
         <Skeleton className="h-48 w-full rounded-3xl" />
       </div>
     </div>
+  );
+}
+
+/** A second-hand ad as a row among the shops' offers */
+function UsedRow({ u }: { u: UsedAd }) {
+  return (
+    <tr key={`used-${u.id}`} className="border-b border-line bg-surface-2/40 last:border-0">
+      <td className="py-4 pr-2 pl-4 max-sm:w-full max-sm:max-w-0 sm:px-5">
+        <div className="flex items-center gap-2.5">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-ink-3" aria-hidden="true" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-bold [overflow-wrap:anywhere]">{t('used.row.name')}</span>
+              <span className="rounded-md bg-brand/25 px-1.5 py-0.5 text-[11px] font-extrabold whitespace-nowrap uppercase">{t('used.badge')}</span>
+            </div>
+            <div className="truncate text-sm text-ink-2">{u.title}</div>
+            <div className="text-xs text-ink-3 sm:hidden">
+              {t(`cond.${u.condition}`)} · {u.city}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td className="hidden px-5 py-4 sm:table-cell">
+        <div className="text-sm font-semibold">{t(`cond.${u.condition}`)}</div>
+        <div className="text-xs text-ink-3">{u.city}</div>
+      </td>
+      <td className="px-2 py-4 text-right sm:px-5">
+        <div className="tabular text-lg font-extrabold text-ink sm:whitespace-nowrap">{money(u.price_rsd)}</div>
+        {u.negotiable && <div className="text-xs text-ink-3">{t('used.row.negotiable')}</div>}
+      </td>
+      <td className="w-0 py-4 pr-3 pl-1 sm:pr-5 sm:pl-0">
+        <Link to={`/oglasi/${u.id}`} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-bold whitespace-nowrap transition hover:border-ink-3 sm:px-3.5">
+          {t('used.row.view')}
+        </Link>
+      </td>
+    </tr>
   );
 }

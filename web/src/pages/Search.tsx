@@ -4,7 +4,7 @@ import { useSearchParams, Link } from 'react-router';
 import { Filters, activeFilterCount, readFilters, writeFilters, type FilterState } from '../components/Filters';
 import { FilterIcon, XIcon } from '../components/icons';
 import { LockedCard } from '../components/LockedCard';
-import { SetCard } from '../components/SetCard';
+import { SetCard, UsedOnlyCard } from '../components/SetCard';
 import { Button, CardSkeleton, EmptyState, ErrorState, Spinner, cx } from '../components/ui';
 import { t, tn, type TKey } from '../i18n';
 import { api, type SearchResponse, type Theme } from '../lib/api';
@@ -41,6 +41,7 @@ export default function SearchPage() {
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
   const total = first?.total ?? 0;
   const locked = first?.locked;
+  const usedOnly = first?.used_only ?? [];
   const sort = f.sort || first?.sort || (f.q ? 'relevance' : 'deal');
   const update = (next: FilterState) => setParams(writeFilters(next), { replace: false });
   const nActive = activeFilterCount(f);
@@ -97,7 +98,7 @@ export default function SearchPage() {
                 <CardSkeleton key={i} />
               ))}
             </div>
-          ) : items.length === 0 && !locked?.items.length ? (
+          ) : items.length === 0 && !locked?.items.length && !usedOnly.length ? (
             <EmptyState
               title={t('results.empty.title')}
               text={t('results.empty.text')}
@@ -111,12 +112,23 @@ export default function SearchPage() {
             />
           ) : (
             <>
-              {items.length === 0 && <p className="mb-4 font-semibold text-ink-2">{t('results.empty.title')}</p>}
+              {items.length === 0 && !usedOnly.length && <p className="mb-4 font-semibold text-ink-2">{t('results.empty.title')}</p>}
               <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
                 {items.map((s) => (
                   <SetCard key={s.set_num} s={s} />
                 ))}
               </div>
+              {usedOnly.length > 0 && (
+                <section className="mt-10">
+                  <h2 className="text-lg font-extrabold">{t('used.only.title')}</h2>
+                  <p className="mb-4 mt-1 text-sm text-ink-2">{t('used.only.text')}</p>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+                    {usedOnly.map((s) => (
+                      <UsedOnlyCard key={s.set_num} s={s} />
+                    ))}
+                  </div>
+                </section>
+              )}
               {locked && locked.items.length > 0 && (
                 <section className="mt-10">
                   <h2 className="text-lg font-extrabold">{locked.total === 1 ? t('locked.titleOne') : t('locked.title', { n: locked.total })}</h2>

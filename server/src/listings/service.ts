@@ -204,3 +204,40 @@ export async function sweepOrphanImages(): Promise<number> {
   return rows.length;
 }
 export { tx };
+
+// ---- ads of one set, shown next to the shops' offers as "Polovan" ----
+export interface UsedAd {
+  id: number;
+  title: string;
+  price_rsd: number;
+  negotiable: boolean;
+  condition: Condition;
+  city: string;
+  image: string | null;
+  created_at: string;
+}
+
+const LIVE = `l.status = 'active' AND l.expires_at > now()
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id = $1::bigint AND b.blocked_id = l.user_id)`;
+
+/** Active ads for one set, cheapest first (ads of sellers the viewer blocked are left out) */
+export async function usedAdsForSet(setNum: string, viewerId: number | null): Promise<UsedAd[]> {
+  return query<UsedAd>(
+    `SELECT l.id, l.title, l.price_rsd, l.negotiable, l.condition, l.city, l.created_at,
+            (SELECT '/media/oglasi/' || i.file FROM listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1) AS image
+       FROM listings l WHERE l.set_num = $2 AND ${LIVE}
+      ORDER BY l.price_rsd, l.created_at DESC LIMIT 20`,
+    [viewerId, setNum],
+  );
+}
+
+/** How many active ads and from what price, for a list of sets */
+export async function usedSummary(setNums: string[], viewerId: number | null): Promise<Map<string, { count: number; min: number }>> {
+  if (!setNums.length) return new Map();
+  const rows = await query<{ set_num: string; n: number; min: number }>(
+    `SELECT l.set_num, count(*)::int AS n, min(l.price_rsd)::int AS min
+       FROM listings l WHERE l.set_num = ANY($2::text[]) AND ${LIVE} GROUP BY l.set_num`,
+    [viewerId, setNums],
+  );
+  return new Map(rows.map((r) => [r.set_num, { count: r.n, min: r.min }]));
+}

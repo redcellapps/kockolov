@@ -1,9 +1,10 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { config } from '../../config.js';
 import { one, query } from '../../db.js';
-import { cached, firstPicture, renderCollectionCard, renderInstagramCard, renderSetCard } from '../../seo/og.js';
+import { cached, firstPicture, renderCollectionCard, renderInstagramCard, renderListingCard, renderSetCard } from '../../seo/og.js';
+import { readImage } from '../../listings/images.js';
 import { keyPart, sendCard, setCardFor } from '../../seo/cards.js';
-import { loadCollection, loadSet, version } from '../../seo/pages.js';
+import { loadAdCard, loadCollection, loadSet, version } from '../../seo/pages.js';
 import { listPosts } from '../../blog/posts.js';
 import { getPost } from '../../social/instagram.js';
 
@@ -77,6 +78,17 @@ export async function publicRoutes(app: FastifyInstance) {
     if (!s) return reply.code(404).send('');
     const { card, key, prefix, alternatives } = setCardFor(s);
     return sendCard(reply, key, prefix, () => renderSetCard(card, alternatives));
+  });
+
+  // ---- link preview of a second-hand ad: its photo, title, price and condition, drawn like a set's card ----
+  app.get<{ Params: { file: string } }>('/og/oglas/:file', async (req, reply) => {
+    const id = Number(jpgName(req.params.file));
+    const ad = config.LISTINGS_MODE === 'on' && Number.isSafeInteger(id) ? await loadAdCard(id) : null;
+    if (!ad) return reply.code(404).send('');
+    const prefix = `ad-${id}-`;
+    const photo = ad.file ? await readImage(ad.file).catch(() => null) : null;
+    const card = { title: ad.title, conditionLabel: ad.conditionLabel, city: ad.city, priceRsd: ad.price_rsd, setNum: ad.set_num, photo: null as Buffer | null };
+    return sendCard(reply, `${prefix}${version({ ...card, file: ad.file })}`, prefix, () => renderListingCard({ ...card, photo }));
   });
 
   // ---- the Instagram "set dana" picture (1080×1350), drawn from what the post froze; Instagram itself

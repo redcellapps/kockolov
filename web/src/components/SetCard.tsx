@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { t, tn } from '../i18n';
-import type { Deal, SetSummary } from '../lib/api';
+import type { Deal, SetSummary, UsedOnlySet } from '../lib/api';
 import { ageLabel, reasonText, money, shopLabel } from '../lib/format';
 import { CheckIcon } from './icons';
 import { ShopDot, cx } from './ui';
@@ -93,11 +93,47 @@ export function SetCard({ s }: { s: SetSummary }) {
                 <div className="mt-1 text-[13px] text-ink-3">{t('card.outOfStock')}</div>
               </>
             )}
+            {!!s.used_count && s.used_min_price != null && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] font-bold">
+                <span className="rounded-md bg-brand/25 px-1.5 py-0.5 uppercase">{t('used.badge')}</span>
+                <span className="text-ink-2">
+                  {t('used.card.from', { price: money(s.used_min_price) })} · {tn('used.card.count', s.used_count)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </Link>
       <WatchButton setNum={s.set_num} compact className="absolute right-3 top-3 z-10" />
     </div>
+  );
+}
+
+/** A set that no shop has but private sellers do: the card leads to the set page, whose offers list the ads */
+export function UsedOnlyCard({ s }: { s: UsedOnlySet }) {
+  return (
+    <Link
+      to={`/set/${s.set_num}`}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-0.5 hover:shadow-lift"
+    >
+      <div className="aspect-square bg-white p-3">
+        <ProductImage src={s.image_url} alt={s.name} className="h-full w-full object-contain" />
+      </div>
+      <div className="flex flex-1 flex-col p-3 sm:p-4">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-3">
+          <span className="tabular">{s.set_num}</span>
+          {s.theme_name && <span className="truncate">· {s.theme_name}</span>}
+        </div>
+        <h3 className="mt-1 line-clamp-2 text-[15px] font-bold leading-snug">{s.name}</h3>
+        <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-3 text-[12px] font-bold">
+          <span className="rounded-md bg-brand/25 px-1.5 py-0.5 uppercase">{t('used.badge')}</span>
+          <span className="text-ink-2">
+            {s.used_min_price != null ? `${t('used.card.from', { price: money(s.used_min_price) })} · ` : ''}
+            {tn('used.card.count', s.used_count)}
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }
 
