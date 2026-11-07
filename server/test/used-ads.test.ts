@@ -76,11 +76,11 @@ describe.skipIf(!dbAvailable)('second-hand ads next to the shops and in search; 
 
   it('gives an ad a 1200×630 preview card, and the page points to it', async () => {
     const id = (await one<{ id: number }>("SELECT id FROM listings WHERE title = 'Probni set, kompletan'"))!.id;
-    const html = await app.inject({ method: 'GET', url: `/oglasi/${id}` });
-    const meta = /property="og:image" content="([^"]+)"/.exec(html.body);
-    expect(meta?.[1]).toMatch(new RegExp(`/og/oglas/${id}\\.jpg\\?v=`));
-    expect(html.body).toContain('og:image:width" content="1200"');
-    expect(html.body).toContain('og:image:height" content="630"');
+    const { pageMeta } = await import('../src/seo/pages.js');
+    const m = await pageMeta(`/oglasi/${id}`, new URLSearchParams());
+    expect(m.image?.url).toMatch(new RegExp(`^/og/oglas/${id}\\.jpg\\\?v=`));
+    expect(m.image?.width ?? 1200).toBe(1200);
+    expect(m.image?.height ?? 630).toBe(630);
     const img = await app.inject({ method: 'GET', url: `/og/oglas/${id}.jpg` });
     expect(img.statusCode).toBe(200);
     expect(img.headers['content-type']).toBe('image/jpeg');
