@@ -131,6 +131,12 @@ describe.skipIf(!dbAvailable)('promotions: crawler proposes, admin decides', asy
     const items = res.json().items as { shop_id: string }[];
     expect(items.map((i) => i.shop_id)).toEqual(['lstore']);
     expect((await app.inject({ method: 'GET', url: '/api/admin/akcije' })).statusCode).toBe(401);
+    // the page has its own head, counting only what visitors can see (the one L Store promotion)
+    const { pageMeta } = await import('../src/seo/pages.js');
+    const meta = await pageMeta('/akcije', new URLSearchParams());
+    expect(meta.title).toContain('Akcije');
+    expect(meta.canonical).toBe('/akcije');
+    expect(meta.description).toContain('1 aktuelna akcija');
     await app.close();
     await pool.end();
   });
