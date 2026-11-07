@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
-import { dateLong, money } from './format';
+import { money } from './format';
 import { t } from '../i18n';
 
 export type PromoKind = 'gift' | 'sale' | 'online_only' | 'multi_buy' | 'code' | 'other';
@@ -32,12 +32,19 @@ export function usePromos() {
   return useQuery({ queryKey: ['promos'], queryFn: () => api<{ items: Promo[] }>('/api/akcije'), staleTime: 5 * 60_000 });
 }
 
+const GENITIVE = ['januara', 'februara', 'marta', 'aprila', 'maja', 'juna', 'jula', 'avgusta', 'septembra', 'oktobra', 'novembra', 'decembra'];
+/** "do 7. decembra 2026." (the month in the genitive, which Intl doesn't give for Serbian) */
+export function untilDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d}. ${GENITIVE[(m ?? 1) - 1]} ${y}.`;
+}
+
 /** "Poklon za porudžbine preko 10.000 RSD · do 30. novembra 2026." */
 export function promoFacts(p: Promo): string[] {
   const out: string[] = [];
   if (p.discount_pct) out.push(t('promo.fact.pct', { n: p.discount_pct }));
   if (p.min_basket_rsd) out.push(t('promo.fact.min', { amount: money(p.min_basket_rsd) }));
   if (p.themes.length) out.push(t('promo.fact.themes', { themes: p.themes.join(', ') }));
-  if (p.valid_until) out.push(t('promo.fact.until', { date: dateLong(p.valid_until) }));
+  if (p.valid_until) out.push(t('promo.fact.until', { date: untilDate(p.valid_until) }));
   return out;
 }

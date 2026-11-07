@@ -24,6 +24,7 @@ export default function SetDetail() {
     queryFn: () => api<SetDetailData>(`/api/sets/${encodeURIComponent(setNum)}`),
     retry: (n, err) => !(err instanceof ApiError && err.status === 404) && n < 2,
   });
+  const promos = usePromos().data?.items ?? [];
   const d = q.data;
   const cheapest = d?.offers.find((o) => o.in_stock);
   usePageTitle(
@@ -49,12 +50,11 @@ export default function SetDetail() {
   const hidden = q.data.hidden_offers ?? 0;
   const hiddenShops = q.data.hidden_shops ?? 0;
   const inStock = offers.filter((o) => o.in_stock);
-  const promos = usePromos().data?.items ?? [];
   // a promotion tied to themes only shows on sets of those themes
-  const shopsWithOffers = new Set(offers.map((o) => o.shop_id));
-  const setPromos = promos.filter((p) => shopsWithOffers.has(p.shop_id) && promosFor(p.shop_id).includes(p));
   const promosFor = (shopId: string): Promo[] =>
     promos.filter((p) => p.shop_id === shopId && (!p.themes.length || (set.theme_name && p.themes.some((x) => x.toLowerCase() === set.theme_name!.toLowerCase()))));
+  const shopsWithOffers = new Set(offers.map((o) => o.shop_id));
+  const setPromos = promos.filter((p) => shopsWithOffers.has(p.shop_id) && promosFor(p.shop_id).includes(p));
   const best = inStock[0] ?? null;
   const rrp = set.rrp_rsd;
   const saving = best && rrp && rrp > best.price_rsd ? rrp - best.price_rsd : 0;
@@ -224,15 +224,15 @@ export default function SetDetail() {
                               )}
                             </div>
                             {o.seller && <div className="truncate text-sm text-ink-2">{o.seller}</div>}
-                            {promosFor(o.shop_id).map((p) => (
-                              <a
-                                key={p.id}
-                                href="#akcije-seta"
-                                className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-md bg-brand/25 px-1.5 py-0.5 text-[11px] font-extrabold uppercase"
-                              >
-                                <span className="truncate">{t(`promo.kind.${p.kind}`)}</span>
-                              </a>
-                            ))}
+                            {promosFor(o.shop_id).length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                {promosFor(o.shop_id).map((p) => (
+                                  <a key={p.id} href="#akcije-seta" className="max-w-full truncate rounded-md bg-brand/25 px-1.5 py-0.5 text-[11px] font-extrabold uppercase">
+                                    {t(`promo.kind.${p.kind}`)}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                             <div className="text-xs text-ink-3 sm:hidden">
                               {o.in_stock ? t('set.offers.inStock') : t('set.offers.outOfStock')} · {ago(o.last_seen)}
                             </div>
