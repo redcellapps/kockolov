@@ -4,6 +4,7 @@ import { hashPassword, normalizeEmail } from './api/auth.js';
 import { sendLink } from './api/invites.js';
 import { migrate, one, pool, query } from './db.js';
 import { runCrawl } from './crawler/pipeline.js';
+import { runPromoCrawl } from './crawler/promos/run.js';
 import { refreshSets } from './crawler/refresh.js';
 import { refreshEurRate } from './fx.js';
 import { seedReferenceData } from './crawler/seed.js';
@@ -28,6 +29,7 @@ const HELP = `Kockolov CLI
   push [--dry-run]                         pošalji obaveštenja o praćenim setovima (inače uz jutarnji pregled)
   push:test --email x@y.rs                 probno obaveštenje na sve uređaje tog korisnika
   ean [broj]                               preuzmi bar-kodove kutija iz LEGO Store-a (podrazumevano 400)
+  promos [prodavnica…]                     pročitaj stranice sa akcijama i predloži ih u administraciji
   user:create --email x@y.rs [--name Ime] [--admin] [--password tajna]
   user:invite --email x@y.rs [--name Ime] [--admin]   (e-mail sa linkom za postavljanje lozinke)
   user:password --email x@y.rs [--password tajna]
@@ -63,6 +65,11 @@ async function main() {
       const res = await runCrawl({ shops: positionals.length ? positionals : undefined });
       console.table(res.map(({ durationMs, ...r }) => ({ ...r, sec: Math.round(durationMs / 1000) })));
       await alertOnCrawlProblems(res);
+      break;
+    }
+    case 'promos': {
+      const rows = await runPromoCrawl({ shops: positionals.length ? positionals : undefined, log: (m) => console.log(m) });
+      console.table(rows);
       break;
     }
     case 'refresh':

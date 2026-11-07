@@ -23,6 +23,8 @@ import MyListings from './ads/MyListings';
 import MessagesPage from './ads/MessagesPage';
 import NewListing from './ads/NewListing';
 import AdminListings from './pages/AdminListings';
+import AdminPromosPage from './pages/AdminPromos';
+import PromosPage from './pages/Promos';
 import TermsPage from './pages/Terms';
 
 /** While the site is private, every page except login needs a session. */
@@ -81,6 +83,8 @@ export default function App() {
         <Route path="/moji-oglasi" element={<Gate needAds needUser><MyListings /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />
+        <Route path="/akcije" element={<Gate><PromosPage /></Gate>} />
+        <Route path="/admin/akcije" element={<Gate needAdmin><AdminPromosPage /></Gate>} />
         <Route path="/teme" element={<Gate><ThemesPage /></Gate>} />
         <Route path="/set/:setNum" element={<Gate><SetDetail /></Gate>} />
         <Route path="/pracenje" element={<Gate needUser><WatchlistPage /></Gate>} />

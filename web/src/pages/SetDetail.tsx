@@ -6,6 +6,8 @@ import { PriceHistoryChart } from '../components/PriceHistoryChart';
 import { ProductImage, SetCard } from '../components/SetCard';
 import { EmptyState, ErrorState, ShopDot, Skeleton, buttonClasses, cx } from '../components/ui';
 import { WatchButton } from '../components/WatchButton';
+import { PromoCard } from '../components/PromoCard';
+import { usePromos, type Promo } from '../lib/promos';
 import { t, tn } from '../i18n';
 import { trackEvent } from '../lib/analytics';
 import { api, ApiError, type SetDetail as SetDetailData } from '../lib/api';
@@ -22,6 +24,7 @@ export default function SetDetail() {
     queryFn: () => api<SetDetailData>(`/api/sets/${encodeURIComponent(setNum)}`),
     retry: (n, err) => !(err instanceof ApiError && err.status === 404) && n < 2,
   });
+  const promos = usePromos().data?.items ?? [];
   const d = q.data;
   const cheapest = d?.offers.find((o) => o.in_stock);
   usePageTitle(
@@ -47,6 +50,11 @@ export default function SetDetail() {
   const hidden = q.data.hidden_offers ?? 0;
   const hiddenShops = q.data.hidden_shops ?? 0;
   const inStock = offers.filter((o) => o.in_stock);
+  // a promotion tied to themes only shows on sets of those themes
+  const promosFor = (shopId: string): Promo[] =>
+    promos.filter((p) => p.shop_id === shopId && (!p.themes.length || (set.theme_name && p.themes.some((x) => x.toLowerCase() === set.theme_name!.toLowerCase()))));
+  const shopsWithOffers = new Set(offers.map((o) => o.shop_id));
+  const setPromos = promos.filter((p) => shopsWithOffers.has(p.shop_id) && promosFor(p.shop_id).includes(p));
   const best = inStock[0] ?? null;
   const rrp = set.rrp_rsd;
   const saving = best && rrp && rrp > best.price_rsd ? rrp - best.price_rsd : 0;
@@ -172,6 +180,16 @@ export default function SetDetail() {
             </Link>
           )}
         </div>
+        {setPromos.length > 0 && (
+          <div id="akcije-seta" className="mb-5 scroll-mt-24">
+            <h3 className="mb-2 text-sm font-extrabold tracking-wide text-ink-2 uppercase">{t('promo.setTitle')}</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {setPromos.map((p) => (
+                <PromoCard key={p.id} p={p} />
+              ))}
+            </div>
+          </div>
+        )}
         {offers.length > 0 && (
           // overflow-x-auto: if a very narrow screen or large system text still doesn't fit, the row scrolls
           // instead of hiding the "Kupi" buttons
@@ -206,6 +224,15 @@ export default function SetDetail() {
                               )}
                             </div>
                             {o.seller && <div className="truncate text-sm text-ink-2">{o.seller}</div>}
+                            {promosFor(o.shop_id).length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                {promosFor(o.shop_id).map((p) => (
+                                  <a key={p.id} href="#akcije-seta" className="max-w-full truncate rounded-md bg-brand/25 px-1.5 py-0.5 text-[11px] font-extrabold uppercase">
+                                    {t(`promo.kind.${p.kind}`)}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                             <div className="text-xs text-ink-3 sm:hidden">
                               {o.in_stock ? t('set.offers.inStock') : t('set.offers.outOfStock')} · {ago(o.last_seen)}
                             </div>

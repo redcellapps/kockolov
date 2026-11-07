@@ -1,0 +1,124 @@
+import { query } from '../../db.js';
+import { PoliteFetcher } from '../../lib/http.js';
+import { extractPromos, isOverText, pageText, parseAtomFeed, passagesFromHtml, type PromoCandidate } from './extract.js';
+import { upsertCandidate } from './store.js';
+
+export interface PromoSource {
+  shopId: string;
+  kind: 'page' | 'feed';
+  url: string;
+  /** shops that sell other things too: only passages that mention LEGO */
+  legoOnly?: boolean;
+}
+
+/** Where each shop announces promotions. Pages are read as plain text, so a redesign doesn't break the reading. */
+export const PROMO_SOURCES: PromoSource[] = [
+  { shopId: 'lstore', kind: 'feed', url: 'https://lstore.rs/blogs/vesti.atom' },
+  { shopId: 'lstore', kind: 'page', url: 'https://lstore.rs/' },
+  { shopId: 'kockarium', kind: 'page', url: 'https://www.kockarium.rs/lego-kocke-akcija/' },
+  { shopId: 'kockarium', kind: 'page', url: 'https://www.kockarium.rs/' },
+  { shopId: 'dexy', kind: 'page', url: 'https://www.dexy.co.rs/akcije-i-snizenja', legoOnly: true },
+  { shopId: 'dexy', kind: 'page', url: 'https://www.dexy.co.rs/lego-kocke', legoOnly: true },
+];
+
+/** Blog posts older than this are not read; a promotion worth showing is recent or has its own end date. */
+const FEED_MAX_AGE_DAYS = 120;
+
+export interface PromoRunRow {
+  source: string;
+  found: number;
+  added: number;
+  changed: number;
+  error?: string;
+}
+
+type Getter = { get(url: string): Promise<{ status: number; text: string }> };
+
+export async function runPromoCrawl(
+  opts: { log?: (m: string) => void; http?: Getter; sources?: PromoSource[]; shops?: string[]; now?: Date } = {},
+): Promise<PromoRunRow[]> {
+  const log = opts.log ?? (() => undefined);
+  const now = opts.now ?? new Date();
+  const http: Getter = opts.http ?? new PoliteFetcher({ log });
+  const sources = (opts.sources ?? PROMO_SOURCES).filter((s) => !opts.shops?.length || opts.shops.includes(s.shopId));
+  const known = new Set((await query<{ id: string }>('SELECT id FROM shops')).map((r) => r.id));
+  const themes = await query<{ slug: string; name: string }>('SELECT slug, name FROM themes');
+  const rows: PromoRunRow[] = [];
+
+  // proposals that ran out since the last read are not worth anyone's attention
+  await query(`DELETE FROM promos WHERE source = 'crawler' AND status = 'pending' AND valid_until < current_date`);
+
+  // Every promotion has its own page, and that page is the one that says whether it is over ("Ova promocija je istekla.").
+  // Pages are fetched once per run; a failed fetch decides nothing.
+  const verdicts = new Map<string, boolean | null>();
+  const listingUrls = new Set((opts.sources ?? PROMO_SOURCES).map((x) => x.url));
+  const isOver = async (url: string): Promise<boolean | null> => {
+    if (verdicts.has(url)) return verdicts.get(url)!;
+    let v: boolean | null = null;
+    try {
+      const res = await http.get(url);
+      if (res.status === 410) v = true; // gone for good; a 404 may be a hiccup and decides nothing
+      else if (res.status === 200) v = isOverText(pageText(res.text));
+    } catch {
+      v = null;
+    }
+    verdicts.set(url, v);
+    return v;
+  };
+
+  // already stored (crawler) promotions that are still shown or waiting: ask their pages again
+  const stored = await query<{ id: number; status: string; source_url: string }>(
+    `SELECT id, status, source_url FROM promos
+      WHERE source = 'crawler' AND status IN ('pending', 'approved') AND (valid_until IS NULL OR valid_until >= current_date)`,
+  );
+  let ended = 0;
+  for (const r of stored) {
+    if (listingUrls.has(r.source_url) || !(await isOver(r.source_url))) continue;
+    ended++;
+    if (r.status === 'pending') await query('DELETE FROM promos WHERE id = $1', [r.id]);
+    else await query('UPDATE promos SET valid_until = current_date - 1, changed = true WHERE id = $1', [r.id]);
+  }
+  if (ended) log(`akcije: ${ended} više nije aktivno (stranica kaže da je istekla)`);
+
+  for (const s of sources) {
+    const row: PromoRunRow = { source: s.url, found: 0, added: 0, changed: 0 };
+    rows.push(row);
+    if (!known.has(s.shopId)) {
+      row.error = `nepoznata prodavnica ${s.shopId}`;
+      continue;
+    }
+    try {
+      const res = await http.get(s.url);
+      if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
+      const found: PromoCandidate[] = [];
+      if (s.kind === 'feed') {
+        const cutoff = now.getTime() - FEED_MAX_AGE_DAYS * 86_400_000;
+        for (const e of parseAtomFeed(res.text)) {
+          if (e.published && new Date(e.published).getTime() < cutoff) continue;
+          found.push(...extractPromos(passagesFromHtml(e.html), { sourceUrl: e.url, titleHint: e.title, themes, now, legoOnly: s.legoOnly }));
+        }
+      } else {
+        found.push(...extractPromos(passagesFromHtml(res.text), { sourceUrl: s.url, themes, now, legoOnly: s.legoOnly }));
+      }
+      // a promotion on its own page (blog post...) is only as live as that page says
+      const live: PromoCandidate[] = [];
+      for (const c of found) {
+        if (c.sourceUrl !== s.url && (await isOver(c.sourceUrl))) continue;
+        live.push(c);
+      }
+      found.length = 0;
+      found.push(...live);
+      row.found = found.length;
+      for (const c of found) {
+        const r = await upsertCandidate(s.shopId, c);
+        if (r.action === 'new') row.added++;
+        if (r.action === 'changed') row.changed++;
+      }
+      log(`akcije [${s.shopId}] ${s.url}: pronađeno ${row.found}, novih ${row.added}, izmenjenih ${row.changed}`);
+    } catch (err) {
+      row.error = (err as Error).message;
+      log(`akcije [${s.shopId}] ${s.url}: ${row.error}`);
+    }
+  }
+  return rows;
+}

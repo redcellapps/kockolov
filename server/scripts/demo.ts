@@ -220,6 +220,18 @@ async function main() {
      ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
     [pw],
   );
+  // a few approved promotions, so the set pages and /akcije have something to show (the real ones come from `npm run promos`)
+  await query(
+    `INSERT INTO promos (shop_id, kind, title, details, min_basket_rsd, discount_pct, themes, valid_until, source_url, source, status, reviewed_at)
+     SELECT v.shop_id, v.kind, v.title, v.details, v.min_basket, v.pct, v.themes, current_date + 30, sh.url, 'manual', 'approved', now()
+       FROM (VALUES
+         ('lstore', 'gift', 'Poklon set uz porudžbine preko 15.000 RSD', 'Primer: izaberi poklon set pri plaćanju.', 15000, NULL::int, '{}'::text[]),
+         ('kockarium', 'online_only', 'Dodatnih 10% samo online', 'Primer: važi za porudžbine preko sajta.', NULL::int, 10, '{}'::text[]),
+         ('kockarium', 'multi_buy', 'Kupi 2 seta, drugi je jeftiniji', 'Primer: veći popust za više setova.', NULL::int, 5, '{}'::text[])
+       ) AS v(shop_id, kind, title, details, min_basket, pct, themes)
+       JOIN shops sh ON sh.id = v.shop_id
+     ON CONFLICT DO NOTHING`,
+  );
   const stats = await query(
     `SELECT (SELECT count(*) FROM sets) AS sets, (SELECT count(*) FROM offers) AS offers,
             (SELECT count(*) FROM offers WHERE set_num IS NULL) AS unmatched, (SELECT count(*) FROM deals) AS deals`,
