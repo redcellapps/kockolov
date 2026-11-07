@@ -24,7 +24,7 @@ vi.mock('../src/mail/mailer.js', () => ({
     mail.sent.push({ ...m, sender: 'morning' });
   },
   sendAccountMail: async (m: Sent) => {
-    if (mail.fail) throw new Error('Invalid login: 535 Incorrect authentication data');
+    if (mail.fail) throw new Error('550 5.1.1 Recipient address rejected: User unknown');
     mail.sent.push({ ...m, sender: 'account' });
   },
 }));
