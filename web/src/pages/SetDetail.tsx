@@ -180,16 +180,6 @@ export default function SetDetail() {
             </Link>
           )}
         </div>
-        {setPromos.length > 0 && (
-          <div id="akcije-seta" className="mb-5 scroll-mt-24">
-            <h3 className="mb-2 text-sm font-extrabold tracking-wide text-ink-2 uppercase">{t('promo.setTitle')}</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {setPromos.map((p) => (
-                <PromoCard key={p.id} p={p} />
-              ))}
-            </div>
-          </div>
-        )}
         {offers.length > 0 && (
           // overflow-x-auto: if a very narrow screen or large system text still doesn't fit, the row scrolls
           // instead of hiding the "Kupi" buttons
@@ -283,6 +273,16 @@ export default function SetDetail() {
         )}
         {hidden > 0 && <MembersTeaser n={hidden} shops={hiddenShops} onlyMembers={offers.length === 0} />}
         <p className="mt-3 text-xs text-ink-3">{t('set.disclaimer')}</p>
+        {setPromos.length > 0 && (
+          <div id="akcije-seta" className="mt-6 scroll-mt-24">
+            <h3 className="mb-2 text-sm font-extrabold tracking-wide text-ink-2 uppercase">{t('promo.setTitle')}</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {setPromos.map((p) => (
+                <PromoCard key={p.id} p={p} />
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* history */}

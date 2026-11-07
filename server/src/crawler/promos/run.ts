@@ -1,6 +1,7 @@
 import { query } from '../../db.js';
 import { PoliteFetcher } from '../../lib/http.js';
 import { extractPromos, isOverText, pageText, parseAtomFeed, passagesFromHtml, type PromoCandidate } from './extract.js';
+import { dedupePromos } from './dedupe.js';
 import { upsertCandidate } from './store.js';
 
 export interface PromoSource {
@@ -47,6 +48,9 @@ export async function runPromoCrawl(
 
   // proposals that ran out since the last read are not worth anyone's attention
   await query(`DELETE FROM promos WHERE source = 'crawler' AND status = 'pending' AND valid_until < current_date`);
+
+  const merged = await dedupePromos();
+  if (merged) log(`akcije: spojeno ${merged} duplikata`);
 
   // Every promotion has its own page, and that page is the one that says whether it is over ("Ova promocija je istekla.").
   // Pages are fetched once per run; a failed fetch decides nothing.
@@ -109,6 +113,7 @@ export async function runPromoCrawl(
       found.length = 0;
       found.push(...live);
       row.found = found.length;
+      found.sort((a, b) => b.signals - a.signals || b.details.length - a.details.length); // the most complete wording goes in first
       for (const c of found) {
         const r = await upsertCandidate(s.shopId, c);
         if (r.action === 'new') row.added++;
@@ -120,5 +125,7 @@ export async function runPromoCrawl(
       log(`akcije [${s.shopId}] ${s.url}: ${row.error}`);
     }
   }
+  const after = await dedupePromos();
+  if (after) log(`akcije: spojeno ${after} duplikata`);
   return rows;
 }
