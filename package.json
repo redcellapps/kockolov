@@ -14,6 +14,7 @@
     "test": "npm test -w server",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
     "crawl": "npm run cli -w server -- crawl",
+    "promos": "npm run cli -w server -- promos",
     "cli": "npm run cli -w server --"
   },
   "engines": {
