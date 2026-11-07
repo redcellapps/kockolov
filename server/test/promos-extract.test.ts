@@ -83,3 +83,19 @@ describe('fold', () => {
     expect(fold('Đurđevdan ČĆŽŠ')).toBe('djurdjevdan cczs');
   });
 });
+
+describe('expired promotions are never proposed', () => {
+  const now = new Date('2026-11-07T08:00:00Z');
+  const opt = { sourceUrl: 'https://x.test/', now };
+  it('skips "do 12. oktobra" and "1-10. oktobra" style endings', () => {
+    expect(extractPromos(['Poklon uz porudžbine preko 10.000 RSD važi do 12. oktobra.'], opt)).toHaveLength(0);
+    expect(extractPromos(['Akcija 15% popusta na LEGO setove 1-10. oktobra.'], opt)).toHaveLength(0);
+    expect(extractPromos(['Akcija 15% popusta, važi do 05.10.'], opt)).toHaveLength(0);
+  });
+  it('keeps running ones, also across New Year without a year written', () => {
+    const live = extractPromos(['Poklon uz porudžbine preko 10.000 RSD važi do 15. januara.'], opt);
+    expect(live).toHaveLength(1);
+    expect(live[0]!.validUntil).toBe('2027-01-15');
+    expect(extractPromos(['Poklon uz porudžbine preko 10.000 RSD važi do 30. novembra.'], opt)).toHaveLength(1);
+  });
+});

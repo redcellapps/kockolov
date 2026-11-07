@@ -47,7 +47,7 @@ export async function promoRoutes(app: FastifyInstance) {
     const { status } = z.object({ status: z.enum(['pending', 'approved', 'rejected']).default('pending') }).parse(req.query);
     const items = await query(
       `SELECT ${COLUMNS} FROM promos p JOIN shops sh ON sh.id = p.shop_id
-        WHERE p.status = $1 ORDER BY p.changed DESC, p.first_seen_at DESC, p.id DESC LIMIT 300`,
+        WHERE p.status = $1 AND ($1 <> 'pending' OR p.valid_until IS NULL OR p.valid_until >= current_date) ORDER BY p.changed DESC, p.first_seen_at DESC, p.id DESC LIMIT 300`,
       [status],
     );
     const counts = await query<{ status: string; n: number }>('SELECT status, count(*)::int AS n FROM promos GROUP BY status');

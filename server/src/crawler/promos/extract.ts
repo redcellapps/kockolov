@@ -48,6 +48,15 @@ function iso(y: number, m: number, d: number): string | null {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? dt.toISOString().slice(0, 10) : null;
 }
 
+/** A date written without a year that is far in the past is the next one ("do 15. januara" read in November). */
+function rollYear(date: string | null, now: Date): string | null {
+  if (!date) return null;
+  const limit = new Date(now.getTime() - 120 * 86_400_000).toISOString().slice(0, 10);
+  if (date >= limit) return date;
+  const [y, m, d] = date.split('-').map(Number);
+  return iso(y! + 1, m!, d!) ?? date;
+}
+
 /** "od 2. do 8. novembra", "1.11.2026 ... 30.11.2026", "do 30.11." Years default to the current one. */
 export function parseDates(text: string, now = new Date()): { from: string | null; until: string | null } {
   const f = fold(text);
@@ -55,15 +64,27 @@ export function parseDates(text: string, now = new Date()): { from: string | nul
   let from: string | null = null;
   let until: string | null = null;
 
-  const words = new RegExp(`(\\d{1,2})\\.\\s*(?:${MONTH_RE}\\s*)?(?:do|-|–)\\s*(\\d{1,2})\\.\\s*${MONTH_RE}(?:\\s*(\\d{4}))?`);
+  const words = new RegExp(`(\\d{1,2})\\.?\\s*(?:${MONTH_RE}\\s*)?(?:do|-|–)\\s*(\\d{1,2})\\.?\\s*${MONTH_RE}(?:\\s*(\\d{4}))?`);
   const w = words.exec(f);
   if (w) {
     const endMonth = monthNumber(w[4]!);
     const startMonth = w[2] ? monthNumber(w[2]) : endMonth;
     const y = w[5] ? Number(w[5]) : year;
     if (endMonth && startMonth) {
-      from = iso(y, startMonth, Number(w[1]));
+      from = iso(w[5] || startMonth <= endMonth ? y : y - 1, startMonth, Number(w[1]));
       until = iso(y, endMonth, Number(w[3]));
+      if (!w[5]) until = rollYear(until, now);
+    }
+  }
+
+  // "do 12. oktobra", "od 1. novembra 2026."
+  if (!from && !until) {
+    const lone = new RegExp(`\\b(do|od)\\s+(\\d{1,2})\\.?\\s*${MONTH_RE}(?:\\s*(\\d{4}))?`).exec(f);
+    const m = lone ? monthNumber(lone[3]!) : null;
+    if (lone && m) {
+      const d = iso(lone[4] ? Number(lone[4]) : year, m, Number(lone[2]));
+      if (lone[1] === 'do') until = lone[4] ? d : rollYear(d, now);
+      else from = d;
     }
   }
 
@@ -78,7 +99,7 @@ export function parseDates(text: string, now = new Date()): { from: string | nul
       until = dates[dates.length - 1]!;
     } else if (found.length === 1) {
       const before = f.slice(Math.max(0, found[0]!.at - 8), found[0]!.at);
-      if (/\bdo\s*$/.test(before)) until = found[0]!.date;
+      if (/\bdo\s*$/.test(before)) until = /\d{4}/.test(f.slice(found[0]!.at, found[0]!.at + 12)) ? found[0]!.date : rollYear(found[0]!.date, now);
       else if (/\bod\s*$/.test(before)) from = found[0]!.date;
     }
   }

@@ -45,6 +45,9 @@ export async function runPromoCrawl(
   const themes = await query<{ slug: string; name: string }>('SELECT slug, name FROM themes');
   const rows: PromoRunRow[] = [];
 
+  // proposals that ran out since the last read are not worth anyone's attention
+  await query(`DELETE FROM promos WHERE source = 'crawler' AND status = 'pending' AND valid_until < current_date`);
+
   for (const s of sources) {
     const row: PromoRunRow = { source: s.url, found: 0, added: 0, changed: 0 };
     rows.push(row);
