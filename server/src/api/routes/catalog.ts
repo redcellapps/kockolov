@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { setForCode } from '../../crawler/ean.js';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
+import { normalizeText } from '../../lib/normalize.js';
+import { listingsEnabledFor, usedAdsForSet, usedSummary } from '../../listings/service.js';
 import { audienceOf, latestDeals, offersFor } from '../audience.js';
 import { buildLockedSearch, buildSearch, buildShopFacet, buildThemeFacet, type SearchFilters } from '../search.js';
 
@@ -28,6 +30,32 @@ const searchSchema = z.object({
   page: z.coerce.number().int().min(1).max(500).optional(),
   size: z.coerce.number().int().min(1).max(96).optional(),
 });
+
+/** Sets that match the search and have active ads, but no shop offer among the results */
+async function usedOnlySets(f: SearchFilters, viewerId: number | null, already: string[]) {
+  const params: unknown[] = [viewerId, already];
+  const conds: string[] = [];
+  for (const tok of normalizeText(f.q).split(' ').filter(Boolean).slice(0, 8)) {
+    params.push(`%${tok}%`);
+    conds.push(`s.search_text LIKE $${params.length}`);
+  }
+  if (f.themes?.length) {
+    params.push(f.themes);
+    conds.push(`s.theme_slug = ANY($${params.length}::text[])`);
+  }
+  const sets = await query<{ set_num: string; name: string; theme_slug: string | null; theme_name: string | null; image_url: string | null; rrp_rsd: number | null; age_min: number | null }>(
+    `SELECT s.set_num, s.name, s.theme_slug, t.name AS theme_name, s.image_url, s.rrp_rsd, s.age_min
+       FROM sets s LEFT JOIN themes t ON t.slug = s.theme_slug
+      WHERE s.set_num <> ALL($2::text[])
+        AND EXISTS (SELECT 1 FROM listings l WHERE l.set_num = s.set_num AND l.status = 'active' AND l.expires_at > now()
+                      AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id = $1::bigint AND b.blocked_id = l.user_id))
+        ${conds.map((c) => `AND ${c}`).join(' ')}
+      ORDER BY s.set_num DESC LIMIT 8`,
+    params,
+  );
+  const used = await usedSummary(sets.map((x) => x.set_num), viewerId);
+  return sets.map((x) => ({ ...x, used_count: used.get(x.set_num)?.count ?? 0, used_min_price: used.get(x.set_num)?.min ?? null }));
+}
 
 export async function catalogRoutes(app: FastifyInstance) {
   app.get('/api/sets', async (req) => {
@@ -58,13 +86,19 @@ export async function catalogRoutes(app: FastifyInstance) {
       query(sf.sql, sf.params),
       lq ? query(lq.sql, lq.params) : Promise.resolve([]),
     ]);
+    // second-hand ads: how many and from what price on each set found, and sets found only in ads
+    const adsOn = listingsEnabledFor(req.user);
+    const viewerId = req.user?.id ?? null;
+    const used = adsOn ? await usedSummary(rows.map((r) => r.set_num as string), viewerId) : new Map();
+    const usedOnly = adsOn && s.page === 1 && f.q && !f.shops?.length && f.min === undefined && f.max === undefined && !f.sale ? await usedOnlySets(f, viewerId, rows.map((r) => r.set_num as string)) : [];
     return {
       locked: { total: lockedRows[0]?.total ?? 0, items: lockedRows.map(({ total, ...r }) => r) },
       total: rows[0]?.total ?? 0,
       page: s.page,
       size: s.size,
       sort: s.sort,
-      items: rows.map(({ total, search_text, created_at, ...r }) => r),
+      used_only: usedOnly,
+      items: rows.map(({ total, search_text, created_at, ...r }) => ({ ...r, used_count: used.get(r.set_num as string)?.count ?? 0, used_min_price: used.get(r.set_num as string)?.min ?? null })),
       facets: { themes, shops },
     };
   });
@@ -129,7 +163,8 @@ export async function catalogRoutes(app: FastifyInstance) {
             [setNum],
           )) ?? { n: 0, shops: 0 })
         : { n: 0, shops: 0 };
-    return { set, offers, history, stats, deal, related, watched, hidden_offers: hidden.n, hidden_shops: hidden.shops };
+    const used = listingsEnabledFor(req.user) ? await usedAdsForSet(setNum, req.user?.id ?? null) : [];
+    return { set, offers, used, history, stats, deal, related, watched, hidden_offers: hidden.n, hidden_shops: hidden.shops };
   });
 
   app.get('/api/deals', async (req) => {

@@ -65,6 +65,32 @@ export interface SetSummary {
   discount_pct: number;
   deal_score: number | null;
   deal_rank: number | null;
+  /** active second-hand ads for this set, and the cheapest one */
+  used_count?: number;
+  used_min_price?: number | null;
+}
+
+/** A set found only in second-hand ads (no shop offer) */
+export interface UsedOnlySet {
+  set_num: string;
+  name: string;
+  theme_slug: string | null;
+  theme_name: string | null;
+  image_url: string | null;
+  used_count: number;
+  used_min_price: number | null;
+}
+
+/** A second-hand ad for the set, as a row next to the shops' offers */
+export interface UsedAd {
+  id: number;
+  title: string;
+  price_rsd: number;
+  negotiable: boolean;
+  condition: 'like_new' | 'used_complete' | 'used_incomplete' | 'parts';
+  city: string;
+  image: string | null;
+  created_at: string;
 }
 
 /** Name and picture of a set that is sold by members-only shops only */
@@ -81,6 +107,8 @@ export interface SearchResponse {
   items: SetSummary[];
   /** anonymous visitors only: sets that exist only in members-only shops (name and picture only) */
   locked?: { total: number; items: LockedSet[] };
+  /** sets that match the search and exist only in second-hand ads */
+  used_only?: UsedOnlySet[];
   facets: { themes: { slug: string | null; count: number }[]; shops: { id: string; count: number }[] };
 }
 
@@ -124,6 +152,8 @@ export interface SetDetail {
     created_at: string;
   };
   offers: Offer[];
+  /** active second-hand ads for this set (cheapest first) */
+  used?: UsedAd[];
   history: HistoryPoint[];
   stats: { lowest_ever: number | null; lowest_30d: number | null; tracked_since: string | null } | null;
   deal: { day: string; rank: number; score: number; best_price_rsd: number; reference_price_rsd: number | null; reasons: Reason[] } | null;

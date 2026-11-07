@@ -355,7 +355,7 @@ async function themePage(slug: string): Promise<PageMeta> {
   };
 }
 
-const CONDITION: Record<string, string> = {
+export const CONDITION: Record<string, string> = {
   like_new: 'kao novo',
   used_complete: 'korišćeno, kompletno',
   used_incomplete: 'korišćeno, nekompletno',
@@ -374,6 +374,19 @@ async function adsListPage(): Promise<PageMeta> {
     title: `LEGO oglasi: polovni setovi od privatnih lica | ${SITE}`,
     description: `Polovni LEGO setovi od privatnih lica u Srbiji${n ? `: ${count(n, 'aktivan oglas', 'aktivna oglasa', 'aktivnih oglasa')}` : ''}. Uporedi sa cenama u prodavnicama i kontaktiraj prodavca.`.replace(/\u00a0/g, ' '),
   };
+}
+
+/** What the ad's link-preview card shows */
+export async function loadAdCard(id: number) {
+  const a = await one<{ title: string; condition: string; price_rsd: number; city: string; set_num: string | null; status: string; file: string | null }>(
+    `SELECT l.title, l.condition, l.price_rsd, l.city, l.set_num, l.status,
+            (SELECT i.file FROM listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1) AS file
+       FROM listings l WHERE l.id = $1`,
+    [id],
+  );
+  if (!a || a.status === 'removed') return null;
+  const label = CONDITION[a.condition] ?? '';
+  return { ...a, conditionLabel: label.charAt(0).toUpperCase() + label.slice(1) };
 }
 
 async function adPage(id: string): Promise<PageMeta> {
@@ -399,7 +412,8 @@ async function adPage(id: string): Promise<PageMeta> {
     description,
     type: 'product',
     product: { price: a.price_rsd, availability: live ? 'instock' : 'oos' },
-    image: a.image ? { url: a.image, alt: a.title, width: 1200, height: 900 } : undefined,
+    // the same 1200×630 card as for sets: photo, title, price and condition, so shares look right everywhere
+    image: { url: `/og/oglas/${id}.jpg?v=${version(a.title, a.price_rsd, a.condition, a.city, a.image)}`, alt: a.title },
     jsonLd: [
       {
         '@context': 'https://schema.org',

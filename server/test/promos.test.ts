@@ -69,6 +69,30 @@ describe.skipIf(!dbAvailable)('promotions: crawler proposes, admin decides', asy
     await runPromoCrawl({ http, now });
   });
 
+  it('the same promotion on several pages or worded a little differently is one proposal', async () => {
+    const { dedupePromos, similarity } = await import('../src/crawler/promos/dedupe.js');
+    expect(similarity('Poklon uz porudžbine preko 15.000 RSD, LEGO poklon set', 'Akcija: poklon uz porudžbine preko 15.000 RSD, LEGO poklon set važi do 31.12.')).toBeGreaterThan(0.75);
+    expect(similarity('Poklon uz porudžbine preko 15.000 RSD', 'Dodatnih 10% samo online na Star Wars')).toBeLessThan(0.5);
+    await query('DELETE FROM promos');
+    const mk = (title: string, details: string, url: string) => ({
+      kind: 'gift' as const, title, details, minBasketRsd: 15000, discountPct: null, themes: [],
+      validFrom: null, validUntil: null, sourceUrl: url, signals: 1,
+    });
+    await upsertCandidate('lstore', mk('Poklon uz kupovinu', 'Poklon uz porudžbine preko 15.000 RSD, izaberi LEGO poklon set pri plaćanju', 'https://lstore.rs/'));
+    // same text on another page, different title, and a nested copy
+    await upsertCandidate('lstore', mk('Poklon set', 'Poklon uz porudžbine preko 15.000 RSD, izaberi LEGO poklon set pri plaćanju. Važi za sve.', 'https://lstore.rs/blogs/vesti/x'));
+    await upsertCandidate('lstore', mk('Poklon', 'izaberi LEGO poklon set pri plaćanju, uz porudžbine preko 15.000 RSD', 'https://lstore.rs/sniz'));
+    expect((await one<{ n: number }>('SELECT count(*)::int AS n FROM promos'))!.n).toBe(1);
+    // duplicates that are already stored are cleaned up, a decided one wins over a waiting look-alike
+    await query(`INSERT INTO promos (shop_id, kind, title, details, source_url, status) VALUES ('lstore','gift','Isto','Poklon uz porudžbine preko 15.000 RSD, izaberi LEGO poklon set pri plaćanju','https://lstore.rs/dup','pending')`);
+    await query(`INSERT INTO promos (shop_id, kind, title, details, source_url, status) VALUES ('kockarium','sale','Drugo','Dodatnih 10% samo online na LEGO Star Wars','https://k.rs/a','pending')`);
+    await query(`UPDATE promos SET status = 'approved' WHERE shop_id = 'lstore' AND source_url = 'https://lstore.rs/'`);
+    expect(await dedupePromos()).toBe(1);
+    expect((await one<{ n: number }>('SELECT count(*)::int AS n FROM promos'))!.n).toBe(2);
+    await query('DELETE FROM promos');
+    await runPromoCrawl({ http, now });
+  });
+
   it('running again changes nothing', async () => {
     const before = (await one<{ n: number }>('SELECT count(*)::int AS n FROM promos'))!.n;
     const rows = await runPromoCrawl({ http, now });

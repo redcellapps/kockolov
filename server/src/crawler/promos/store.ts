@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { one, query } from '../../db.js';
+import { isSamePromo } from './dedupe.js';
 import { fold, type PromoCandidate } from './extract.js';
 
 export interface UpsertResult {
@@ -18,6 +19,14 @@ export async function upsertCandidate(shopId: string, c: PromoCandidate): Promis
     [shopId, c.sourceUrl, c.kind, c.title],
   );
   if (!existing) {
+    // the same promotion found elsewhere (another page, worded a bit differently) is not a new one
+    const text = `${c.title} ${c.details}`;
+    const others = await query<{ id: number; title: string; details: string }>('SELECT id, title, details FROM promos WHERE shop_id = $1', [shopId]);
+    const twin = others.find((o) => isSamePromo(text, `${o.title} ${o.details}`));
+    if (twin) {
+      await query('UPDATE promos SET last_seen_at = now() WHERE id = $1', [twin.id]);
+      return { action: 'seen' };
+    }
     await query(
       `INSERT INTO promos (shop_id, kind, title, details, min_basket_rsd, discount_pct, themes, valid_from, valid_until, source_url, fingerprint)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
