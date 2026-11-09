@@ -345,6 +345,24 @@ describe('WooCommerce sale price only in sale_price (Švrća)', () => {
   });
 });
 
+describe('WooCommerce sale_price without on_sale (ABC Kocka 21318)', () => {
+  it('ignores a leftover sale_price when the product is not on sale', () => {
+    const p = {
+      id: 1,
+      name: 'LEGO® Ideas 21318 Kućica na drvetu',
+      permalink: 'https://abckocka.com/proizvod/lego-ideas-21318/',
+      sku: '21318',
+      on_sale: false,
+      prices: { price: '2999000', regular_price: '2999000', sale_price: '2459000', currency_minor_unit: 2 },
+      is_in_stock: true,
+      images: [],
+    };
+    const o = wooProductToOffer(p)!;
+    expect(o.priceRsd).toBe(29990);
+    expect(o.regularPriceRsd).toBeNull();
+  });
+});
+
 describe('Dečiji svet (WooCommerce, internal SKUs)', () => {
   const items = JSON.parse(fx('decijisvet/products-category444-p1.json'));
   const offer = (id: number) => wooProductToOffer(items.find((p: { id: number }) => p.id === id), { skuIsSetNum: false, allCategoriesAreThemes: true })!;
