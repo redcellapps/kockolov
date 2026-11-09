@@ -7,7 +7,9 @@ import type { CrawlContext, PageResult, RawOffer, ShopAdapter, ShopInfo } from '
 // 2.744,99 RSD). Pages: &page=N with per_page=100 (the API maximum) until an empty array comes back.
 // Some shops' discount plugins leave `price` at the regular price and put the real one only in
 // `sale_price` (Švrća, October 2026: price 209900, sale_price 178415, page shows 1.784,15), so the
-// lower of the two is the price.
+// lower of the two is the price. But only when the product is really `on_sale`: ABCKocka (November
+// 2026, set 21318) has price 2999000, sale_price 2459000 and on_sale false, the page shows 29.990, so a
+// sale_price without on_sale is a plugin leftover and is ignored.
 
 export interface WooStoreProduct {
   id: number;
@@ -81,7 +83,7 @@ export function wooProductToOffer(p: WooStoreProduct, opts: WooOptions = {}): Ra
   const title = stripHtml(p.name);
   const unit = p.prices?.currency_minor_unit ?? 2;
   const listed = minor(p.prices?.price, unit);
-  const sale = minor(p.prices?.sale_price, unit);
+  const sale = p.on_sale === false ? null : minor(p.prices?.sale_price, unit);
   const price = listed && sale && sale < listed ? sale : listed;
   if (!p.id || !title || !price || !p.permalink) return null;
   const regular = Math.max(minor(p.prices?.regular_price, unit) ?? 0, listed ?? 0) || null;
