@@ -94,6 +94,12 @@ const schema = z.object({
   CONTACT_EMAIL: z.string().default('kontakt@kockolov.rs'),
   // pause between two news e-mails, so the mail server isn't flooded
   ANNOUNCE_DELAY_MS: z.coerce.number().default(1500),
+  // The mail server cuts a mailbox off at ~120 e-mails an hour (Vesta default); stay below it. 0 = no limit.
+  ANNOUNCE_PER_HOUR: z.coerce.number().default(100),
+  // Mail server refuses (hourly limit, login, unreachable): wait this long, then try the same person again...
+  ANNOUNCE_PAUSE_MS: z.coerce.number().default(600_000),
+  // ...and give up after this many pauses in a row (the rest stays waiting for "Pokušaj ponovo")
+  ANNOUNCE_MAX_PAUSES: z.coerce.number().default(12),
 
   // Push notifications (a watched set got cheaper or is back in stock). Empty = the server makes a key
   // pair once and keeps it in the database; set both only to bring a key from elsewhere.

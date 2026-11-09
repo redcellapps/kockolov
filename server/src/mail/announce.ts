@@ -161,6 +161,38 @@ export async function createAnnouncement(a: { subject: string; body: string }, a
 const running = new Set<number>();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const TEMPORARY_CODES = new Set(['ECONNECTION', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ESOCKET', 'EDNS', 'EAI_AGAIN', 'EAUTH']);
+const TEMPORARY_TEXT = /sending too much|too many|rate.?limit|limitlog|quota|try again|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|\b535\b/i;
+
+/**
+ * Problems on the sending side that say nothing about the recipient: the mailbox' hourly limit,
+ * a refused login, an unreachable mail server, any 4xx. Those must not turn into a failed delivery;
+ * the run pauses and tries the same person again later.
+ */
+export function isTemporaryMailError(err: unknown): boolean {
+  const e = err as { code?: string; responseCode?: number; message?: string };
+  const rc = e.responseCode ?? 0;
+  if ((rc >= 400 && rc < 500) || rc === 535) return true;
+  if (e.code && TEMPORARY_CODES.has(e.code)) return true;
+  return TEMPORARY_TEXT.test(e.message ?? '');
+}
+
+/**
+ * How long to wait before the next e-mail so that no more than ANNOUNCE_PER_HOUR news e-mails
+ * leave in any hour (the mail server cuts a mailbox off at about 120 an hour). 0 = go on.
+ */
+export async function hourlyWaitMs(): Promise<number> {
+  const limit = config.ANNOUNCE_PER_HOUR;
+  if (limit <= 0) return 0;
+  const r = await one<{ n: number; wait_ms: number | null }>(
+    `SELECT count(*)::int AS n,
+            (extract(epoch FROM (min(sent_at) + interval '1 hour' - now())) * 1000)::float8 AS wait_ms
+       FROM announcement_deliveries WHERE sent_at > now() - interval '1 hour'`,
+  );
+  if (!r || r.n < limit) return 0;
+  return Math.max(1000, Math.ceil(r.wait_ms ?? 0) + 2000);
+}
+
 export function isSending(id: number): boolean {
   return running.has(id);
 }
@@ -174,7 +206,8 @@ export async function deliverAnnouncement(id: number, log = console.log): Promis
     if (!a) return;
     let sent = 0;
     let failed = 0;
-    for (;;) {
+    let pauses = 0;
+    run: for (;;) {
       // someone who turned news off after the admin pressed send is skipped
       await query(
         `DELETE FROM announcement_deliveries d USING users u
@@ -190,18 +223,35 @@ export async function deliverAnnouncement(id: number, log = console.log): Promis
       );
       if (!batch.length) break;
       for (const u of batch) {
+        const wait = await hourlyWaitMs();
+        if (wait > 0) {
+          log(`novosti #${id}: sat je pun (${config.ANNOUNCE_PER_HOUR} mejlova), čekam ${Math.round(wait / 1000)} s`);
+          await sleep(wait);
+        }
         try {
           await sendAccountMail(mailFor(a, u));
           await query('UPDATE announcement_deliveries SET sent_at = now() WHERE announcement_id = $1 AND user_id = $2', [id, u.user_id]);
           sent++;
+          pauses = 0;
         } catch (err) {
+          const msg = (err as Error).message;
+          if (isTemporaryMailError(err)) {
+            // not this person's fault: leave them waiting, pause, and go on from the same place
+            if (++pauses > config.ANNOUNCE_MAX_PAUSES) {
+              log(`novosti #${id}: mejl server i dalje ne prima (${msg}); odustajem, ostalo čeka. Nastavlja se klikom na „Pokušaj ponovo“ ili posle restarta.`);
+              return;
+            }
+            log(`novosti #${id}: privremena greška (${msg}); pauza ${Math.round(config.ANNOUNCE_PAUSE_MS / 1000)} s, pokušaj ${pauses}/${config.ANNOUNCE_MAX_PAUSES}`);
+            await sleep(config.ANNOUNCE_PAUSE_MS);
+            continue run;
+          }
           failed++;
           await query('UPDATE announcement_deliveries SET error = $3 WHERE announcement_id = $1 AND user_id = $2', [
             id,
             u.user_id,
-            (err as Error).message.slice(0, 500),
+            msg.slice(0, 500),
           ]);
-          log(`novosti #${id}: greška za ${u.email}: ${(err as Error).message}`);
+          log(`novosti #${id}: greška za ${u.email}: ${msg}`);
         }
         if (config.ANNOUNCE_DELAY_MS > 0) await sleep(config.ANNOUNCE_DELAY_MS);
       }
@@ -215,17 +265,23 @@ export async function deliverAnnouncement(id: number, log = console.log): Promis
   }
 }
 
-/** Failed deliveries get another try */
+/** Failed deliveries get another try, and a run that gave up waiting for the mail server is picked up again */
 export async function retryAnnouncement(id: number, log = console.log): Promise<number> {
-  const rows = await query(
-    `UPDATE announcement_deliveries SET error = NULL WHERE announcement_id = $1 AND sent_at IS NULL AND error IS NOT NULL RETURNING user_id`,
+  await query(
+    `UPDATE announcement_deliveries SET error = NULL WHERE announcement_id = $1 AND sent_at IS NULL AND error IS NOT NULL`,
     [id],
   );
-  if (rows.length) {
+  const waiting = (
+    await one<{ n: number }>(
+      'SELECT count(*)::int AS n FROM announcement_deliveries WHERE announcement_id = $1 AND sent_at IS NULL AND error IS NULL',
+      [id],
+    )
+  )?.n ?? 0;
+  if (waiting) {
     await query("UPDATE announcements SET status = 'sending', finished_at = NULL WHERE id = $1", [id]);
     void deliverAnnouncement(id, log);
   }
-  return rows.length;
+  return waiting;
 }
 
 /** After a restart: finish whatever was being sent */
