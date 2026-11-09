@@ -171,6 +171,7 @@ export async function publicRoutes(app: FastifyInstance) {
     return xml(reply, [
       url('/'),
       url('/ponude'),
+      url('/akcije'),
       url('/teme'),
       url('/pretraga'),
       url('/privatnost'),

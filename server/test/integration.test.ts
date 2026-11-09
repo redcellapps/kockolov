@@ -392,6 +392,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect((await app.inject({ method: 'GET', url: '/sitemap-sets-oos.xml' })).statusCode).toBe(404);
       expect(map.text).toContain('/set/10280</loc>');
       expect(map.text).toContain('/privatnost</loc>');
+      expect(map.text).toContain('/akcije</loc>');
     } finally {
       config.PUBLIC_MODE = false;
     }
