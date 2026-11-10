@@ -32,6 +32,14 @@ export interface FetcherOptions {
   log?: (msg: string) => void;
 }
 
+/** "fetch failed" alone says nothing: Node keeps the real reason (ECONNRESET, ENOTFOUND, CERT_HAS_EXPIRED, timeout…) in `cause` */
+export function describeNetworkError(err: unknown): string {
+  const e = err as Error & { cause?: { code?: string; name?: string; message?: string } };
+  const c = e?.cause;
+  const why = c ? [c.code ?? c.name, c.message].filter(Boolean).join(': ') : e?.name === 'TimeoutError' ? 'timeout' : '';
+  return why && !e.message.includes(why) ? `${e.message} (${why})` : String(e?.message ?? err);
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -125,8 +133,8 @@ export class PoliteFetcher {
         return { status: res.status, text: await res.text() };
       } catch (err) {
         if (err instanceof HttpError) throw err;
-        if (attempt > this.opts.retries) throw err;
-        this.opts.log(`retry ${attempt} after network error: ${(err as Error).message} ${url}`);
+        if (attempt > this.opts.retries) throw new Error(`${describeNetworkError(err)} ${url}`, { cause: err });
+        this.opts.log(`retry ${attempt} after network error: ${describeNetworkError(err)} ${url}`);
         await sleep(2000 * attempt ** 2);
       }
     }
