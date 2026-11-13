@@ -232,6 +232,7 @@ jobs:
             if [ -z "${!v}" ]; then echo "::error::Nedostaje secret $v (mobile/store/app-store.md)"; exit 1; fi
           done
           if [ ! -f App/GoogleService-Info.plist ]; then echo "::error::Nedostaje secret GOOGLE_SERVICE_INFO_PLIST (bez njega nema obaveštenja)"; exit 1; fi
+          # signed for the App Store straight away: an "Apple Development" profile would need a registered iPhone
           version=$(node -p "require('../../package.json').version")
           build=$(( GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT ))
           key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
@@ -239,7 +240,7 @@ jobs:
           auth=(-allowProvisioningUpdates -authenticationKeyPath "$key" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Kockolov.xcarchive" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Distribution" \
             MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" \
             "${auth[@]}" archive | tail -n 60
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
