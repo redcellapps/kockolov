@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { setForCode } from '../../crawler/ean.js';
+import { pickFeatured } from '../../deals/featured.js';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
 import { normalizeText } from '../../lib/normalize.js';
@@ -185,7 +186,8 @@ export async function catalogRoutes(app: FastifyInstance) {
         LIMIT $1`,
       [limit],
     );
-    return { day: rows[0]?.day ?? null, items: rows };
+    // `featured`: which of the top deals the home page highlights right now (rotates every few hours)
+    return { day: rows[0]?.day ?? null, items: rows, featured: pickFeatured(rows as { set_num: string; score: string }[])?.set_num ?? null };
   });
 
   app.get('/api/themes', async (req) => {

@@ -14,7 +14,15 @@ import { usePageTitle } from '../lib/title';
 export default function Home() {
   usePageTitle(null);
   const { user, registrationOpen } = useAuth();
-  const deals = useQuery({ queryKey: ['deals', 12], queryFn: () => api<{ day: string | null; items: Deal[] }>('/api/deals?limit=12') });
+  // 13 = the highlighted deal + a full grid of 12 below it
+  const deals = useQuery({
+    queryKey: ['deals', 13],
+    queryFn: () => api<{ day: string | null; items: Deal[]; featured?: string | null }>('/api/deals?limit=13'),
+  });
+  const items = deals.data?.items ?? [];
+  // the highlighted deal rotates through the day's best (the server picks it); the grid shows the rest
+  const hero = items.find((d) => d.set_num === deals.data?.featured) ?? items[0];
+  const grid = items.filter((d) => d !== hero).slice(0, 12);
   const themes = useQuery({ queryKey: ['themes'], queryFn: () => api<Theme[]>('/api/themes'), staleTime: 600_000 });
   const stats = useQuery({ queryKey: ['stats'], queryFn: () => api<Stats>('/api/stats'), staleTime: 300_000 });
   const shops = useQuery({ queryKey: ['shops'], queryFn: () => api<Shop[]>('/api/shops'), staleTime: 600_000 });
@@ -22,7 +30,7 @@ export default function Home() {
   return (
     <>
       <Hero
-        deal={deals.data?.items[0]}
+        deal={hero}
         dealLoading={deals.isLoading}
         stats={stats.data}
         unlock={!user && shops.data ? stats.data?.members_shops : undefined}
@@ -50,9 +58,9 @@ export default function Home() {
               <CardSkeleton key={i} />
             ))}
           </div>
-        ) : deals.data?.items.length ? (
+        ) : grid.length ? (
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {deals.data.items.map((d) => (
+            {grid.map((d) => (
               <DealCard key={d.set_num} d={d} />
             ))}
           </div>

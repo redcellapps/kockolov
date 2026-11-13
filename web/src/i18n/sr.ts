@@ -44,7 +44,7 @@ export const sr = {
   'home.themes.title': 'Istraži po temi',
   'home.themes.all': 'Sve teme',
   'home.popular': 'Popularno:',
-  'home.top.label': 'Najbolja ponuda danas',
+  'home.top.label': 'Izdvojena ponuda',
   'home.top.saving': 'Ušteda {amount} u odnosu na redovnu cenu u LEGO® Store-\u2060u',
   'home.top.was': 'Redovna cena u LEGO® Store-\u2060u:',
   'home.top.compare': 'Poređenje cena',
