@@ -750,6 +750,8 @@ export const sr = {
   'privacy.what.4': 'Tehničke podatke o nalogu: kada je napravljen i potvrđen, poslednju prijavu i evidenciju poslatih poruka.',
   'privacy.what.5':
     'IP adresu koristimo samo za zaštitu od zloupotrebe (ograničenje broja pokušaja prijave i registracije) i ne upisujemo je u bazu. Server, kao i svaki veb-server, vodi dnevnik pristupa sa IP adresama, koji se čuva kratko i automatski briše.',
+  'privacy.what.10':
+    'Pri svakoj prijavi na osnovu IP adrese određujemo samo državu iz koje se prijavljuješ i uz nalog upisujemo njenu oznaku (na primer RS), ne i IP adresu. Državu vidi samo administrator, a služi nam da znamo iz kojih zemalja nas koriste. Određivanje radi naš server sa bazom GeoLite kompanije MaxMind (maxmind.com), bez slanja podataka bilo kome; pošto je približno, može da pokaže pogrešnu državu, na primer ako koristiš VPN.',
   'privacy.what.7':
     'Ako uključiš obaveštenja, čuvamo adresu za isporuku obaveštenja na taj uređaj: na sajtu je daje tvoj pregledač, a u aplikaciji Firebase Cloud Messaging (Google) dodeljuje token aplikaciji na tom telefonu. Uz nju čuvamo samo naziv pregledača ili platformu (Android ili iOS), da bi znao gde su obaveštenja uključena. Kad ih isključiš ili se odjaviš sa tog uređaja, adresu brišemo.',
   'privacy.what.8':

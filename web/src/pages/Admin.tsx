@@ -40,6 +40,20 @@ interface Overview {
   users: number;
   crawlRunning: boolean;
 }
+const countryNames = new Intl.DisplayNames(['sr-Latn'], { type: 'region' });
+
+/** Small flag (an image: Windows draws emoji flags as plain letters); empty until the account has signed in once */
+function CountryFlag({ code }: { code?: string | null }) {
+  if (!code) return <span className="inline-block h-3.5 w-5 shrink-0" aria-hidden />;
+  let name = code;
+  try {
+    name = countryNames.of(code) ?? code;
+  } catch {
+    /* keep the code */
+  }
+  return <img src={`/flags/${code.toLowerCase()}.svg`} alt={code} title={name} loading="lazy" className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-black/10" />;
+}
+
 interface AdminUser {
   id: number;
   email: string;
@@ -47,6 +61,7 @@ interface AdminUser {
   role: string;
   digest_enabled: boolean;
   last_login_at: string | null;
+  country?: string | null;
   accepted_at: string | null;
   invited_at: string | null;
   self_signup?: boolean;
@@ -256,7 +271,12 @@ export default function AdminPage() {
             <tbody>
               {users.data?.map((u) => (
                 <tr key={u.id} className="border-t border-line align-middle">
-                  <td className="py-2.5 pr-3 font-semibold">{u.email}</td>
+                  <td className="py-2.5 pr-3 font-semibold">
+                    <span className="inline-flex items-center gap-2">
+                      <CountryFlag code={u.country} />
+                      {u.email}
+                    </span>
+                  </td>
                   <td className="pr-3 text-ink-2">{u.name}</td>
                   <td className="pr-3 text-ink-2">{u.role === 'admin' ? t('admin.users.role.admin') : t('admin.users.role.user')}</td>
                   <td className="pr-3">

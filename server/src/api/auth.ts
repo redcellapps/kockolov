@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { config } from '../config.js';
 import { one, query } from '../db.js';
+import { recordCountry } from '../lib/geo.js';
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, keylen: number, opts: object) => Promise<Buffer>;
 const SCRYPT = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
@@ -75,6 +76,7 @@ export async function createDeviceSession(userId: number, kind: 'app' | 'tv', de
 
 export async function createSession(reply: FastifyReply, userId: number): Promise<void> {
   const kind = appKind(reply.request);
+  await recordCountry(userId, reply.request.ip);
   if (kind !== 'web') {
     // the app stays signed in for a year
     reply.header(TOKEN_HEADER, await createDeviceSession(userId, kind, (reply.request.headers['user-agent'] ?? '').slice(0, 120) || null));

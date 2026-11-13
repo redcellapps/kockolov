@@ -1,3 +1,6 @@
+import { createRequire } from 'node:module';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { config } from '../../config.js';
 import { one, query } from '../../db.js';
@@ -42,6 +45,19 @@ export async function publicRoutes(app: FastifyInstance) {
     }
     await query('UPDATE users SET digest_enabled = $2 WHERE id = $1', [u.id, on]);
     return { ok: true, digestEnabled: on, newsEnabled: u.news_enabled };
+  });
+
+  // Country flags for the admin's user list, served from the country-flag-icons package (only the ones shown get loaded)
+  const flagDir = path.join(path.dirname(createRequire(import.meta.url).resolve('country-flag-icons')), '3x2');
+  app.get('/flags/:file', async (req, reply) => {
+    const { file } = req.params as { file: string };
+    if (!/^[a-z]{2}\.svg$/.test(file)) return reply.code(404).send();
+    try {
+      const svg = await readFile(path.join(flagDir, `${file.slice(0, 2).toUpperCase()}.svg`));
+      return reply.type('image/svg+xml').header('Cache-Control', 'public, max-age=2592000').send(svg);
+    } catch {
+      return reply.code(404).send();
+    }
   });
 
   app.get('/robots.txt', async (_req, reply) => {
