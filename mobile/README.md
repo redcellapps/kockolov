@@ -17,6 +17,8 @@ GitHub Actions (`.github/workflows/mobile.yml`) na svaki push u `mobile/` ili `w
 
 Verzija za Google Play: Actions → Mobile apps → **Run workflow** → „Verzija za Google Play” → potpisan `.aab`
 (Releases → `android-play`). Ključ, secrets i ceo postupak objave: [`store/google-play.md`](store/google-play.md).
+Verzija za App Store: isto dugme, „Verzija za App Store” → potpisan build ide pravo u TestFlight (bez Mac-a).
+Secrets i postupak: [`store/app-store.md`](store/app-store.md).
 
 Lokalno (Android Studio / Xcode):
 

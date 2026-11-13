@@ -10,6 +10,11 @@ name: Mobile apps
 #   ANDROID_KEYSTORE_PASSWORD     its password (also used for the key unless ANDROID_KEY_PASSWORD is set)
 #   ANDROID_KEY_ALIAS             the key's alias (e.g. upload)
 #   ANDROID_KEY_PASSWORD          optional, when the key has its own password
+#   ASC_KEY_ID, ASC_ISSUER_ID     App Store Connect API key (Users and Access → Integrations → Team Keys, role Admin)
+#   ASC_KEY_P8                    contents of that AuthKey_XXXX.p8 file
+#   APPLE_TEAM_ID                 the 10-character Team ID (developer.apple.com → Membership details)
+# Run by hand with "Verzija za App Store" ticked, the iOS job signs the app in the cloud and uploads it to
+# App Store Connect, where it shows up in TestFlight (mobile/store/app-store.md).
 on:
   push:
     branches: [main, mobile]
@@ -18,6 +23,10 @@ on:
     inputs:
       play:
         description: Verzija za Google Play (potpisan .aab)
+        type: boolean
+        default: false
+      appstore:
+        description: Verzija za App Store (potpisan build u TestFlight)
         type: boolean
         default: false
 
@@ -173,6 +182,12 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      # Apple accepts only builds made with Xcode 26 (iOS 26 SDK): take the newest one on the runner
+      - name: Xcode 26
+        run: |
+          x=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$x" ]; then sudo xcode-select -s "$x"; fi
+          xcodebuild -version
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -202,3 +217,45 @@ jobs:
             -sdk iphoneos -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tail -n 40
           exit ${PIPESTATUS[0]}
+      # version from mobile/package.json (same as Android), build number always higher than the last one
+      - name: App Store build → TestFlight
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.appstore }}
+        working-directory: mobile/ios/App
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          for v in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Nedostaje secret $v (mobile/store/app-store.md)"; exit 1; fi
+          done
+          if [ ! -f App/GoogleService-Info.plist ]; then echo "::error::Nedostaje secret GOOGLE_SERVICE_INFO_PLIST (bez njega nema obaveštenja)"; exit 1; fi
+          version=$(node -p "require('../../package.json').version")
+          build=$(( GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT ))
+          key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          if printf '%s' "$ASC_KEY_P8" | grep -q 'BEGIN PRIVATE KEY'; then printf '%s\n' "$ASC_KEY_P8" > "$key"; else printf '%s' "$ASC_KEY_P8" | base64 --decode > "$key"; fi
+          auth=(-allowProvisioningUpdates -authenticationKeyPath "$key" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Kockolov.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" \
+            "${auth[@]}" archive | tail -n 60
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Kockolov.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" "${auth[@]}" | tail -n 40
+          rm -f "$key"
+          echo "### Kockolov $version ($build) poslat u App Store Connect" >> "$GITHUB_STEP_SUMMARY"
+          echo "Za 10–30 min se pojavljuje u App Store Connect → TestFlight (posle Apple-ove automatske obrade)." >> "$GITHUB_STEP_SUMMARY"
