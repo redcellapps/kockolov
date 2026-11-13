@@ -1,4 +1,5 @@
 import { trackEvent } from '../lib/analytics';
+import { isApp } from '../lib/platform';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { LogoMark } from '../components/Logo';
@@ -209,7 +210,9 @@ export default function LoginPage() {
     <AuthCard>
       <h1 className="mt-6 text-2xl font-extrabold">{title}</h1>
       {subtitle && <p className="mt-1 text-ink-2">{subtitle}</p>}
-      {googleClientId && mode !== 'forgot' && (
+      {/* not in the apps: Google refuses sign-in inside an app's web view, and on iPhone Apple would then also
+          require "Sign in with Apple" (App Review 4.8); e-mail sign-in works everywhere */}
+      {googleClientId && !isApp && mode !== 'forgot' && (
         <div className="mt-6">
           <GoogleSignIn clientId={googleClientId} onCredential={signInWithGoogle} />
           <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase text-ink-3">
