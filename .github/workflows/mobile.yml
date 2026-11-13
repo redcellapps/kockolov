@@ -232,17 +232,20 @@ jobs:
             if [ -z "${!v}" ]; then echo "::error::Nedostaje secret $v (mobile/store/app-store.md)"; exit 1; fi
           done
           if [ ! -f App/GoogleService-Info.plist ]; then echo "::error::Nedostaje secret GOOGLE_SERVICE_INFO_PLIST (bez njega nema obaveštenja)"; exit 1; fi
-          # signed for the App Store straight away: an "Apple Development" profile would need a registered iPhone
           version=$(node -p "require('../../package.json').version")
           build=$(( GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT ))
           key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
           if printf '%s' "$ASC_KEY_P8" | grep -q 'BEGIN PRIVATE KEY'; then printf '%s\n' "$ASC_KEY_P8" > "$key"; else printf '%s' "$ASC_KEY_P8" | base64 --decode > "$key"; fi
-          auth=(-allowProvisioningUpdates -authenticationKeyPath "$key" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          echo "ASC_KEY_FILE=$key" >> "$GITHUB_ENV"
+          export ASC_KEY_FILE="$key"
+          # a throwaway Apple Distribution certificate + App Store profile (no registered devices needed),
+          # deleted again in the next step
+          python3 -m pip install --quiet --break-system-packages pyjwt cryptography 2>/dev/null || python3 -m pip install --quiet pyjwt cryptography
+          python3 ../../scripts/ios-signing.py setup
+          IOS_PROFILE_NAME=$(cat "$RUNNER_TEMP/ios-signing/profile-name")
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Kockolov.xcarchive" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Distribution" \
-            MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" \
-            "${auth[@]}" archive | tail -n 60
+            MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" archive | tail -n 60
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -250,13 +253,24 @@ jobs:
             <key>method</key><string>app-store-connect</string>
             <key>destination</key><string>upload</string>
             <key>teamID</key><string>$APPLE_TEAM_ID</string>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict><key>rs.kockolov.app</key><string>$IOS_PROFILE_NAME</string></dict>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict></plist>
           EOF
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Kockolov.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" "${auth[@]}" | tail -n 40
-          rm -f "$key"
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -authenticationKeyPath "$key" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" | tail -n 40
           echo "### Kockolov $version ($build) poslat u App Store Connect" >> "$GITHUB_STEP_SUMMARY"
           echo "Za 10–30 min se pojavljuje u App Store Connect → TestFlight (posle Apple-ove automatske obrade)." >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove the temporary certificate and profile
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.appstore }}
+        working-directory: mobile/ios/App
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$ASC_KEY_FILE" ] && [ -f "$ASC_KEY_FILE" ]; then python3 ../../scripts/ios-signing.py cleanup; rm -f "$ASC_KEY_FILE"; fi
