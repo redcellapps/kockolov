@@ -66,7 +66,9 @@ if (fromServer) {
 
 /** Back to the real clock once the server's page has been taken over */
 function ClockRelease() {
-  useEffect(() => freezeClock(null), []);
+  useEffect(() => {
+    freezeClock(null);
+  }, []);
   return null;
 }
 
