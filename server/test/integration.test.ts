@@ -575,8 +575,8 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       const pubDeal = (await get('/api/deals', false)).items.find((i: { set_num: string }) => i.set_num === '10280');
       expect(pubDeal).toMatchObject({ best_shop: 'dexy', best_price_rsd: 6999 });
       expect((await sitemapText()).text).toContain('/set/42166</loc>');
-      const head = await app.inject({ method: 'GET', url: '/set/10280' });
-      expect(head.body).toContain('6.999');
+      const { pageMeta } = await import('../src/seo/pages.js');
+      expect((await pageMeta('/set/10280', new URLSearchParams())).title).toMatch(/– od 6\.999 RSD \| Kockolov$/);
     } finally {
       config.PUBLIC_MODE = false;
     }
