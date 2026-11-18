@@ -124,7 +124,7 @@ Kockolov upoređuje cene LEGO® setova u prodavnicama u Srbiji: LEGO® Store, Ko
 KAKO RADI
 Cene proveravamo svakog jutra, direktno na sajtovima prodavnica. Kupuješ u prodavnici koju izabereš: Kockolov ništa ne prodaje i ništa ne naplaćuje.
 
-Pretraga i ponude rade bez naloga. Uz besplatan nalog vidiš cene iz svih prodavnica, pratiš setove i dobijaš obaveštenja. Bez reklama i bez praćenja korisnika.
+Cene iz svih prodavnica vidiš bez naloga. Uz besplatan nalog pratiš setove i dobijaš obaveštenja kad cena padne. Bez reklama i bez praćenja korisnika.
 
 LEGO® je zaštićeni znak LEGO grupe, koja ne sponzoriše, ne odobrava niti je povezana sa ovom aplikacijom.
 ```
