@@ -24,12 +24,15 @@ describe('pages drawn on the server', () => {
        }`,
     );
     const app = Fastify();
-    app.get('/api/echo', async (req) => `cookie=${req.headers.cookie ?? ''}`);
-    expect(await renderPage('/x', undefined)).toBeNull(); // nothing loaded yet
+    app.get('/api/echo', async (req) => `cookie=${req.headers.cookie ?? ''} ip=${req.ip}`);
+    expect(await renderPage('/x', {})).toBeNull(); // nothing loaded yet
     expect(await startSsr(app, path.join(root, 'dist'))).toBe(true);
-    const [a, b] = await Promise.all([renderPage('/set/1', 'kl_session=ana'), renderPage('/set/2', 'kl_session=bora')]);
-    expect(a?.html).toBe('<p>/set/1 cookie=kl_session=ana</p>');
-    expect(b?.html).toBe('<p>/set/2 cookie=kl_session=bora</p>');
+    const [a, b] = await Promise.all([
+      renderPage('/set/1', { cookie: 'kl_session=ana', ip: '203.0.113.7' }),
+      renderPage('/set/2', { cookie: 'kl_session=bora', ip: '198.51.100.9' }),
+    ]);
+    expect(a?.html).toBe('<p>/set/1 cookie=kl_session=ana ip=203.0.113.7</p>');
+    expect(b?.html).toBe('<p>/set/2 cookie=kl_session=bora ip=198.51.100.9</p>');
     expect(await startSsr(app, path.join(os.tmpdir(), 'nema-ovoga', 'dist'))).toBe(false);
     await app.close();
   });

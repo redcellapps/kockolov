@@ -18,7 +18,13 @@ interface SsrModule {
   setServerFetch(f: (path: string, init: RequestInit) => Promise<Response>): void;
 }
 
-const visitor = new AsyncLocalStorage<{ cookie?: string }>();
+/** who is looking: their cookie (signed in or not), address and browser, for the API calls made for them */
+export interface Visitor {
+  cookie?: string;
+  ip?: string;
+  userAgent?: string;
+}
+const visitor = new AsyncLocalStorage<Visitor>();
 let mod: SsrModule | null = null;
 
 /** Loads the renderer next to web/dist, if it was built. Returns whether pages will be drawn on the server. */
@@ -27,10 +33,17 @@ export async function startSsr(app: FastifyInstance, webDist: string): Promise<b
   if (!existsSync(file)) return false;
   mod = (await import(pathToFileURL(file).href)) as SsrModule;
   mod.setServerFetch(async (p, init) => {
+    const v = visitor.getStore() ?? {};
     const r = await app.inject({
       method: (init.method ?? 'GET') as 'GET',
       url: p,
-      headers: { cookie: visitor.getStore()?.cookie ?? '', ...(init.body ? { 'content-type': 'application/json' } : {}) },
+      // the visitor's own address, so per-person limits and counters (an ad's views) see them, not this server
+      ...(v.ip ? { remoteAddress: v.ip } : {}),
+      headers: {
+        cookie: v.cookie ?? '',
+        ...(v.userAgent ? { 'user-agent': v.userAgent } : {}),
+        ...(init.body ? { 'content-type': 'application/json' } : {}),
+      },
       ...(init.body ? { payload: String(init.body) } : {}),
     });
     const empty = r.statusCode === 204 || r.statusCode === 304;
@@ -40,13 +53,13 @@ export async function startSsr(app: FastifyInstance, webDist: string): Promise<b
 }
 
 /** The page's HTML and the data it was drawn from, or null (no renderer, an error, or slower than 3 s). */
-export async function renderPage(url: string, cookie: string | undefined): Promise<{ html: string; state: unknown } | null> {
+export async function renderPage(url: string, who: Visitor): Promise<{ html: string; state: unknown } | null> {
   if (!mod) return null;
   const m = mod;
   let timer: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([
-      visitor.run({ cookie }, () => m.render(url)),
+      visitor.run(who, () => m.render(url)),
       new Promise<null>((resolve) => {
         timer = setTimeout(() => resolve(null), 3000);
       }),

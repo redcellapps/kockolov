@@ -147,7 +147,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
         const meta = await pageMeta(url.pathname, url.searchParams);
         if (meta.redirect) return reply.redirect(meta.redirect, 301);
         status = meta.status;
-        const page = ssr && status === 200 && meta.ssr !== false ? await renderPage(req.url, req.headers.cookie).catch((err) => {
+        const page = ssr && status === 200 && meta.ssr !== false ? await renderPage(req.url, { cookie: req.headers.cookie, ip: req.ip, userAgent: req.headers['user-agent'] }).catch((err) => {
           req.log.error(err, 'server render failed');
           return null;
         }) : null;
