@@ -18,7 +18,8 @@ import { messageRoutes } from './routes/messages.js';
 import { listingAdminRoutes } from './routes/listings-admin.js';
 import { blockRoutes } from './routes/blocks.js';
 import { pushRoutes } from './routes/push.js';
-import { injectHead, pageMeta } from '../seo/pages.js';
+import { injectApp, injectHead, pageMeta } from '../seo/pages.js';
+import { renderPage, startSsr } from '../seo/ssr.js';
 import { authRoutes } from './routes/auth.js';
 import { catalogRoutes } from './routes/catalog.js';
 import { meRoutes } from './routes/me.js';
@@ -135,6 +136,8 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     // SPA fallback: every non-API route renders index.html, with a <head> made for that page
     // (title, description, link-preview tags, structured data) and a real 404 for unknown pages
     const template = readFileSync(path.join(dist, 'index.html'), 'utf8');
+    // pages drawn on the server when web/dist-ssr was built (npm run build -w web)
+    const ssr = await startSsr(app, dist);
     app.setNotFoundHandler(async (req, reply) => {
       if (req.url.startsWith('/api/')) return reply.code(404).send({ error: 'Nije pronađeno.' });
       const url = new URL(req.url, 'http://local');
@@ -142,8 +145,14 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
       let status = 200;
       try {
         const meta = await pageMeta(url.pathname, url.searchParams);
-        html = injectHead(template, meta);
+        if (meta.redirect) return reply.redirect(meta.redirect, 301);
         status = meta.status;
+        const page = ssr && status === 200 && meta.ssr !== false ? await renderPage(req.url, req.headers.cookie).catch((err) => {
+          req.log.error(err, 'server render failed');
+          return null;
+        }) : null;
+        // the real page when it could be drawn here; otherwise the crawler copy, and the app starts empty
+        html = page ? injectApp(injectHead(template, { ...meta, body: undefined }), page) : injectHead(template, meta);
       } catch (err) {
         req.log.error(err, 'page meta failed');
       }

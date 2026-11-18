@@ -461,15 +461,24 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect((await head('/brisanje-naloga')).m).toMatchObject({ status: 200, title: 'Brisanje naloga | Kockolov' });
       expect((await head('/nalog')).m.robots).toBe('noindex, follow');
       expect((await head('/pretraga?q=falcon')).m.robots).toBe('noindex, follow');
-      const theme = await head('/pretraga?theme=harry-potter');
+      // a theme has its own address; the old one moves there for good, filtered views aren't indexed
+      expect((await head('/pretraga?theme=harry-potter')).m.redirect).toBe('/tema/harry-potter');
+      expect((await head('/pretraga?theme=harry-potter,city')).m.redirect).toBeUndefined();
+      const old = await app.inject({ method: 'GET', url: '/pretraga?theme=harry-potter' });
+      expect(old.statusCode === 301 || old.statusCode === 404).toBe(true); // 404 when the web app isn't built (no page handler)
+      const theme = await head('/tema/harry-potter');
       expect(theme.m.title).toBe('LEGO Harry Potter kocke i setovi: uporedi cene | Kockolov');
-      expect(theme.m.canonical).toBe('/pretraga?theme=harry-potter');
+      expect(theme.m.canonical).toBe('/tema/harry-potter');
+      expect(theme.m.robots).toBeUndefined();
+      expect((await head('/tema/harry-potter?sort=price_asc')).m).toMatchObject({ canonical: '/tema/harry-potter', robots: 'noindex, follow' });
+      expect((await head('/tema/nema-ove-teme')).m.status).toBe(404);
+      expect((await sitemapText()).text).toContain('/tema/harry-potter</loc>');
       expect((await head('/')).m.jsonLd?.[0]).toMatchObject({ '@type': 'WebSite' });
       expect(theme.html).toContain('<h1>LEGO Harry Potter</h1>');
       expect(theme.html).toMatch(/<a href="\/set\/\d+[^"]*">LEGO \d+/);
       const home = (await head('/')).html;
       expect(home).toContain('<h2>LEGO teme</h2>');
-      expect(home).toContain('href="/pretraga?theme=harry-potter"');
+      expect(home).toContain('href="/tema/harry-potter"');
 
       // text from the shops can't break out of the HTML
       const { name: original } = (await one("SELECT name FROM sets WHERE set_num = '10280'"))!;

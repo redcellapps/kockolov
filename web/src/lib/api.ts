@@ -11,11 +11,18 @@ export class ApiError extends Error {
   }
 }
 
+/** Page rendering on the server (entry-server.tsx): the server answers API calls itself, as the visitor. */
+type ServerFetch = (path: string, init: RequestInit) => Promise<Response>;
+let serverFetch: ServerFetch | null = null;
+export const setServerFetch = (f: ServerFetch | null) => {
+  serverFetch = f;
+};
+
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, headers, ...rest } = init;
   // in the Android/iOS app: kockolov.rs's API, signed in with the token kept on the phone
   const token = appToken();
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await (serverFetch ?? ((u: string, i: RequestInit) => fetch(`${API_BASE}${u}`, i)))(path, {
     credentials: isApp ? 'omit' : 'same-origin',
     ...rest,
     headers: {
@@ -150,6 +157,10 @@ export interface SetDetail {
     image_url: string | null;
     rrp_rsd: number | null;
     created_at: string;
+    /** the LEGO Store's product text, one paragraph per line */
+    description?: string | null;
+    /** box barcode (EAN-13) */
+    ean?: string | null;
   };
   offers: Offer[];
   /** active second-hand ads for this set (cheapest first) */

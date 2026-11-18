@@ -1,6 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { hydrate, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter, HashRouter, useLocation, useNavigate } from 'react-router';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -48,7 +48,14 @@ function NativeBridge() {
 // the app reads its sign-in token from the phone before the first request
 await loadAppToken();
 
-createRoot(document.getElementById('root')!).render(
+// A page the server already drew (entry-server.tsx): start from the same data and take over its HTML.
+// Everything else (the app, the preview, private pages, a page the server couldn't draw) starts empty.
+const root = document.getElementById('root')!;
+const ssrState = (window as { __KQ__?: unknown }).__KQ__;
+const fromServer = root.dataset.ssr === 'page' && !!ssrState;
+if (fromServer) hydrate(queryClient, ssrState);
+
+const tree = (
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <Router>
@@ -61,5 +68,7 @@ createRoot(document.getElementById('root')!).render(
         </AuthProvider>
       </Router>
     </QueryClientProvider>
-  </StrictMode>,
+  </StrictMode>
 );
+if (fromServer) hydrateRoot(root, tree);
+else createRoot(root).render(tree);

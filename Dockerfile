@@ -25,6 +25,8 @@ COPY server/migrations server/migrations
 COPY server/assets server/assets
 COPY server/content server/content
 COPY --from=build /app/web/dist web/dist
+# the page renderer (pages drawn on the server, server/src/seo/ssr.ts): one file with React and the app
+COPY --from=build /app/web/dist-ssr web/dist-ssr
 # link-preview images and pictures of ads, kept between restarts (volumes in docker-compose.yml)
 RUN mkdir -p /app/cache/og /app/data/listings && chown -R node:node /app/cache /app/data
 USER node
