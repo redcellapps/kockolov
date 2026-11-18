@@ -63,7 +63,7 @@ export function parseEplanetaPage(html: string, baseUrl: string): RawOffer[] {
 
 export function eplanetaAdapter(baseUrl = 'https://eplaneta.rs'): ShopAdapter {
   return {
-    shop: { id: 'eplaneta', name: 'ePlaneta', url: 'https://eplaneta.rs', kind: 'shop', membersOnly: true },
+    shop: { id: 'eplaneta', name: 'ePlaneta', url: 'https://eplaneta.rs', kind: 'shop' },
     async *crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       const seen = new Set<string>();
       for (let page = 1; page <= ctx.maxPages; page++) {

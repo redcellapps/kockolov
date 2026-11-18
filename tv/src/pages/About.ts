@@ -66,8 +66,8 @@ export default Blits.Component('About', {
   methods: {
     async load() {
       try {
-        const [shops, stats] = await Promise.all([api.shops(), api.stats()])
-        this.shopsText = t('about.shops', { shops: shops.map((s) => s.name).join(', '), more: stats.members_shops })
+        const shops = await api.shops()
+        this.shopsText = t('about.shops', { shops: shops.filter((s) => s.offers_in_stock > 0).map((s) => s.name).join(', ') })
       } catch (e) {
         this.$log.warn('about', e)
       }

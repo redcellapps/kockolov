@@ -59,7 +59,7 @@ export function parseTehnomanija(json: MagentoResponse, baseUrl: string): RawOff
 
 export function tehnomanijaAdapter(baseUrl = 'https://www.tehnomanija.rs'): ShopAdapter {
   return {
-    shop: { id: 'tehnomanija', name: 'Tehnomanija', url: 'https://www.tehnomanija.rs', kind: 'shop', membersOnly: true },
+    shop: { id: 'tehnomanija', name: 'Tehnomanija', url: 'https://www.tehnomanija.rs', kind: 'shop' },
     async *crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       const json = await ctx.http.getJson<MagentoResponse>(`${baseUrl}/graphql?query=${encodeURIComponent(TEHNOMANIJA_QUERY)}`);
       const offers = parseTehnomanija(json, baseUrl);

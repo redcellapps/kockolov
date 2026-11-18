@@ -1,10 +1,17 @@
-import { useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { t } from '../i18n';
+import { trackEvent } from '../lib/analytics';
 import { api, ApiError } from '../lib/api';
 import { isApp } from '../lib/platform';
+import { canScanInBrowser } from '../lib/webScan';
 import { XIcon } from './icons';
 import { Button, cx } from './ui';
+
+// The site only (the app has the phone's own scanner, the in-browser preview no camera), so the app and
+// the preview don't carry the camera view and its 1 MB reader. Loaded only when someone opens it.
+const WEB_SCAN = import.meta.env.MODE !== 'app' && import.meta.env.MODE !== 'demo';
+const WebScanner = WEB_SCAN ? lazy(() => import('./WebScanner').then((m) => ({ default: m.WebScanner }))) : null;
 
 export function ScanIcon({ size = 20 }: { size?: number }) {
   return (
@@ -18,18 +25,44 @@ export function ScanIcon({ size = 20 }: { size?: number }) {
 type Note = { text: string; code?: string };
 
 /**
- * App only: scans the barcode on a LEGO box and opens that set. When the code isn't known yet,
- * the set number printed on the box can be typed instead.
+ * Scans the barcode on a LEGO box and opens that set: in the app with the phone's own scanner, on the
+ * site (phones and tablets) with the camera in the browser. When the code isn't known yet, the set
+ * number printed on the box can be typed instead.
  */
 export function ScanButton({ variant = 'icon', className }: { variant?: 'icon' | 'wide'; className?: string }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<Note | null>(null);
   const [num, setNum] = useState('');
-  if (!isApp) return null;
+  // the site: decided after the first render, so the page drawn on the server and in the browser match
+  const [web, setWeb] = useState(false);
+  const [camera, setCamera] = useState(false);
+  useEffect(() => {
+    if (!isApp && WEB_SCAN) setWeb(canScanInBrowser());
+  }, []);
+  if (!isApp && !web) return null;
+
+  const open = (q: string) =>
+    navigate(/^\d{3,7}(-\d{1,2})?$/.test(q) ? `/set/${q}` : `/pretraga?q=${encodeURIComponent(q)}`);
+
+  const lookUp = async (code: string) => {
+    try {
+      const found = await api<{ set_num: string }>(`/api/sets/by-code/${encodeURIComponent(code)}`);
+      trackEvent('skener', { rezultat: 'set' });
+      navigate(`/set/${encodeURIComponent(found.set_num)}`);
+    } catch (err) {
+      const notFound = err instanceof ApiError && err.status === 404;
+      trackEvent('skener', { rezultat: notFound ? 'nepoznat' : 'greska' });
+      setNote({ text: notFound ? t('scan.notFound') : t('scan.failed'), code });
+    }
+  };
 
   const scan = async () => {
     setNote(null);
+    if (!isApp) {
+      setCamera(true);
+      return;
+    }
     setBusy(true);
     try {
       const r = await (await import('../native/scan')).scanBox();
@@ -38,12 +71,7 @@ export function ScanButton({ variant = 'icon', className }: { variant?: 'icon' |
         setNote({ text: t(r.error === 'denied' ? 'scan.denied' : r.error === 'preparing' ? 'scan.preparing' : 'scan.unsupported') });
         return;
       }
-      try {
-        const found = await api<{ set_num: string }>(`/api/sets/by-code/${encodeURIComponent(r.code)}`);
-        navigate(`/set/${encodeURIComponent(found.set_num)}`);
-      } catch (err) {
-        setNote({ text: err instanceof ApiError && err.status === 404 ? t('scan.notFound') : t('scan.failed'), code: r.code });
-      }
+      await lookUp(r.code);
     } finally {
       setBusy(false);
     }
@@ -55,7 +83,7 @@ export function ScanButton({ variant = 'icon', className }: { variant?: 'icon' |
     if (!q) return;
     setNote(null);
     setNum('');
-    navigate(/^\d{3,7}(-\d{1,2})?$/.test(q) ? `/set/${q}` : `/pretraga?q=${encodeURIComponent(q)}`);
+    open(q);
   };
 
   return (
@@ -74,6 +102,21 @@ export function ScanButton({ variant = 'icon', className }: { variant?: 'icon' |
         <Button type="button" variant="dark" onClick={() => void scan()} disabled={busy} className={className}>
           <ScanIcon size={18} /> {t('scan.button')}
         </Button>
+      )}
+      {camera && WebScanner && (
+        <Suspense fallback={null}>
+          <WebScanner
+            onClose={() => setCamera(false)}
+            onTyped={(q) => {
+              setCamera(false);
+              open(q);
+            }}
+            onCode={(code) => {
+              setCamera(false);
+              void lookUp(code);
+            }}
+          />
+        </Suspense>
       )}
       {note && (
         <div role="dialog" aria-live="polite" className="safe-bottom fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface px-4 pt-4 shadow-lift">

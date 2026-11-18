@@ -462,7 +462,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect((await head('/nalog')).m.robots).toBe('noindex, follow');
       expect((await head('/pretraga?q=falcon')).m.robots).toBe('noindex, follow');
       const theme = await head('/pretraga?theme=harry-potter');
-      expect(theme.m.title).toBe('LEGO Harry Potter setovi: cene u Srbiji | Kockolov');
+      expect(theme.m.title).toBe('LEGO Harry Potter kocke i setovi: uporedi cene | Kockolov');
       expect(theme.m.canonical).toBe('/pretraga?theme=harry-potter');
       expect((await head('/')).m.jsonLd?.[0]).toMatchObject({ '@type': 'WebSite' });
       expect(theme.html).toContain('<h1>LEGO Harry Potter</h1>');
@@ -541,7 +541,7 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
     }
   });
 
-  it('shows members-only shops to signed-in users only', async () => {
+  it('shows every shop to everyone, signed in or not', async () => {
     const card = (id: string, name: string, price: string, prev: string, code: string) =>
       `<div class="product-item" data-productid="${id}" data-productname="${name}" data-productprice="${price}"
          data-productprevprice="${prev}" data-productcode="${code}" data-productcat="LEGO® Technic">
@@ -564,33 +564,37 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
 
     config.PUBLIC_MODE = true;
     try {
-      // visitors: the public best price, the set page tells them how many offers they are missing
-      expect((await get('/api/sets?q=10280', false)).items[0]).toMatchObject({ best_price: 7319, best_shop: 'ananas' });
+      // since 19 Nov 2026 every shop is public: visitors see Dexy too, and its price is the best one
+      expect((await get('/api/sets?q=10280', false)).items[0]).toMatchObject({ best_price: 6999, best_shop: 'dexy' });
       const page = await get('/api/sets/10280', false);
-      expect(page.offers.map((o: { shop_id: string }) => o.shop_id)).not.toContain('dexy');
-      expect(page).toMatchObject({ hidden_offers: 1, hidden_shops: 1 });
-      expect((await get('/api/sets?q=42166&stock=0', false)).total).toBe(0);
-      expect((await get('/api/sets/42166', false))).toMatchObject({ offers: [], hidden_offers: 1 });
-      expect((await get('/api/shops', false)).map((s: { id: string }) => s.id)).not.toContain('dexy');
-      expect(await get('/api/stats', false)).toMatchObject({ shops: 3, members_shops: 1, members_offers: 2 }); // only shops that have offers count
+      expect(page.offers[0]).toMatchObject({ shop_id: 'dexy', shop_name: 'Dexy Co', price_rsd: 6999 });
+      expect(page.hidden_offers ?? 0).toBe(0);
+      expect((await get('/api/sets?q=42166', false)).items[0]).toMatchObject({ set_num: '42166', name: 'Technic Neom Mclaren Extreme E' });
+      expect((await get('/api/shops', false)).find((s: { id: string }) => s.id === 'dexy')).toMatchObject({ members_only: false, offers_in_stock: 2 });
+      expect(await get('/api/stats', false)).toMatchObject({ shops: 19, members_shops: 0, members_offers: 0 }); // every enabled shop
       const pubDeal = (await get('/api/deals', false)).items.find((i: { set_num: string }) => i.set_num === '10280');
-      expect(pubDeal.best_shop).toBe('ananas');
-      expect((await sitemapText()).text).not.toContain('42166');
+      expect(pubDeal).toMatchObject({ best_shop: 'dexy', best_price_rsd: 6999 });
+      expect((await sitemapText()).text).toContain('/set/42166</loc>');
       const head = await app.inject({ method: 'GET', url: '/set/10280' });
-      expect(head.body).not.toContain('6999');
+      expect(head.body).toContain('6.999');
     } finally {
       config.PUBLIC_MODE = false;
     }
-
-    // signed in: every shop
+    // signed in: the same
     expect((await get('/api/sets?q=10280', true)).items[0]).toMatchObject({ best_price: 6999, best_shop: 'dexy' });
-    const full = await get('/api/sets/10280', true);
-    expect(full.offers[0]).toMatchObject({ shop_id: 'dexy', shop_name: 'Dexy Co', price_rsd: 6999 });
-    expect(full.hidden_offers).toBe(0);
-    expect((await get('/api/sets?q=42166', true)).items[0]).toMatchObject({ set_num: '42166', name: 'Technic Neom Mclaren Extreme E' });
-    expect((await get('/api/shops', true)).find((s: { id: string }) => s.id === 'dexy')).toMatchObject({ members_only: true, offers_in_stock: 2 });
-    const memDeal = (await get('/api/deals', true)).items.find((i: { set_num: string }) => i.set_num === '10280');
-    expect(memDeal).toMatchObject({ best_shop: 'dexy', best_price_rsd: 6999 });
+
+    // a shop can still be made members-only (membersOnly in its adapter): visitors then don't see it
+    await query("UPDATE shops SET members_only = true WHERE id = 'dexy'");
+    config.PUBLIC_MODE = true;
+    try {
+      const page = await get('/api/sets/10280', false);
+      expect(page.offers.map((o: { shop_id: string }) => o.shop_id)).not.toContain('dexy');
+      expect(page).toMatchObject({ hidden_offers: 1, hidden_shops: 1 });
+      expect((await get('/api/sets/10280', true)).offers[0]).toMatchObject({ shop_id: 'dexy' });
+    } finally {
+      config.PUBLIC_MODE = false;
+      await query("UPDATE shops SET members_only = false WHERE id = 'dexy'");
+    }
   });
 
   it('lets the admin send a news e-mail to everyone who wants news, after a test copy', async () => {

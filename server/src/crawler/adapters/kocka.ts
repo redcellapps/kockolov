@@ -51,7 +51,7 @@ export function parseKockaPage(html: string, baseUrl: string): RawOffer[] {
 
 export function kockaAdapter(baseUrl = 'https://kocka.rs'): ShopAdapter {
   return {
-    shop: { id: 'kocka', name: 'Kocka.rs', url: 'https://kocka.rs', kind: 'shop', membersOnly: true },
+    shop: { id: 'kocka', name: 'Kocka.rs', url: 'https://kocka.rs', kind: 'shop' },
     crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       return pageThrough(
         ctx,

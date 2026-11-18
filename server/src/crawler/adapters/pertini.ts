@@ -48,7 +48,7 @@ export function parsePertiniPage(html: string, baseUrl: string): RawOffer[] {
 
 export function pertiniAdapter(baseUrl = 'https://www.pertinitoys.com'): ShopAdapter {
   return {
-    shop: { id: 'pertini', name: 'Pertini Toys', url: 'https://www.pertinitoys.com', kind: 'shop', membersOnly: true },
+    shop: { id: 'pertini', name: 'Pertini Toys', url: 'https://www.pertinitoys.com', kind: 'shop' },
     crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       return pageThrough(
         ctx,

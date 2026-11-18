@@ -45,7 +45,7 @@ export function parseEkupiPage(html: string, baseUrl: string): RawOffer[] {
 
 export function ekupiAdapter(baseUrl = 'https://www.ekupi.rs'): ShopAdapter {
   return {
-    shop: { id: 'ekupi', name: 'eKupi', url: 'https://www.ekupi.rs', kind: 'shop', membersOnly: true },
+    shop: { id: 'ekupi', name: 'eKupi', url: 'https://www.ekupi.rs', kind: 'shop' },
     crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       return pageThrough(
         ctx,

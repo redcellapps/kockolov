@@ -155,7 +155,7 @@ const TOYZZZ_LEGO_TAG = 530;
 
 export const toyzzzAdapter = (baseUrl = 'https://toyzzz.rs') =>
   wooStoreAdapter(
-    { id: 'toyzzz', name: 'Toyzzz', url: 'https://toyzzz.rs', kind: 'shop', membersOnly: true },
+    { id: 'toyzzz', name: 'Toyzzz', url: 'https://toyzzz.rs', kind: 'shop' },
     baseUrl,
     // the LEGO tag misses some sets, the search finds them; the search also matches non-LEGO
     // products that only mention LEGO in the description, so those must say LEGO in the name
@@ -165,7 +165,7 @@ export const toyzzzAdapter = (baseUrl = 'https://toyzzz.rs') =>
 
 export const abckockaAdapter = (baseUrl = 'https://abckocka.com') =>
   wooStoreAdapter(
-    { id: 'abckocka', name: 'ABC Kocka', url: 'https://abckocka.com', kind: 'shop', membersOnly: true },
+    { id: 'abckocka', name: 'ABC Kocka', url: 'https://abckocka.com', kind: 'shop' },
     baseUrl,
     [''], // the whole catalogue: mostly LEGO, but also Barbie and Nerf (October 2026)
     (p) => /\blego\b/i.test(p.name) || !!p.categories?.some((c) => /\blego\b/i.test(c.name ?? '')),
@@ -176,7 +176,7 @@ const DECIJISVET_LEGO_CATEGORY = 444;
 
 export const decijisvetAdapter = (baseUrl = 'https://decijisvetigracke.rs') =>
   wooStoreAdapter(
-    { id: 'decijisvet', name: 'Dečiji svet', url: 'https://decijisvetigracke.rs', kind: 'shop', membersOnly: true },
+    { id: 'decijisvet', name: 'Dečiji svet', url: 'https://decijisvetigracke.rs', kind: 'shop' },
     baseUrl,
     [`category=${DECIJISVET_LEGO_CATEGORY}`],
     // the category also holds a few other brands' toys ("GOO JIT ZU MINECRAFT S4 HERO FIGURA")

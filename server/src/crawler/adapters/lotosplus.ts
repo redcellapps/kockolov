@@ -73,7 +73,7 @@ export function parseLotosProducts(products: ShopifyCollectionProduct[], baseUrl
 
 export function lotosplusAdapter(baseUrl = 'https://lotosplus.rs'): ShopAdapter {
   return {
-    shop: { id: 'lotosplus', name: 'Lotos Plus', url: 'https://lotosplus.rs', kind: 'shop', membersOnly: true },
+    shop: { id: 'lotosplus', name: 'Lotos Plus', url: 'https://lotosplus.rs', kind: 'shop' },
     async *crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       for (let page = 1; page <= ctx.maxPages; page++) {
         const data = await ctx.http.getJson<{ products: ShopifyCollectionProduct[] }>(

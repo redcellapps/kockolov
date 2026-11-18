@@ -43,7 +43,7 @@ export function parseBigbangPage(html: string, baseUrl: string): RawOffer[] {
 
 export function bigbangAdapter(baseUrl = 'https://www.bigbang.rs'): ShopAdapter {
   return {
-    shop: { id: 'bigbang', name: 'BigBang', url: 'https://www.bigbang.rs', kind: 'shop', membersOnly: true },
+    shop: { id: 'bigbang', name: 'BigBang', url: 'https://www.bigbang.rs', kind: 'shop' },
     crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       return pageThrough(
         ctx,
