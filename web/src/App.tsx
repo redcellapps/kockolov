@@ -6,6 +6,7 @@ import { useAuth } from './lib/auth';
 import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
 import AdminOffersPage from './pages/AdminOffers';
+import BlackFridayPage from './pages/BlackFriday';
 import { BlogListPage, BlogPostPage } from './pages/Blog';
 import Home from './pages/Home';
 import InvitePage from './pages/Invite';
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />
         <Route path="/akcije" element={<Gate><PromosPage /></Gate>} />
+        <Route path="/crni-petak" element={<Gate><BlackFridayPage /></Gate>} />
         <Route path="/admin/akcije" element={<Gate needAdmin><AdminPromosPage /></Gate>} />
         <Route path="/teme" element={<Gate><ThemesPage /></Gate>} />
         <Route path="/set/:setNum" element={<Gate><SetDetail /></Gate>} />
