@@ -143,20 +143,26 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
       const url = new URL(req.url, 'http://local');
       let html = template;
       let status = 200;
+      let drawn = false;
       try {
         const meta = await pageMeta(url.pathname, url.searchParams);
         if (meta.redirect) return reply.redirect(meta.redirect, 301);
         status = meta.status;
         const page = ssr && status === 200 && meta.ssr !== false ? await renderPage(req.url, { cookie: req.headers.cookie, ip: req.ip, userAgent: req.headers['user-agent'] }).catch((err) => {
-          req.log.error(err, 'server render failed');
+          // the plain copy instead: data that didn't come, a page that redirects (logged, but not an outage)
+          req.log.warn({ url: req.url, reason: err instanceof Error ? err.message : String(err) }, 'page not drawn on the server');
           return null;
         }) : null;
         // the real page when it could be drawn here; otherwise the crawler copy, and the app starts empty
         html = page ? injectApp(injectHead(template, { ...meta, body: undefined }), page) : injectHead(template, meta);
+        drawn = !!page;
       } catch (err) {
         req.log.error(err, 'page meta failed');
       }
-      return reply.code(status).header('Cache-Control', 'no-cache').type('text/html; charset=utf-8').send(html);
+      // a drawn page carries the visitor's own data (signed in: currency, watchlist): never for shared caches
+      if (drawn) reply.header('Cache-Control', 'private, no-cache').header('Vary', 'Cookie');
+      else reply.header('Cache-Control', 'no-cache');
+      return reply.code(status).type('text/html; charset=utf-8').send(html);
     });
   }
   return app;

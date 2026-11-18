@@ -472,6 +472,9 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect(theme.m.robots).toBeUndefined();
       expect((await head('/tema/harry-potter?sort=price_asc')).m).toMatchObject({ canonical: '/tema/harry-potter', robots: 'noindex, follow' });
       expect((await head('/tema/nema-ove-teme')).m.status).toBe(404);
+      // a stray "%" in the address: not a page (and no crash)
+      expect((await head('/tema/harry%E0potter')).m.status).toBe(404);
+      expect((await head('/set/75%ZZ192')).m.status).toBe(404);
       expect((await sitemapText()).text).toContain('/tema/harry-potter</loc>');
       expect((await head('/')).m.jsonLd?.[0]).toMatchObject({ '@type': 'WebSite' });
       expect(theme.html).toContain('<h1>LEGO Harry Potter</h1>');

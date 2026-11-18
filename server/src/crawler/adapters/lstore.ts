@@ -27,7 +27,9 @@ const decode = (t: string) =>
   t.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e: string) => {
     if (e[0] === '#') {
       const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+      // real characters only: no NUL or other control characters (Postgres refuses NUL), no surrogate
+      // halves, nothing past U+10FFFF (String.fromCodePoint would throw and stop the whole crawl)
+      return code >= 32 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) && !(code >= 0x7f && code < 0xa0) ? String.fromCodePoint(code) : ' ';
     }
     return ENTITIES[e.toLowerCase()] ?? m;
   });
@@ -47,11 +49,14 @@ export function lstoreDescription(html: string | null | undefined): string | nul
   if (!html || /bogos|mailto:/i.test(html)) return null;
   const text = decode(
     html
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<(script|style|template)\b[\s\S]*?<\/\1\s*>/gi, '')
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|li|h[1-6]|div|ul|ol)>/gi, '\n')
       .replace(/<li[^>]*>/gi, '• ')
       .replace(/<[^>]+>/g, ''),
   )
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, ' ')
     .split('\n')
     .map((l) => l.replace(/\s+/g, ' ').trim())
     .filter((l) => l && l !== '...' && l !== '•')
@@ -60,11 +65,24 @@ export function lstoreDescription(html: string | null | undefined): string | nul
   return text.length > 4000 ? `${text.slice(0, 3999).replace(/\s+\S*$/, '')}…` : text;
 }
 
-/** "Komplet sadrži 850 delova." / "1.234 dela" / "241 deo" -> the piece count */
+// a piece count: "850", "1.234", "1 234"; LEGO's Serbian copy says delova / dela / deo / elemenata
+const NUM = String.raw`(?<![\d.,])(\d{1,2}(?:[. \u00a0]\d{3})+|\d{1,5})`;
+const UNIT = String.raw`\s*(?:delova|dela|deo|elemenata|elementa|kockica)(?![a-zčćžšđ])`;
+const SAID = new RegExp(String.raw`(?:sadrži|sadrzi|ukupno|\bima\b|čini ga|izgrađen od)[^\d]{0,40}?${NUM}${UNIT}`, 'i');
+const ANY = new RegExp(`${NUM}${UNIT}`, 'gi');
+const count = (s: string) => Number(s.replace(/[. \u00a0]/g, ''));
+const plausible = (n: number) => Number.isFinite(n) && n > 0 && n < 20000;
+
+/**
+ * The piece count from the product text: "Komplet sadrži 850 delova." first; otherwise the largest count
+ * mentioned (so "2 mini-figure ... 850 delova" gives 850, not 2).
+ */
 export function piecesFrom(text: string | null): number | null {
-  const m = text?.match(/(\d{1,2}(?:\.\d{3})+|\d{1,5})\s*(delova|dela|deo|elemenata|elementa|komada|kockica)\b/i);
-  const n = m ? Number(m[1].replace(/\./g, '')) : NaN;
-  return Number.isFinite(n) && n > 0 && n < 20000 ? n : null;
+  if (!text) return null;
+  const said = SAID.exec(text);
+  if (said && plausible(count(said[1]))) return count(said[1]);
+  const all = [...text.matchAll(ANY)].map((m) => count(m[1])).filter(plausible);
+  return all.length ? Math.max(...all) : null;
 }
 
 export function parseLstoreProducts(products: ShopifyProduct[], baseUrl: string): RawOffer[] {

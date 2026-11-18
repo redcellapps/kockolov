@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { t } from '../i18n';
-import { ago, money } from '../lib/format';
+import { ago, clockNow, money } from '../lib/format';
 import { cx } from '../components/ui';
 import { serverUrl } from '../lib/platform';
 import { AdWatchHeart } from './WatchButton';
@@ -13,7 +13,7 @@ export function CondBadge({ c, className }: { c: Listing['condition']; className
 }
 
 export const adAgo = (iso: string) => {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  const d = Math.floor((clockNow() - new Date(iso).getTime()) / 86_400_000);
   return d <= 0 ? t('ads.today') : t('ads.ago', { when: ago(iso).replace(/^pre\s+/, '') });
 };
 

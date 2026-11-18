@@ -20,7 +20,8 @@ export default function SearchPage() {
   const [params, setParams] = useSearchParams();
   const f = useMemo(() => {
     const p = new URLSearchParams(params);
-    if (slug && !p.has('theme')) p.set('theme', slug);
+    // the address decides the theme (a stray ?theme= on a theme's page would list another one)
+    if (slug) p.set('theme', slug);
     return readFilters(p);
   }, [params, slug]);
   const [sheet, setSheet] = useState(false);

@@ -14,7 +14,7 @@ import type { FastifyInstance } from 'fastify';
  */
 
 interface SsrModule {
-  render(url: string): Promise<{ html: string; state: unknown }>;
+  render(url: string, until?: number): Promise<{ html: string; state: unknown }>;
   setServerFetch(f: (path: string, init: RequestInit) => Promise<Response>): void;
 }
 
@@ -24,8 +24,15 @@ export interface Visitor {
   ip?: string;
   userAgent?: string;
 }
-const visitor = new AsyncLocalStorage<Visitor>();
+const visitor = new AsyncLocalStorage<Visitor & { until: number }>();
 let mod: SsrModule | null = null;
+
+/**
+ * How long a visitor waits for a drawn page before getting the crawler copy, and how many pages are drawn
+ * at once (more visitors than that get the crawler copy too, so a slow database isn't buried under renders).
+ */
+export const ssrLimits = { ms: 3000, atOnce: 8 };
+let running = 0;
 
 /** Loads the renderer next to web/dist, if it was built. Returns whether pages will be drawn on the server. */
 export async function startSsr(app: FastifyInstance, webDist: string): Promise<boolean> {
@@ -33,15 +40,17 @@ export async function startSsr(app: FastifyInstance, webDist: string): Promise<b
   if (!existsSync(file)) return false;
   mod = (await import(pathToFileURL(file).href)) as SsrModule;
   mod.setServerFetch(async (p, init) => {
-    const v = visitor.getStore() ?? {};
+    const v = visitor.getStore();
+    // the visitor already got the crawler copy: a page past its time makes no more calls
+    if (v && Date.now() > v.until) throw new Error('page out of time');
     const r = await app.inject({
       method: (init.method ?? 'GET') as 'GET',
       url: p,
       // the visitor's own address, so per-person limits and counters (an ad's views) see them, not this server
-      ...(v.ip ? { remoteAddress: v.ip } : {}),
+      ...(v?.ip ? { remoteAddress: v.ip } : {}),
       headers: {
-        cookie: v.cookie ?? '',
-        ...(v.userAgent ? { 'user-agent': v.userAgent } : {}),
+        cookie: v?.cookie ?? '',
+        ...(v?.userAgent ? { 'user-agent': v.userAgent } : {}),
         ...(init.body ? { 'content-type': 'application/json' } : {}),
       },
       ...(init.body ? { payload: String(init.body) } : {}),
@@ -52,16 +61,26 @@ export async function startSsr(app: FastifyInstance, webDist: string): Promise<b
   return true;
 }
 
-/** The page's HTML and the data it was drawn from, or null (no renderer, an error, or slower than 3 s). */
+/**
+ * The page's HTML and the data it was drawn from, or null (no renderer, too many pages being drawn, or
+ * slower than ssrLimits.ms). Rejects when the page couldn't be drawn (an error, data that didn't come).
+ */
 export async function renderPage(url: string, who: Visitor): Promise<{ html: string; state: unknown } | null> {
-  if (!mod) return null;
-  const m = mod;
+  if (!mod || running >= ssrLimits.atOnce) return null;
+  const until = Date.now() + ssrLimits.ms;
+  const work = visitor.run({ ...who, until }, () => mod!.render(url, until));
+  // counted until it really ends, not when the visitor stops waiting
+  running++;
+  const done = () => {
+    running--;
+  };
+  work.then(done, done);
   let timer: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([
-      visitor.run(who, () => m.render(url)),
+      work,
       new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), 3000);
+        timer = setTimeout(() => resolve(null), ssrLimits.ms);
       }),
     ]);
   } finally {

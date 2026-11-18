@@ -197,6 +197,15 @@ const PRIVATE_PATHS = ['/prijava', '/registracija', '/zaboravljena-lozinka', '/n
 const PRIVATE_PREFIXES = ['/poziv/', '/potvrda/', '/odjava/', '/poruke/', '/admin/'];
 const PRIVATE_AD_PATH = /^\/oglasi\/[^/]+\/izmeni$/;
 
+/** a path segment as text, or null when it isn't valid (a stray "%"): that page doesn't exist */
+function decoded(segment: string): string | null {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
 export async function pageMeta(rawPath: string, params: URLSearchParams): Promise<PageMeta> {
   const p = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
   // closed testing: nothing gets indexed or previewed in detail
@@ -211,7 +220,10 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
   if (adMatch) return adPage(adMatch[1]);
 
   const setMatch = /^\/set\/([^/]+)$/.exec(p);
-  if (setMatch) return setPage(decodeURIComponent(setMatch[1]));
+  if (setMatch) {
+    const num = decoded(setMatch[1]);
+    if (num != null) return setPage(num);
+  }
 
   if (p === '/') {
     const st = await siteStats();
@@ -297,7 +309,10 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
   }
 
   const themeMatch = /^\/tema\/([^/]+)$/.exec(p);
-  if (themeMatch) return themePage(decodeURIComponent(themeMatch[1]), [...params.keys()].length > 0);
+  if (themeMatch) {
+    const slug = decoded(themeMatch[1]);
+    if (slug != null) return themePage(slug, [...params.keys()].length > 0);
+  }
 
   if (p === '/pretraga') {
     const keys = [...params.keys()];
@@ -430,7 +445,7 @@ export const CONDITION: Record<string, string> = {
 /** Classifieds are only indexed when they are public: LISTINGS_MODE=on (and the site itself public, checked by the caller) */
 async function adsListPage(): Promise<PageMeta> {
   const path = '/oglasi';
-  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow' };
+  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow', ssr: false };
   const n = (await one<{ n: number }>("SELECT count(*)::int AS n FROM listings WHERE status = 'active' AND expires_at > now()"))?.n ?? 0;
   return {
     ...DEFAULT,
@@ -456,7 +471,7 @@ export async function loadAdCard(id: number) {
 
 async function adPage(id: string): Promise<PageMeta> {
   const path = `/oglasi/${id}`;
-  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow' };
+  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow', ssr: false };
   const a = await one<{ title: string; description: string; condition: string; price_rsd: number; city: string; status: string; set_num: string | null; image: string | null; expired: boolean }>(
     `SELECT l.title, l.description, l.condition, l.price_rsd, l.city, l.status, l.set_num, l.expires_at <= now() AS expired,
             (SELECT '/media/oglasi/' || i.file FROM listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1) AS image

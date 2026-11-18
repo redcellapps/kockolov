@@ -144,11 +144,12 @@ export async function crawlShop(adapter: ShopAdapter, log: (m: string) => void, 
             ],
           );
           const offerId = res.rows[0].id;
-          // the LEGO Store's product text describes the set; pieces from it only when nothing else said
+          // the LEGO Store's product text describes the set, and is where the piece count comes from: a newer
+          // count replaces the old one (a corrected text fixes it), a text without one keeps it
           if (setNum && adapter.shop.kind === 'official' && o.description) {
             await db.query(
-              `UPDATE sets SET description = $2, pieces = COALESCE(pieces, $3)
-                WHERE set_num = $1 AND (description IS DISTINCT FROM $2 OR (pieces IS NULL AND $3::int IS NOT NULL))`,
+              `UPDATE sets SET description = $2, pieces = COALESCE($3, pieces)
+                WHERE set_num = $1 AND (description IS DISTINCT FROM $2 OR pieces IS DISTINCT FROM COALESCE($3::int, pieces))`,
               [setNum, o.description, o.pieces ?? null],
             );
           }

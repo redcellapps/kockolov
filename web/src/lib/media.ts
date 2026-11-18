@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
-/** True while the media query matches; updates when the window is resized. */
+/**
+ * True while the media query matches; updates when the window is resized. A page drawn on the server
+ * (and the browser taking it over) starts with false, then shows the real answer right after.
+ */
 export function useMedia(query: string): boolean {
-  const [match, setMatch] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
-  useEffect(() => {
-    const m = window.matchMedia(query);
-    const on = () => setMatch(m.matches);
-    on();
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
-  }, [query]);
-  return match;
+  const subscribe = useCallback(
+    (changed: () => void) => {
+      const m = window.matchMedia(query);
+      m.addEventListener('change', changed);
+      return () => m.removeEventListener('change', changed);
+    },
+    [query],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
 }

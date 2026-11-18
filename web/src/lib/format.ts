@@ -77,10 +77,21 @@ export function shopLabel(id: string | null | undefined, seller?: string | null)
   return seller ? `${n} · ${seller}` : n;
 }
 
+/*
+ * The time a page is drawn at. While the browser takes over a page the server drew (main.tsx), it is the
+ * server's time, so "pre 3 sata" and the price chart come out exactly as in the HTML (a different text
+ * would make React throw the server's page away); the real clock the rest of the time.
+ */
+let frozenAt: number | null = null;
+export const clockNow = () => frozenAt ?? Date.now();
+export function freezeClock(at: number | null): void {
+  frozenAt = at;
+}
+
 /** "pre 3 sata", "juče", "pre 5 dana" */
 export function ago(iso: string | null | undefined): string {
   if (!iso) return '';
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  const diff = (clockNow() - new Date(iso).getTime()) / 1000;
   if (diff < 90) return t('time.now');
   const min = Math.round(diff / 60);
   if (min < 60) return t('time.minutes', { n: min });
@@ -101,13 +112,16 @@ export function plural(n: number, one: string, few: string, many: string): strin
   return many;
 }
 
+/** dates as in Serbia, wherever the page is drawn (the server or a phone abroad) */
+const ZONE = 'Europe/Belgrade';
+
 export function dateLong(iso: string | null | undefined): string {
   if (!iso) return '';
-  return new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+  return new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'long', year: 'numeric', timeZone: ZONE }).format(new Date(iso));
 }
 
 export function dateShort(d: Date): string {
-  return new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'short' }).format(d);
+  return new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'short', timeZone: ZONE }).format(d);
 }
 
 export function timeHM(iso: string | null | undefined): string {
