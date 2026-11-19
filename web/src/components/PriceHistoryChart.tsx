@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../i18n';
 import type { HistoryPoint, Offer } from '../lib/api';
-import { dateShort, fromDisplay, money, moneyNum, shopLabel, toDisplay } from '../lib/format';
+import { clockNow, dateShort, fromDisplay, money, moneyNum, shopLabel, toDisplay } from '../lib/format';
 
 // Step-line chart: prices only change when a shop changes them, so lines stay flat between changes.
 // Colors follow the offer (fixed categorical order by shop, then seller) — never re-assigned by rank.
@@ -63,7 +63,7 @@ export function PriceHistoryChart({ offers, history }: { offers: Offer[]; histor
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
   const [hoverX, setHoverX] = useState<number | null>(null);
-  const now = useMemo(() => Date.now(), []);
+  const now = useMemo(() => clockNow(), []);
 
   useEffect(() => {
     if (!wrap.current) return;

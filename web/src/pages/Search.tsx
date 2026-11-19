@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { useSearchParams, Link } from 'react-router';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router';
 import { Filters, activeFilterCount, readFilters, writeFilters, type FilterState } from '../components/Filters';
 import { FilterIcon, XIcon } from '../components/icons';
 import { SetCard, UsedOnlyCard } from '../components/SetCard';
@@ -14,8 +14,16 @@ const SORTS = ['relevance', 'deal', 'discount', 'price_asc', 'price_desc', 'newe
 const PAGE = 24;
 
 export default function SearchPage() {
+  // /tema/:slug is a theme's own page: the same list with that theme picked
+  const { slug } = useParams();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const f = useMemo(() => readFilters(params), [params]);
+  const f = useMemo(() => {
+    const p = new URLSearchParams(params);
+    // the address decides the theme (a stray ?theme= on a theme's page would list another one)
+    if (slug) p.set('theme', slug);
+    return readFilters(p);
+  }, [params, slug]);
   const [sheet, setSheet] = useState(false);
 
   const q = useInfiniteQuery({
@@ -41,7 +49,16 @@ export default function SearchPage() {
   const total = first?.total ?? 0;
   const usedOnly = first?.used_only ?? [];
   const sort = f.sort || first?.sort || (f.q ? 'relevance' : 'deal');
-  const update = (next: FilterState) => setParams(writeFilters(next), { replace: false });
+  const update = (next: FilterState) => {
+    const p = writeFilters(next);
+    // on a theme's page: stay there while that theme alone is picked, otherwise go to the full search
+    if (slug && p.get('theme') === slug) {
+      p.delete('theme');
+      setParams(p, { replace: false });
+    } else if (slug) navigate(`/pretraga?${p}`);
+    else setParams(p, { replace: false });
+  };
+  const themeName = slug ? themes.data?.find((x) => x.slug === slug)?.name : undefined;
   const nActive = activeFilterCount(f);
 
   return (
@@ -49,7 +66,7 @@ export default function SearchPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-            {f.q ? <>„{f.q}”</> : t('nav.search')}
+            {f.q ? <>„{f.q}”</> : themeName ? t('theme.heading', { name: themeName }) : t('nav.search')}
           </h1>
           <p className="mt-1 flex items-center gap-2 text-ink-2">
             {first ? tn('results.count', total) : t('common.loading')}

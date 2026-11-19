@@ -1,6 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { hydrate, QueryClient, QueryClientProvider, type DehydratedState } from '@tanstack/react-query';
 import { StrictMode, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter, HashRouter, useLocation, useNavigate } from 'react-router';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -8,6 +8,7 @@ import './index.css';
 import { ApiError } from './lib/api';
 import { trackPage } from './lib/analytics';
 import { AuthProvider } from './lib/auth';
+import { freezeClock } from './lib/format';
 import { isApp, loadAppToken } from './lib/platform';
 import { startPwa } from './lib/pwa';
 
@@ -48,12 +49,36 @@ function NativeBridge() {
 // the app reads its sign-in token from the phone before the first request
 await loadAppToken();
 
-createRoot(document.getElementById('root')!).render(
+// A page the server already drew (entry-server.tsx): start from the same data and take over its HTML.
+// Everything else (the app, the preview, private pages, a page the server couldn't draw) starts empty.
+const root = document.getElementById('root')!;
+const ssr = (window as { __KQ__?: { q?: DehydratedState; now?: number } }).__KQ__;
+const fromServer = root.dataset.ssr === 'page' && !!ssr?.q && typeof ssr.now === 'number';
+if (fromServer) {
+  // The server fetched the data a moment ago: date it by this browser's clock, so a clock running ahead
+  // doesn't make it look old and refetch while the page is taken over.
+  const shift = Date.now() - ssr.now!;
+  for (const q of ssr.q!.queries) if (q.state.dataUpdatedAt) q.state.dataUpdatedAt += shift;
+  hydrate(queryClient, ssr.q!);
+  // the server's clock until the page is taken over (ClockRelease), so relative times match its HTML
+  freezeClock(ssr.now!);
+}
+
+/** Back to the real clock once the server's page has been taken over */
+function ClockRelease() {
+  useEffect(() => {
+    freezeClock(null);
+  }, []);
+  return null;
+}
+
+const tree = (
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <Router>
         <NativeBridge />
         <PageTracker />
+        <ClockRelease />
         <AuthProvider>
           <ErrorBoundary>
             <App />
@@ -61,5 +86,7 @@ createRoot(document.getElementById('root')!).render(
         </AuthProvider>
       </Router>
     </QueryClientProvider>
-  </StrictMode>,
+  </StrictMode>
 );
+if (fromServer) hydrateRoot(root, tree);
+else createRoot(root).render(tree);

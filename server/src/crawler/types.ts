@@ -21,6 +21,10 @@ export interface RawOffer {
   imageUrl?: string | null;
   priceRsd: number;
   regularPriceRsd?: number | null;
+  /** the official shop's product text as plain paragraphs (LEGO Store only), for the set page */
+  description?: string | null;
+  /** number of pieces, when the shop says it */
+  pieces?: number | null;
   inStock: boolean;
   stockQty?: number | null;
   /** set number if the shop states it explicitly (SKU) */

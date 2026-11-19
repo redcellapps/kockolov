@@ -30,8 +30,12 @@ export interface PageMeta {
   product?: { price: number; availability: 'instock' | 'oos' };
   article?: { published: string; author: string };
   jsonLd?: object[];
-  /** the page's main content as plain HTML, for crawlers (see seo/body.ts) */
+  /** the page's main content as plain HTML, for crawlers when the page can't be drawn on the server (see seo/body.ts) */
   body?: string;
+  /** false: never drawn on the server (private pages, closed testing) */
+  ssr?: false;
+  /** a permanent redirect to this path instead of a page */
+  redirect?: string;
 }
 
 const site = () => config.APP_URL.replace(/\/$/, '');
@@ -66,11 +70,16 @@ export interface SetSeo {
   shops_in_stock: number;
   /** other shops' photos of the set, for when its own picture can't be loaded */
   alt_images: string[];
+  /** the LEGO Store's product text, one paragraph per line */
+  description: string | null;
+  pieces: number | null;
+  ean: string | null;
 }
 
 export function loadSet(setNum: string): Promise<SetSeo | null> {
   return one<SetSeo>(
-    `SELECT s.set_num, s.name, s.theme_slug, t.name AS theme_name, s.image_url, s.rrp_rsd,
+    `SELECT s.set_num, s.name, s.theme_slug, t.name AS theme_name, s.image_url, s.rrp_rsd, s.description, s.pieces,
+            (SELECT o.ean FROM offers o WHERE o.set_num = s.set_num AND o.ean IS NOT NULL ORDER BY o.shop_id = 'lstore' DESC, o.id LIMIT 1) AS ean,
             b.price_rsd AS best_price, b.shop_id AS best_shop, b.seller AS best_seller,
             a.max_price, a.any_price, coalesce(a.offers_in_stock, 0) AS offers_in_stock, coalesce(a.shops_in_stock, 0) AS shops_in_stock,
             array(
@@ -188,13 +197,22 @@ const PRIVATE_PATHS = ['/prijava', '/registracija', '/zaboravljena-lozinka', '/n
 const PRIVATE_PREFIXES = ['/poziv/', '/potvrda/', '/odjava/', '/poruke/', '/admin/'];
 const PRIVATE_AD_PATH = /^\/oglasi\/[^/]+\/izmeni$/;
 
+/** a path segment as text, or null when it isn't valid (a stray "%"): that page doesn't exist */
+function decoded(segment: string): string | null {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
 export async function pageMeta(rawPath: string, params: URLSearchParams): Promise<PageMeta> {
   const p = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
   // closed testing: nothing gets indexed or previewed in detail
-  if (!config.PUBLIC_MODE) return { ...DEFAULT, path: p, robots: 'noindex, nofollow' };
+  if (!config.PUBLIC_MODE) return { ...DEFAULT, path: p, robots: 'noindex, nofollow', ssr: false };
 
   if (PRIVATE_PATHS.includes(p) || PRIVATE_PREFIXES.some((x) => p.startsWith(x)) || PRIVATE_AD_PATH.test(p)) {
-    return { ...DEFAULT, path: p, robots: 'noindex, follow' };
+    return { ...DEFAULT, path: p, robots: 'noindex, follow', ssr: false };
   }
 
   if (p === '/oglasi') return adsListPage();
@@ -202,7 +220,10 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
   if (adMatch) return adPage(adMatch[1]);
 
   const setMatch = /^\/set\/([^/]+)$/.exec(p);
-  if (setMatch) return setPage(decodeURIComponent(setMatch[1]));
+  if (setMatch) {
+    const num = decoded(setMatch[1]);
+    if (num != null) return setPage(num);
+  }
 
   if (p === '/') {
     const st = await siteStats();
@@ -287,10 +308,19 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
     };
   }
 
+  const themeMatch = /^\/tema\/([^/]+)$/.exec(p);
+  if (themeMatch) {
+    const slug = decoded(themeMatch[1]);
+    if (slug != null) return themePage(slug, [...params.keys()].length > 0);
+  }
+
   if (p === '/pretraga') {
     const keys = [...params.keys()];
     const theme = params.get('theme');
-    if (theme && keys.every((k) => k === 'theme')) return themePage(theme);
+    // a single theme has its own address since 19 Nov 2026; old links move there for good
+    if (theme && !theme.includes(',') && keys.every((k) => k === 'theme')) {
+      return { ...DEFAULT, path: p, redirect: `/tema/${encodeURIComponent(theme)}` };
+    }
     // free-text searches and filter combinations are endless: crawl them, don't index them
     return {
       ...DEFAULT,
@@ -386,9 +416,10 @@ async function blogPost(slug: string): Promise<PageMeta> {
   };
 }
 
-async function themePage(slug: string): Promise<PageMeta> {
+/** A theme's own page, /tema/<slug>; with filters or a sort in the address it isn't indexed separately. */
+async function themePage(slug: string, filtered = false): Promise<PageMeta> {
   const c = await loadCollection('theme', slug);
-  const path = `/pretraga?theme=${encodeURIComponent(slug)}`;
+  const path = `/tema/${encodeURIComponent(slug)}`;
   if (!c) return { ...DEFAULT, status: 404, path, title: `Tema nije pronađena | ${SITE}`, robots: 'noindex' };
   const name = c.title.replace('LEGO ', '');
   const st = await siteStats();
@@ -396,6 +427,7 @@ async function themePage(slug: string): Promise<PageMeta> {
     ...DEFAULT,
     path,
     canonical: path,
+    robots: filtered ? 'noindex, follow' : undefined,
     title: `LEGO ${name} kocke i setovi: uporedi cene | ${SITE}`,
     description: `${c.subtitle} Svi LEGO ${name} setovi iz prodavnica ${shortList(st.shop_names)} na jednom mestu.`.replace(/\u00a0/g, ' '),
     image: { url: `/og/theme/${encodeURIComponent(slug)}.jpg?v=${version(c.subtitle, c.items[0]?.image_url)}`, alt: `LEGO ${name} na Kockolovu` },
@@ -413,7 +445,7 @@ export const CONDITION: Record<string, string> = {
 /** Classifieds are only indexed when they are public: LISTINGS_MODE=on (and the site itself public, checked by the caller) */
 async function adsListPage(): Promise<PageMeta> {
   const path = '/oglasi';
-  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow' };
+  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow', ssr: false };
   const n = (await one<{ n: number }>("SELECT count(*)::int AS n FROM listings WHERE status = 'active' AND expires_at > now()"))?.n ?? 0;
   return {
     ...DEFAULT,
@@ -439,7 +471,7 @@ export async function loadAdCard(id: number) {
 
 async function adPage(id: string): Promise<PageMeta> {
   const path = `/oglasi/${id}`;
-  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow' };
+  if (config.LISTINGS_MODE !== 'on') return { ...DEFAULT, path, robots: 'noindex, nofollow', ssr: false };
   const a = await one<{ title: string; description: string; condition: string; price_rsd: number; city: string; status: string; set_num: string | null; image: string | null; expired: boolean }>(
     `SELECT l.title, l.description, l.condition, l.price_rsd, l.city, l.status, l.set_num, l.expires_at <= now() AS expired,
             (SELECT '/media/oglasi/' || i.file FROM listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1) AS image
@@ -507,7 +539,7 @@ async function setPage(setNum: string): Promise<PageMeta> {
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Kockolov', item: `${site()}/` },
         ...(s.theme_slug && s.theme_name
-          ? [{ '@type': 'ListItem', position: 2, name: `LEGO ${s.theme_name}`, item: `${site()}/pretraga?theme=${encodeURIComponent(s.theme_slug)}` }]
+          ? [{ '@type': 'ListItem', position: 2, name: `LEGO ${s.theme_name}`, item: `${site()}/tema/${encodeURIComponent(s.theme_slug)}` }]
           : []),
         { '@type': 'ListItem', position: s.theme_slug ? 3 : 2, name: label, item: `${site()}${path}` },
       ],
@@ -521,6 +553,8 @@ async function setPage(setNum: string): Promise<PageMeta> {
       name: `LEGO® ${s.theme_name ? `${s.theme_name} ` : ''}${s.name} ${s.set_num}`,
       sku: s.set_num,
       mpn: s.set_num,
+      ...(s.ean?.length === 13 ? { gtin13: s.ean } : s.ean?.length === 12 ? { gtin12: s.ean } : {}),
+      ...(s.description ? { description: s.description.replace(/\n/g, ' ').slice(0, 5000) } : {}),
       brand: { '@type': 'Brand', name: 'LEGO' },
       ...(s.image_url ? { image: [abs(s.image_url)] } : {}),
       ...(s.theme_name ? { category: s.theme_name } : {}),
@@ -561,6 +595,17 @@ async function setPage(setNum: string): Promise<PageMeta> {
 const attr = (s: string) => escapeHtml(s);
 /** JSON inside <script>: "<" can't close the tag */
 const json = (o: object) => JSON.stringify(o).replace(/</g, '\\u003c');
+
+/**
+ * The page drawn on the server (seo/ssr.ts) inside #root, and the data it was drawn from for the browser
+ * to start with (main.tsx hydrates instead of starting empty). Replaces the crawler copy.
+ */
+export function injectApp(html: string, page: { html: string; state: unknown }): string {
+  return html.replace(
+    '<div id="root"></div>',
+    () => `<div id="root" data-ssr="page">${page.html}</div>\n    <script>window.__KQ__=${json(page.state as object)}</script>`,
+  );
+}
 
 /** Replaces the template's title and description and adds the rest before </head>. */
 export function injectHead(template: string, m: PageMeta): string {

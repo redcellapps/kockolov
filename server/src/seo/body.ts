@@ -40,7 +40,7 @@ async function themeList() {
 }
 
 const themeLinks = (themes: { slug: string; name: string; count: number }[]) =>
-  `<ul>${themes.map((t) => `<li><a href="/pretraga?theme=${encodeURIComponent(t.slug)}">LEGO ${h(t.name)}</a> (${t.count})</li>`).join('')}</ul>`;
+  `<ul>${themes.map((t) => `<li><a href="/tema/${encodeURIComponent(t.slug)}">LEGO ${h(t.name)}</a> (${t.count})</li>`).join('')}</ul>`;
 
 async function dealList(n: number) {
   return query<ListedSet>(
@@ -122,7 +122,7 @@ export async function setBody(s: SetSeo): Promise<string> {
   const label = `LEGO ${s.set_num} ${s.name}`;
   const crumbs =
     `<a href="/">Kockolov</a>` +
-    (s.theme_slug && s.theme_name ? ` › <a href="/pretraga?theme=${encodeURIComponent(s.theme_slug)}">LEGO ${h(s.theme_name)}</a>` : '');
+    (s.theme_slug && s.theme_name ? ` › <a href="/tema/${encodeURIComponent(s.theme_slug)}">LEGO ${h(s.theme_name)}</a>` : '');
   const saving = s.best_price && s.rrp_rsd && s.rrp_rsd > s.best_price ? s.rrp_rsd - s.best_price : 0;
   const summary = s.best_price
     ? `<p>Najniža cena: ${price(s.best_price)}${s.shops_in_stock ? `, ponude iz ${s.shops_in_stock}${NB}${plural(s.shops_in_stock, 'prodavnice', 'prodavnice', 'prodavnica')}` : ''}.` +
@@ -139,5 +139,15 @@ export async function setBody(s: SetSeo): Promise<string> {
         .join('')}</ul>`
     : '';
   const more = related.length ? `<h2>Slični LEGO ${h(s.theme_name ?? '')} setovi</h2>${setLinks(related)}` : '';
-  return wrapBody(`${nav}<p>${crumbs}</p><h1>${h(label)}</h1>${summary}${table}${more}`);
+  const facts = [
+    ['Broj seta', s.set_num],
+    ['Tema', s.theme_name],
+    ['Broj delova', s.pieces ? String(s.pieces) : null],
+    ['Bar-kod (EAN)', s.ean],
+  ].filter(([, v]) => v);
+  const about =
+    `<h2>O setu</h2>` +
+    (s.description ? s.description.split('\n').map((p) => `<p>${h(p)}</p>`).join('') : '') +
+    `<ul>${facts.map(([k, v]) => `<li>${k}: ${h(v!)}</li>`).join('')}</ul>`;
+  return wrapBody(`${nav}<p>${crumbs}</p><h1>${h(label)}</h1>${summary}${table}${about}${more}`);
 }

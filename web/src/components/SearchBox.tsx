@@ -24,12 +24,17 @@ export function SearchBox({ size = 'md', autoFocus, className }: { size?: 'md' |
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const next = new URLSearchParams(location.pathname === '/pretraga' ? params : undefined);
+    // a search from the list (or a theme's page) keeps its filters, the theme included
+    const theme = /^\/tema\/([^/]+)$/.exec(location.pathname)?.[1];
+    const next = new URLSearchParams(location.pathname === '/pretraga' || theme ? params : undefined);
+    if (theme) next.set('theme', decodeURIComponent(theme));
     if (value.trim()) next.set('q', value.trim());
     else next.delete('q');
     next.delete('page');
     if (!value.trim()) next.delete('sort');
-    navigate(`/pretraga?${next.toString()}`);
+    const onlyTheme = next.get('theme');
+    if (onlyTheme && !onlyTheme.includes(',') && [...next.keys()].every((k) => k === 'theme')) navigate(`/tema/${encodeURIComponent(onlyTheme)}`);
+    else navigate(`/pretraga?${next.toString()}`);
   }
 
   const lg = size === 'lg';

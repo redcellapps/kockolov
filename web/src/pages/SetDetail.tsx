@@ -79,7 +79,7 @@ export default function SetDetail() {
         {set.theme_slug && (
           <>
             <span>/</span>
-            <Link to={`/pretraga?theme=${set.theme_slug}`} className="font-semibold hover:text-ink">
+            <Link to={`/tema/${set.theme_slug}`} className="font-semibold hover:text-ink">
               {set.theme_name}
             </Link>
           </>
@@ -105,7 +105,7 @@ export default function SetDetail() {
           <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink-2">
             <span className="tabular rounded-lg bg-surface-2 px-2 py-1">{t('set.number', { num: set.set_num })}</span>
             {set.theme_name && (
-              <Link to={`/pretraga?theme=${set.theme_slug}`} className="rounded-lg bg-surface-2 px-2 py-1 hover:text-ink">
+              <Link to={`/tema/${set.theme_slug}`} className="rounded-lg bg-surface-2 px-2 py-1 hover:text-ink">
                 {set.theme_name}
               </Link>
             )}
@@ -300,6 +300,40 @@ export default function SetDetail() {
         <p className="mb-4 text-sm text-ink-3">{t('set.history.legend')}</p>
         <div className="rounded-2xl border border-line bg-surface p-4 sm:p-6">
           <PriceHistoryChart offers={offers} history={history} />
+        </div>
+      </section>
+
+      {/* about the set: the LEGO Store's text and the facts, also what search engines read */}
+      <section className="mt-12">
+        <h2 className="mb-4 text-2xl font-extrabold tracking-tight">{t('set.about.title')}</h2>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          {set.description ? (
+            <div className="space-y-3 rounded-2xl border border-line bg-surface p-5 text-[15px] leading-relaxed text-ink-2 sm:p-6">
+              {set.description.split('\n').map((para, i) => (
+                <p key={i}>{para}</p>
+              ))}
+            </div>
+          ) : null}
+          <dl className={cx('rounded-2xl border border-line bg-surface p-5 sm:p-6', !set.description && 'lg:col-span-2')}>
+            {(
+              [
+                [t('set.about.number'), set.set_num],
+                [t('set.about.name'), set.name],
+                [t('set.about.theme'), set.theme_name],
+                [t('set.about.pieces'), set.pieces ? new Intl.NumberFormat('sr-RS').format(set.pieces) : null],
+                [t('set.about.age'), set.age_min ? ageLabel(set.age_min) : null],
+                [t('set.about.rrp'), rrp ? money(rrp) : null],
+                [t('set.about.ean'), set.ean],
+              ] as [string, string | null | undefined][]
+            )
+              .filter(([, v]) => v)
+              .map(([k, v]) => (
+                <div key={k} className="flex items-baseline justify-between gap-4 border-b border-dashed border-line py-2.5 first:pt-0 last:border-0 last:pb-0">
+                  <dt className="text-sm text-ink-3">{k}</dt>
+                  <dd className="tabular text-right text-[15px] font-semibold">{v}</dd>
+                </div>
+              ))}
+          </dl>
         </div>
       </section>
 

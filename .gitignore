@@ -12,3 +12,5 @@ web/dist-app/
 
 # classifieds pictures made during local development
 data/
+
+web/dist-ssr/

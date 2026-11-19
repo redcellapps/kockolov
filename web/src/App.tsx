@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router';
+import { Navigate, Route, Routes, useLocation, type NavigateProps } from 'react-router';
 import { Layout } from './components/Layout';
 import { Spinner } from './components/ui';
 import { useAuth } from './lib/auth';
@@ -28,6 +28,15 @@ import AdminPromosPage from './pages/AdminPromos';
 import PromosPage from './pages/Promos';
 import TermsPage from './pages/Terms';
 
+/**
+ * A redirect. A page drawn on the server can't redirect from inside (and would come out empty): there it
+ * gives up, and the server sends its plain copy of the page instead (entry-server.tsx).
+ */
+function Redirect(props: NavigateProps) {
+  if (import.meta.env.SSR) throw new Error(`redirects to ${String(props.to)}`);
+  return <Navigate {...props} />;
+}
+
 /** While the site is private, every page except login needs a session. */
 function Gate({ children, needUser, needAdmin, needAds }: { children: ReactNode; needUser?: boolean; needAdmin?: boolean; needAds?: boolean }) {
   const { user, publicMode, loading, listings } = useAuth();
@@ -40,10 +49,10 @@ function Gate({ children, needUser, needAdmin, needAds }: { children: ReactNode;
     );
   }
   if (!user && (needUser || needAdmin || !publicMode)) {
-    return <Navigate to="/prijava" replace state={{ from: loc.pathname + loc.search }} />;
+    return <Redirect to="/prijava" replace state={{ from: loc.pathname + loc.search }} />;
   }
-  if (needAdmin && user?.role !== 'admin') return <Navigate to="/" replace />;
-  if (needAds && !listings) return <Navigate to="/" replace />; // Oglasi are off (LISTINGS_MODE) or not for this user yet
+  if (needAdmin && user?.role !== 'admin') return <Redirect to="/" replace />;
+  if (needAds && !listings) return <Redirect to="/" replace />; // Oglasi are off (LISTINGS_MODE) or not for this user yet
   return <>{children}</>;
 }
 
@@ -53,7 +62,7 @@ function LoginRoute() {
   const loc = useLocation();
   if (!loading && user) {
     const from = (loc.state as { from?: string } | null)?.from;
-    return <Navigate to={from && !['/prijava', '/registracija', '/zaboravljena-lozinka'].includes(from) ? from : '/'} replace />;
+    return <Redirect to={from && !['/prijava', '/registracija', '/zaboravljena-lozinka'].includes(from) ? from : '/'} replace />;
   }
   return <LoginPage />;
 }
@@ -83,6 +92,7 @@ export default function App() {
         <Route path="/oglasi/:id/izmeni" element={<Gate needAds needUser><NewListing /></Gate>} />
         <Route path="/moji-oglasi" element={<Gate needAds needUser><MyListings /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
+        <Route path="/tema/:slug" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />
         <Route path="/akcije" element={<Gate><PromosPage /></Gate>} />
         <Route path="/crni-petak" element={<Gate><BlackFridayPage /></Gate>} />

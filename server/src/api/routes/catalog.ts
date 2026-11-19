@@ -111,7 +111,8 @@ export async function catalogRoutes(app: FastifyInstance) {
     const visible = offersFor(audience);
     const set = await one(
       `SELECT s.set_num, s.name, s.name_en, s.theme_slug, t.name AS theme_name, s.year, s.pieces, s.age_min,
-              s.image_url, s.rrp_rsd, s.created_at
+              s.image_url, s.rrp_rsd, s.created_at, s.description,
+              (SELECT o.ean FROM offers o WHERE o.set_num = s.set_num AND o.ean IS NOT NULL ORDER BY o.shop_id = 'lstore' DESC, o.id LIMIT 1) AS ean
          FROM sets s LEFT JOIN themes t ON t.slug = s.theme_slug WHERE s.set_num = $1`,
       [setNum],
     );

@@ -137,7 +137,7 @@ export default function Home() {
 export function ThemeTile({ th, inGrid }: { th: Theme; inGrid?: boolean }) {
   return (
     <Link
-      to={`/pretraga?theme=${th.slug}`}
+      to={`/tema/${th.slug}`}
       className={cx(
         'group overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-0.5 hover:shadow-lift',
         inGrid ? 'min-w-0' : 'w-40 shrink-0 snap-start sm:w-auto',

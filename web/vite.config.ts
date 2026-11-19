@@ -23,7 +23,15 @@ const noWebScanner = (): Plugin => ({
 });
 
 export default defineConfig(({ mode }) =>
-  mode === 'app'
+  mode === 'ssr'
+    ? {
+        // the server's page renderer (server/src/seo/ssr.ts): one self-contained file with React and the
+        // app, because the server's Docker image has only the server's own dependencies
+        plugins: [react(), tailwindcss(), noWebScanner()],
+        ssr: { noExternal: true, target: 'node' },
+        build: { ssr: 'src/entry-server.tsx', outDir: 'dist-ssr', emptyOutDir: true, sourcemap: false, copyPublicDir: false, rollupOptions: { output: { inlineDynamicImports: true } } },
+      }
+    : mode === 'app'
     ? {
         plugins: [react(), tailwindcss(), appHtml(), noWebScanner()],
         build: { outDir: 'dist-app', sourcemap: false },
