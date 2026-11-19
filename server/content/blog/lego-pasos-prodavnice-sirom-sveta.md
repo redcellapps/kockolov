@@ -53,7 +53,7 @@ Zato što pokazuju ono što kutija na polici ne može. Svaka prodavnica je mali 
 
 A kad se vratiš kući, setovi koje si video na polici čekaju i u prodavnicama kod nas. Tu pomaže Kockolov:
 
-- Svako jutro poredi cene u [LEGO Store-u](https://lstore.rs), [Kockariumu](https://www.kockarium.rs) i [Ananasu](https://ananas.rs), a uz besplatan nalog i u još desetak prodavnica u Srbiji.
+- Svako jutro poredi cene u [LEGO Store-u](https://lstore.rs), [Kockariumu](https://www.kockarium.rs) i [Ananasu](https://ananas.rs) i u još petnaestak prodavnica u Srbiji. Sve cene vidiš i bez naloga.
 - Za svaki set pokazuje istoriju cena, pa odmah vidiš da li je akcija stvarno akcija.
 - Setove koje želiš dodaš u Praćeno, a svako jutro u 7 sati stiže ti mejl sa najboljim ponudama.
 
