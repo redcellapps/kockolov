@@ -5,7 +5,10 @@ export interface ShopInfo {
   name: string;
   url: string;
   kind: 'official' | 'shop' | 'marketplace';
-  /** prices visible only to signed-in users */
+  /**
+   * Prices visible only to signed-in users. Since 19 Nov 2026 every shop is public (visitors and search
+   * engines see all of them); kept so a shop could be made members-only again without new code.
+   */
   membersOnly?: boolean;
 }
 

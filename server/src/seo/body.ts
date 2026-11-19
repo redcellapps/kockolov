@@ -54,15 +54,15 @@ const setLinks = (rows: ListedSet[]) => `<ul>${rows.map((r) => setLink(r.set_num
 export async function homeBody(): Promise<string> {
   const [deals, themes] = await Promise.all([dealList(12), themeList()]);
   return wrapBody(
-    `${nav}<h1>Najbolje cene LEGO setova u Srbiji</h1>` +
-      `<p>Kockolov svakog jutra poredi cene LEGO setova u srpskim prodavnicama i izdvaja najisplativije kupovine.</p>` +
+    `${nav}<h1>Uporedi cene LEGO kocke u celoj Srbiji</h1>` +
+      `<p>Kockolov svakog jutra poredi cene LEGO kocke i setova u prodavnicama u Srbiji i izdvaja najisplativije kupovine.</p>` +
       `<h2>Ponude dana</h2>${setLinks(deals)}<h2>LEGO teme</h2>${themeLinks(themes)}`,
   );
 }
 
 export async function dealsBody(): Promise<string> {
   const deals = await dealList(40);
-  return wrapBody(`${nav}<h1>LEGO ponude dana</h1>${setLinks(deals)}`);
+  return wrapBody(`${nav}<h1>LEGO na akciji danas: ponude dana</h1>${setLinks(deals)}`);
 }
 
 export async function themesBody(): Promise<string> {

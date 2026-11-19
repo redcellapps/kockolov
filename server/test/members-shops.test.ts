@@ -50,11 +50,11 @@ describe('shop names in e-mails', () => {
   });
 });
 
-describe('every new shop is members-only', () => {
-  it('marks all shops except the original three', () => {
+describe('every shop is public', () => {
+  it('has no members-only shop since 19 Nov 2026', () => {
     const shops = allAdapters().map((a) => a.shop);
-    expect(shops.filter((s) => !s.membersOnly).map((s) => s.id)).toEqual(['lstore', 'kockarium', 'ananas']);
-    expect(shops.filter((s) => s.membersOnly)).toHaveLength(16);
+    expect(shops).toHaveLength(19);
+    expect(shops.filter((s) => s.membersOnly)).toEqual([]);
     expect(new Set(shops.map((s) => s.id)).size).toBe(shops.length);
   });
 });

@@ -49,7 +49,7 @@ export function parseOddoPage(html: string, baseUrl: string): RawOffer[] {
 
 export function oddoAdapter(baseUrl = 'https://www.oddoigracke.rs'): ShopAdapter {
   return {
-    shop: { id: 'oddo', name: 'ODDO igračke', url: 'https://www.oddoigracke.rs', kind: 'shop', membersOnly: true },
+    shop: { id: 'oddo', name: 'ODDO igračke', url: 'https://www.oddoigracke.rs', kind: 'shop' },
     crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       return pageThrough(
         ctx,

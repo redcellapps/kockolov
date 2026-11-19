@@ -77,10 +77,10 @@ export function nbshopAdapter(shop: ShopInfo, baseUrl: string, listPath = '/lego
 }
 
 export const dexyAdapter = (baseUrl = 'https://www.dexy.co.rs') =>
-  nbshopAdapter({ id: 'dexy', name: 'Dexy Co', url: 'https://www.dexy.co.rs', kind: 'shop', membersOnly: true }, baseUrl);
+  nbshopAdapter({ id: 'dexy', name: 'Dexy Co', url: 'https://www.dexy.co.rs', kind: 'shop' }, baseUrl);
 
 export const kockalendAdapter = (baseUrl = 'https://www.kockalend.rs') =>
-  nbshopAdapter({ id: 'kockalend', name: 'Kockalend', url: 'https://www.kockalend.rs', kind: 'shop', membersOnly: true }, baseUrl);
+  nbshopAdapter({ id: 'kockalend', name: 'Kockalend', url: 'https://www.kockalend.rs', kind: 'shop' }, baseUrl);
 
 export const babyparkAdapter = (baseUrl = 'https://www.babypark.rs') =>
-  nbshopAdapter({ id: 'babypark', name: 'Baby Park', url: 'https://www.babypark.rs', kind: 'shop', membersOnly: true }, baseUrl);
+  nbshopAdapter({ id: 'babypark', name: 'Baby Park', url: 'https://www.babypark.rs', kind: 'shop' }, baseUrl);

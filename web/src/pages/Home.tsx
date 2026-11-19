@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
-import { ChevronRight, ClockIcon, LockIcon, SparkIcon, StoreIcon, TagIcon } from '../components/icons';
+import { ChevronRight, ClockIcon, SparkIcon, StoreIcon, TagIcon } from '../components/icons';
 import { Hero } from '../components/home/Hero';
-import { MembersCta } from '../components/home/MembersCta';
+import { AccountCta } from '../components/home/AccountCta';
 import { DealCard, ProductImage } from '../components/SetCard';
 import { CardSkeleton, cx, EmptyState, SectionHeader } from '../components/ui';
 import { t, tn } from '../i18n';
@@ -13,7 +13,7 @@ import { usePageTitle } from '../lib/title';
 
 export default function Home() {
   usePageTitle(null);
-  const { user, registrationOpen } = useAuth();
+  const { user, registrationOpen, listings } = useAuth();
   // 13 = the highlighted deal + a full grid of 12 below it
   const deals = useQuery({
     queryKey: ['deals', 13],
@@ -29,17 +29,10 @@ export default function Home() {
 
   return (
     <>
-      <Hero
-        deal={hero}
-        dealLoading={deals.isLoading}
-        stats={stats.data}
-        unlock={!user && shops.data ? stats.data?.members_shops : undefined}
-      />
+      <Hero deal={hero} dealLoading={deals.isLoading} stats={stats.data} />
 
-      {/* Visitors: most shops show prices to signed-in users only */}
-      {!user && !!stats.data?.members_shops && shops.data && (
-        <MembersCta stats={stats.data} shops={shops.data} registrationOpen={registrationOpen} />
-      )}
+      {/* Visitors: every shop is public; the account is for watching sets, the morning e-mail and the ads */}
+      {!user && shops.data && <AccountCta shops={shops.data} registrationOpen={registrationOpen} listings={listings} />}
 
       {/* Deals */}
       <section className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 sm:pt-16">
@@ -117,22 +110,8 @@ export default function Home() {
                 {s.name}
                 <span className="tabular font-normal text-ink-3">{num(s.offers_in_stock)}</span>
                 {s.sellers > 1 && <span className="font-normal text-ink-3">· {tn('shop.sellers', s.sellers)}</span>}
-                {s.members_only && (
-                  <span title={t('members.badge')} className="text-ink-3">
-                    <LockIcon size={13} />
-                    <span className="sr-only">{t('members.badge')}</span>
-                  </span>
-                )}
               </span>
             ))}
-            {!user && !!stats.data?.members_shops && (
-              <Link
-                to={registrationOpen ? '/registracija' : '/prijava'}
-                className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-ink-3/50 px-3 py-1.5 text-sm font-bold text-ink hover:border-ink"
-              >
-                <LockIcon size={14} /> {tn('members.moreShops', stats.data.members_shops)}
-              </Link>
-            )}
           </div>
         )}
       </section>

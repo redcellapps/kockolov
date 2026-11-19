@@ -19,7 +19,7 @@ export const sr = {
   'pair.expired': 'Kod je istekao.',
   'pair.new': 'Novi kod',
   'pair.done': 'Televizor je povezan. Zdravo, {name}!',
-  'pair.benefit': 'Sa nalogom vidiš sve prodavnice, ponude dana za članove i praćene setove.',
+  'pair.benefit': 'Sa nalogom vidiš i svoje praćene setove i koliko su pojeftinili.',
   'pair.noAccount': 'Nemaš nalog? Napravi ga besplatno na kockolov.rs — treba ti samo e-mail.',
   'pair.error': 'Ne mogu da dobijem kod. Proveri internet vezu i pokušaj ponovo.',
 
@@ -111,7 +111,7 @@ export const sr = {
   'about.title': 'O aplikaciji',
   'about.text':
     'Kockolov svakog jutra obilazi prodavnice u Srbiji, beleži cene LEGO® setova i izdvaja prave popuste u odnosu na redovnu cenu u LEGO® Store-u. Na televizoru gledaš, na telefonu kupuješ: skeniraj QR kod na stranici seta.',
-  'about.shops': 'Prodavnice u ovoj verziji: {shops}. Uz besplatan nalog na kockolov.rs vidiš još {more} prodavnica — povezivanje televizora sa nalogom stiže u sledećoj verziji.',
+  'about.shops': 'Prodavnice koje upoređujemo: {shops}.',
   'about.legal': 'LEGO® je zaštićeni žig LEGO Grupe, koja ne sponzoriše, ne odobrava i nije povezana sa ovom aplikacijom.',
   'about.privacy': 'Politika privatnosti',
   'about.privacy.hint': 'kockolov.rs/privatnost — skeniraj kod',

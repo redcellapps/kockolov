@@ -44,6 +44,9 @@ const inShops = (n: number) => count(n, 'prodavnici', 'prodavnice', 'prodavnica'
 const fromShops = (n: number) => count(n, 'prodavnice', 'prodavnice', 'prodavnica');
 /** "LEGO Store, Kockarium i Ananas" */
 const list = (names: string[]) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} i ${names.at(-1)}` : (names[0] ?? ''));
+/** "LEGO® Store Srbija, ABC Kocka, Ananas i još 16": a description stays short with all 19 shops public */
+const shortList = (names: string[], shown = 3) =>
+  names.length > shown + 1 ? `${names.slice(0, shown).join(', ')} i još ${names.length - shown}` : list(names);
 
 // ---- data ----
 export interface SetSeo {
@@ -103,7 +106,8 @@ async function siteStats() {
   return (await one<{ sets: number; shops: number; shop_names: string[]; deals: number; max_pct: number | null }>(
     `SELECT (SELECT count(DISTINCT set_num)::int FROM public_offers WHERE active AND in_stock AND set_num IS NOT NULL) AS sets,
             (SELECT count(*)::int FROM shops WHERE enabled AND NOT members_only) AS shops,
-            (SELECT coalesce(array_agg(name ORDER BY kind = 'official' DESC, name), '{}') FROM shops WHERE enabled AND NOT members_only) AS shop_names,
+            (SELECT coalesce(array_agg(sh.name ORDER BY sh.kind = 'official' DESC, (SELECT count(*) FROM public_offers o WHERE o.shop_id = sh.id AND o.active AND o.in_stock) DESC, sh.name), '{}')
+               FROM shops sh WHERE sh.enabled AND NOT sh.members_only) AS shop_names,
             (SELECT count(*)::int FROM deals WHERE ${latestDeals('public')}) AS deals,
             (SELECT max(round(100.0 * (reference_price_rsd - best_price_rsd) / reference_price_rsd))::int
                FROM deals WHERE ${latestDeals('public')} AND reference_price_rsd > best_price_rsd) AS max_pct`,
@@ -164,8 +168,8 @@ export const version = (...parts: unknown[]) =>
 // ---- pages ----
 const DEFAULT: Omit<PageMeta, 'path'> = {
   status: 200,
-  title: 'Kockolov — najbolje cene LEGO setova u Srbiji',
-  description: 'Uporedi cene LEGO setova u srpskim prodavnicama i pronađi najbolju ponudu. Svakog jutra izdvajamo najisplativije kupovine.',
+  title: 'Uporedi cene LEGO kocke i setova u Srbiji | Kockolov',
+  description: 'Uporedi cene LEGO kocke i setova u prodavnicama u Srbiji i pronađi najbolju ponudu. Svakog jutra izdvajamo najisplativije kupovine.',
   type: 'website',
 };
 
@@ -196,7 +200,7 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
       ...DEFAULT,
       path: '/',
       canonical: '/',
-      description: `Uporedi cene ${sets(st.sets)} u ${inShops(st.shops)}: ${list(st.shop_names)}. Svakog jutra izdvajamo najisplativije kupovine i šaljemo ih e-mailom.`.replace(/\u00a0/g, ' '),
+      description: `Uporedi cene LEGO kocke u ${inShops(st.shops)} u Srbiji: ${shortList(st.shop_names)}. ${sets(st.sets)} na stanju, ponude dana i istorija cena, svakog jutra.`.replace(/\u00a0/g, ' '),
       image: { url: `/og/home.jpg?v=${version(st.sets, items[0]?.best_price, items[0]?.image_url)}`, alt: 'Kockolov: najbolje cene LEGO setova' },
       jsonLd: [{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE, url: `${site()}/`, inLanguage: 'sr-Latn' }],
       body: await homeBody(),
@@ -232,10 +236,10 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
       ...DEFAULT,
       path: p,
       canonical: p,
-      title: day ? `LEGO ponude dana, ${day} | ${SITE}` : `LEGO ponude dana | ${SITE}`,
+      title: day ? `LEGO na akciji danas: ponude dana, ${day} | ${SITE}` : `LEGO na akciji danas: ponude dana | ${SITE}`,
       description: st.max_pct
-        ? `Najisplativije LEGO kupovine danas u srpskim prodavnicama: ${st.deals} ponuda, do −${st.max_pct}% u odnosu na redovnu cenu u LEGO Store-u. Lista se osvežava svakog jutra.`
-        : 'Najisplativije LEGO kupovine u srpskim prodavnicama. Lista se osvežava svakog jutra.',
+        ? `LEGO kocke na akciji danas u prodavnicama u Srbiji: ${st.deals} ponuda, do −${st.max_pct}% u odnosu na redovnu cenu u LEGO Store-u. Lista se osvežava svakog jutra.`
+        : 'LEGO kocke na akciji u prodavnicama u Srbiji. Lista se osvežava svakog jutra.',
       image: { url: `/og/deals.jpg?v=${version(st.deals, st.max_pct, items[0]?.best_price)}`, alt: 'LEGO ponude dana na Kockolovu' },
       body: await dealsBody(),
     };
@@ -365,8 +369,8 @@ async function themePage(slug: string): Promise<PageMeta> {
     ...DEFAULT,
     path,
     canonical: path,
-    title: `LEGO ${name} setovi: cene u Srbiji | ${SITE}`,
-    description: `${c.subtitle} Svi LEGO ${name} setovi iz prodavnica ${list(st.shop_names)} na jednom mestu.`.replace(/\u00a0/g, ' '),
+    title: `LEGO ${name} kocke i setovi: uporedi cene | ${SITE}`,
+    description: `${c.subtitle} Svi LEGO ${name} setovi iz prodavnica ${shortList(st.shop_names)} na jednom mestu.`.replace(/\u00a0/g, ' '),
     image: { url: `/og/theme/${encodeURIComponent(slug)}.jpg?v=${version(c.subtitle, c.items[0]?.image_url)}`, alt: `LEGO ${name} na Kockolovu` },
     body: await themeBody(slug, name, c.subtitle),
   };

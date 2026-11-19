@@ -27,16 +27,16 @@ export const DEMO_EMAIL = snap.user?.email ?? 'demo@kockolov.local';
 export const DEMO_PASSWORD = 'demo1234';
 export const DEMO_DATE = snap.stats?.members?.last_update as string | undefined;
 
-// Like the live site: visitors see the public shops, signed-in users every shop.
+// Like the live site since 19 Nov 2026: every shop is public, so visitors and signed-in users see the
+// same offers and deals (the snapshot still lists the shops that used to be members-only; ignored).
 type Audience = 'public' | 'members';
-const membersShops = new Set<string>(snap.membersShops ?? []);
 const allOffers = snap.offers as DemoOffer[];
 const catalogs: Record<Audience, DemoCatalog> = {
-  public: new DemoCatalog(snap.sets as DemoSet[], allOffers.filter((o) => !membersShops.has(o.shop_id)), snap.latestDeals.public as DemoDeal[]),
+  public: new DemoCatalog(snap.sets as DemoSet[], allOffers, snap.latestDeals.members as DemoDeal[]),
   members: new DemoCatalog(snap.sets as DemoSet[], allOffers, snap.latestDeals.members as DemoDeal[]),
 };
 const state = {
-  // the preview starts as a visitor; signing in shows the members-only shops
+  // the preview starts as a visitor
   user: null as Json | null,
   // a few sets already watched, so the watchlist page shows what it does
   watchlist: new Set<string>((snap.deals.members.items as Json[]).slice(0, 3).map((d) => d.set_num as string)),
@@ -211,7 +211,8 @@ function handle(method: string, url: URL, body: Json | null): { status: number; 
   if ((path === '/api/auth/forgot' || path === '/api/auth/resend') && method === 'POST') return ok({ ok: true });
 
   // public mode: visitors may browse
-  const audience: Audience = state.user ? 'members' : 'public';
+  // every shop is public: visitors get what signed-in users get (the snapshot's "members" view)
+  const audience: Audience = 'members';
   const catalog = catalogs[audience];
   if (path === '/api/stats') return ok(snap.stats[audience]);
   if (path === '/api/shops') return ok(snap.shops[audience]);

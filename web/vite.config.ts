@@ -13,16 +13,25 @@ const appHtml = (): Plugin => ({
       .replace(/\s*<link rel="manifest"[^>]*>/, ''),
 });
 
+// The app and the in-browser preview never open the site's camera view (components/ScanButton.tsx drops
+// it there), but its 1 MB barcode reader .wasm would still be copied into their builds
+const noWebScanner = (): Plugin => ({
+  name: 'kockolov-no-web-scanner',
+  enforce: 'pre',
+  resolveId: (id) => (id.startsWith('zxing-wasm/reader/zxing_reader.wasm') ? '\0no-zxing-wasm' : null),
+  load: (id) => (id === '\0no-zxing-wasm' ? 'export default ""' : null),
+});
+
 export default defineConfig(({ mode }) =>
   mode === 'app'
     ? {
-        plugins: [react(), tailwindcss(), appHtml()],
+        plugins: [react(), tailwindcss(), appHtml(), noWebScanner()],
         build: { outDir: 'dist-app', sourcemap: false },
       }
     : mode === 'demo'
     ? {
         // npm run build:demo: one self-contained HTML file with the app, data and pictures inside
-        plugins: [react(), tailwindcss(), viteSingleFile()],
+        plugins: [react(), tailwindcss(), viteSingleFile(), noWebScanner()],
         publicDir: false,
         build: { outDir: 'dist-demo', rollupOptions: { input: 'demo.html' }, sourcemap: false },
       }

@@ -86,7 +86,7 @@ export const shoppsterRetry = { attempts: 3, pauseMs: 5000 };
 
 export function shoppsterAdapter(baseUrl = 'https://www.shoppster.rs'): ShopAdapter {
   return {
-    shop: { id: 'shoppster', name: 'Shoppster', url: 'https://www.shoppster.rs', kind: 'marketplace', membersOnly: true },
+    shop: { id: 'shoppster', name: 'Shoppster', url: 'https://www.shoppster.rs', kind: 'marketplace' },
     async *crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       const seen = new Set<string>();
       let totalPages = 1;

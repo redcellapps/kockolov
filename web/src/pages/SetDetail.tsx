@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Fragment } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router';
-import { ArrowLeft, CheckIcon, ExternalIcon, LockIcon, TrendDown } from '../components/icons';
+import { Link, useNavigate, useParams } from 'react-router';
+import { ArrowLeft, CheckIcon, ExternalIcon, TrendDown } from '../components/icons';
 import { ShareButton } from '../components/ShareButton';
 import { PriceHistoryChart } from '../components/PriceHistoryChart';
 import { ProductImage, SetCard } from '../components/SetCard';
@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, ShopDot, Skeleton, buttonClasses, cx } from '..
 import { WatchButton } from '../components/WatchButton';
 import { PromoCard } from '../components/PromoCard';
 import { usePromos, type Promo } from '../lib/promos';
-import { t, tn } from '../i18n';
+import { t } from '../i18n';
 import { trackEvent } from '../lib/analytics';
 import { api, ApiError, type SetDetail as SetDetailData, type UsedAd } from '../lib/api';
 import { ageLabel, ago, dateLong, displayCurrency, money, rateText, reasonText, shopName } from '../lib/format';
@@ -59,8 +59,6 @@ export default function SetDetail() {
     else usedTail.push(u);
   }
   const lastInStock = inStockOffers[inStockOffers.length - 1];
-  const hidden = q.data.hidden_offers ?? 0;
-  const hiddenShops = q.data.hidden_shops ?? 0;
   const inStock = offers.filter((o) => o.in_stock);
   // a promotion tied to themes only shows on sets of those themes
   const promosFor = (shopId: string): Promo[] =>
@@ -129,11 +127,6 @@ export default function SetDetail() {
                   {best.seller && <span>· {best.seller}</span>}
                 </div>
                 {displayCurrency() === 'EUR' && <p className="mt-1.5 text-xs text-ink-3">{t('fx.note', { rate: rateText(fx?.eur.rate) })}</p>}
-                {hidden > 0 && (
-                  <a href="#ponude" className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 underline decoration-line underline-offset-4 hover:text-ink">
-                    <LockIcon size={15} /> {tn('members.teaser.offers', hidden)} {tn('members.teaser.shops', hiddenShops)}
-                  </a>
-                )}
                 {saving > 0 && (
                   <div className="mt-4 flex items-center gap-2 rounded-xl bg-save-soft px-3 py-2 text-sm font-bold text-save">
                     <TrendDown size={18} /> {t('set.youSave', { amount: money(saving), pct: savingPct })}
@@ -153,8 +146,6 @@ export default function SetDetail() {
                   <ShareButton path={`/set/${set.set_num}`} title={`LEGO ${set.set_num} ${set.name}`} text={t('share.text', { price: money(best.price_rsd) })} />
                 </div>
               </>
-            ) : hidden > 0 ? (
-              <MembersTeaser n={hidden} shops={hiddenShops} onlyMembers compact />
             ) : (
               <>
                 <div className="text-lg font-extrabold">{t('card.outOfStock')}</div>
@@ -290,7 +281,6 @@ export default function SetDetail() {
             </table>
           </div>
         )}
-        {hidden > 0 && <MembersTeaser n={hidden} shops={hiddenShops} onlyMembers={offers.length === 0} />}
         <p className="mt-3 text-xs text-ink-3">{t('set.disclaimer')}</p>
         {setPromos.length > 0 && (
           <div id="akcije-seta" className="mt-6 scroll-mt-24">
@@ -323,55 +313,6 @@ export default function SetDetail() {
           </div>
         </section>
       )}
-    </div>
-  );
-}
-
-/** For visitors: offers from members-only shops exist, sign in to see them. */
-function MembersTeaser({ n, shops, onlyMembers, compact }: { n: number; shops: number; onlyMembers?: boolean; compact?: boolean }) {
-  const { registrationOpen } = useAuth();
-  const loc = useLocation();
-  const from = { from: loc.pathname + loc.search };
-  const actions = (
-    <div className="flex flex-wrap gap-2">
-      <Link to="/prijava" state={from} className={buttonClasses('primary', 'md')}>
-        {t('members.login')}
-      </Link>
-      {registrationOpen && (
-        <Link to="/registracija" state={from} className={buttonClasses('outline', 'md')}>
-          {t('members.register')}
-        </Link>
-      )}
-    </div>
-  );
-  const text = (
-    <>
-      <div className="font-extrabold">
-        {tn('members.teaser.offers', n)} {tn('members.teaser.shops', shops)}
-      </div>
-      <p className="mt-0.5 text-sm text-ink-2">{onlyMembers ? t('members.teaser.onlyMembers') : t('members.teaser.text')}</p>
-    </>
-  );
-  if (compact) {
-    return (
-      <div>
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-brand-ink">
-            <LockIcon size={20} />
-          </span>
-          <div className="min-w-0">{text}</div>
-        </div>
-        <div className="mt-4">{actions}</div>
-      </div>
-    );
-  }
-  return (
-    <div className="mt-3 flex flex-col gap-4 rounded-2xl border border-dashed border-ink-3/40 bg-surface-2 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand text-brand-ink">
-        <LockIcon size={22} />
-      </span>
-      <div className="min-w-0 flex-1">{text}</div>
-      {actions}
     </div>
   );
 }

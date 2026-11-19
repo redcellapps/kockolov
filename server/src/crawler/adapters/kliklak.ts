@@ -39,7 +39,7 @@ export function parseKliklakPage(html: string, baseUrl: string): RawOffer[] {
 
 export function kliklakAdapter(baseUrl = 'https://www.kliklak.rs'): ShopAdapter {
   return {
-    shop: { id: 'kliklak', name: 'Kliklak', url: 'https://www.kliklak.rs', kind: 'shop', membersOnly: true },
+    shop: { id: 'kliklak', name: 'Kliklak', url: 'https://www.kliklak.rs', kind: 'shop' },
     crawl(ctx: CrawlContext): AsyncGenerator<PageResult> {
       const slow = { ...ctx, http: { get: (url: string, o = {}) => ctx.http.get(url, { timeoutMs: 120_000, ...o }) } as typeof ctx.http };
       return pageThrough(

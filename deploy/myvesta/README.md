@@ -211,8 +211,8 @@ and whether they use the site in a browser, the installed site (PWA) or the Andr
 
 Every morning at 08:30 the worker picks a popular set (in stock at a public shop, with a picture, many shops carry
 it or people watch it, a bonus for a real discount, a different theme than the last few posts, not repeated within
-60 days) and makes a 1080×1350 picture and a caption. Prices in it come from the public shops only; the members-only
-shops are just counted ("+ još 4 prodavnice uz nalog").
+60 days) and makes a 1080×1350 picture and a caption. Prices in it come from the public shops (all shops since
+19 Nov 2026; a members-only shop would only be counted, "+ još 4 prodavnice uz nalog").
 
 - **Without an Instagram account connected** (the default) the post waits on the admin page (Administracija →
   Instagram: set dana) and `ADMIN_ALERT_EMAIL` gets an e-mail with the picture and the caption. Save the picture,
