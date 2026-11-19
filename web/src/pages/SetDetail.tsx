@@ -9,10 +9,10 @@ import { EmptyState, ErrorState, ShopDot, Skeleton, buttonClasses, cx } from '..
 import { WatchButton } from '../components/WatchButton';
 import { PromoCard } from '../components/PromoCard';
 import { usePromos, type Promo } from '../lib/promos';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 import { trackEvent } from '../lib/analytics';
 import { api, ApiError, type SetDetail as SetDetailData, type UsedAd } from '../lib/api';
-import { ageLabel, ago, dateLong, displayCurrency, money, rateText, reasonText, shopName } from '../lib/format';
+import { ageLabel, ago, dateInSentence, dateLong, dateTimeLong, displayCurrency, money, rateText, reasonText, shopName } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { usePageTitle } from '../lib/title';
 
@@ -69,6 +69,8 @@ export default function SetDetail() {
   const rrp = set.rrp_rsd;
   const saving = best && rrp && rrp > best.price_rsd ? rrp - best.price_rsd : 0;
   const savingPct = saving && rrp ? Math.round((100 * saving) / rrp) : 0;
+  // a set no shop has ever had (from the catalog of every LEGO set): picture and facts, no prices
+  const never = !offers.length && !history.length && !used.length;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -90,6 +92,16 @@ export default function SetDetail() {
         {/* image: as tall as itself, not stretched to the summary next to it */}
         <div className="relative self-start overflow-hidden rounded-3xl border border-line">
           <ProductImage src={set.image_url} alt={set.name} className="aspect-square [&_img]:p-8 sm:[&_img]:p-12" />
+          {set.image_url?.includes('rebrickable.com') && (
+            <a
+              href={`https://rebrickable.com/sets/${set.set_num}-1/`}
+              target="_blank"
+              rel="noopener nofollow"
+              className="absolute bottom-3 right-3 rounded-md bg-white/85 px-1.5 py-0.5 text-[11px] text-hero-muted hover:text-hero-ink"
+            >
+              {t('set.image.credit')}
+            </a>
+          )}
           {savingPct >= 3 && (
             <span className="absolute left-4 top-4 rounded-xl bg-deal px-3 py-1.5 text-lg font-extrabold text-white shadow">−{savingPct}%</span>
           )}
@@ -148,9 +160,16 @@ export default function SetDetail() {
               </>
             ) : (
               <>
-                <div className="text-lg font-extrabold">{t('card.outOfStock')}</div>
-                <div className="mt-3">
-                  <WatchButton setNum={set.set_num} />
+                <div className="text-lg font-extrabold">{offers.length ? t('card.outOfStock') : t('set.nowhere.title')}</div>
+                <p className="mt-1 text-[15px] text-ink-2">{offers.length ? t('set.oos.text') : t('set.nowhere.text')}</p>
+                <div className="mt-4">
+                  {user ? (
+                    <WatchButton setNum={set.set_num} />
+                  ) : (
+                    <Link to="/registracija" state={{ from: `/set/${set.set_num}` }} className={buttonClasses('primary', 'md')}>
+                      {t('set.watchSignup')}
+                    </Link>
+                  )}
                 </div>
               </>
             )}
@@ -165,11 +184,13 @@ export default function SetDetail() {
             )}
           </div>
 
+          {!never && (
           <dl className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
             <Stat label={t('set.rrp')} value={rrp ? money(rrp) : '—'} hint={rrp ? t('set.rrp.where') : t('set.rrp.unknown')} />
             <Stat label={t('set.lowest30')} value={money(stats?.lowest_30d)} />
             <Stat label={t('set.lowestEver')} value={money(stats?.lowest_ever)} hint={stats?.tracked_since ? t('set.trackedSince', { date: dateLong(stats.tracked_since) }) : undefined} />
           </dl>
+          )}
 
           {/* the start of the LEGO Store's text, the whole of it under "O setu" */}
           {set.description && (
@@ -184,6 +205,7 @@ export default function SetDetail() {
       </div>
 
       {/* offers */}
+      {!never && (
       <section id="ponude" className="mt-12 scroll-mt-24">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-2xl font-extrabold tracking-tight">{t('set.offers.title')}</h2>
@@ -304,7 +326,10 @@ export default function SetDetail() {
         )}
       </section>
 
+      )}
+
       {/* history */}
+      {!never && (
       <section className="mt-12">
         <h2 className="mb-1 text-2xl font-extrabold tracking-tight">{t('set.history.title')}</h2>
         <p className="mb-4 text-sm text-ink-3">{t('set.history.legend')}</p>
@@ -312,25 +337,39 @@ export default function SetDetail() {
           <PriceHistoryChart offers={offers} history={history} />
         </div>
       </section>
+      )}
 
       {/* about the set: the LEGO Store's text and the facts, also what search engines read */}
       <section id="o-setu" className="mt-12 scroll-mt-24">
         <h2 className="mb-4 text-2xl font-extrabold tracking-tight">{t('set.about.title')}</h2>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          {set.description ? (
-            <div className="space-y-3 rounded-2xl border border-line bg-surface p-5 text-[15px] leading-relaxed text-ink-2 sm:p-6">
-              {set.description.split('\n').map((para, i) => (
-                <p key={i}>{para}</p>
-              ))}
-            </div>
-          ) : null}
-          <dl className={cx('rounded-2xl border border-line bg-surface p-5 sm:p-6', !set.description && 'lg:col-span-2')}>
+          <div className="rounded-2xl border border-line bg-surface p-5 text-[15px] leading-relaxed text-ink-2 sm:p-6">
+            {/* where it is cheapest, in sentences: our own numbers, what search engines and AI answers quote */}
+            <h3 className="text-lg font-extrabold leading-snug text-ink">
+              {t(offers.length ? 'set.answer.title' : 'set.answer.titleNowhere', { num: set.set_num })}
+            </h3>
+            <p className="mt-2">
+              <SetAnswer d={q.data} />
+            </p>
+            {set.description && (
+              <>
+                <h3 className="mt-6 text-lg font-extrabold leading-snug text-ink">{t('set.about.lego')}</h3>
+                <div className="mt-2 space-y-3">
+                  {set.description.split('\n').map((para, i) => (
+                    <p key={i}>{para}</p>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <dl className="self-start rounded-2xl border border-line bg-surface p-5 sm:p-6">
             {(
               [
                 [t('set.about.number'), set.set_num],
                 [t('set.about.name'), set.name],
                 [t('set.about.theme'), set.theme_name],
                 [t('set.about.pieces'), set.pieces ? new Intl.NumberFormat('sr-RS').format(set.pieces) : null],
+                [t('set.about.year'), set.year ? String(set.year) : null],
                 [t('set.about.age'), set.age_min ? ageLabel(set.age_min) : null],
                 [t('set.about.rrp'), rrp ? money(rrp) : null],
                 [t('set.about.ean'), set.ean],
@@ -418,4 +457,33 @@ function UsedRow({ u }: { u: UsedAd }) {
       </td>
     </tr>
   );
+}
+
+/** "Najniža cena za LEGO … danas je … u prodavnici …": the set's prices in a few plain sentences */
+function SetAnswer({ d }: { d: SetDetailData }) {
+  const { set, offers, stats } = d;
+  const inStock = offers.filter((o) => o.in_stock);
+  const best = inStock[0];
+  const rrp = set.rrp_rsd;
+  const vars = { num: set.set_num, name: set.name };
+  const checked = offers.reduce<string | null>((a, o) => (o.last_seen && (!a || o.last_seen > a) ? o.last_seen : a), null);
+  const parts: string[] = [];
+  if (best) {
+    parts.push(t('set.answer.best', { ...vars, price: money(best.price_rsd), shop: shopName(best.shop_id) }));
+    const saving = rrp && rrp > best.price_rsd ? rrp - best.price_rsd : 0;
+    const pct = saving && rrp ? Math.round((100 * saving) / rrp) : 0;
+    if (pct >= 3) parts.push(t('set.answer.belowRrp', { pct, amount: money(saving), rrp: money(rrp) }));
+    else if (rrp) parts.push(t('set.answer.rrp', { rrp: money(rrp) }));
+    const shops = new Set(inStock.map((o) => o.shop_id)).size;
+    if (shops > 1) parts.push(tn('set.answer.shops', shops));
+    if (stats?.lowest_ever != null) {
+      if (stats.lowest_ever >= best.price_rsd && stats.tracked_since) parts.push(t('set.answer.lowestToday', { since: dateInSentence(stats.tracked_since) }));
+      else if (stats.lowest_ever < best.price_rsd && stats.lowest_ever_at) parts.push(t('set.answer.lowestEver', { price: money(stats.lowest_ever), date: dateInSentence(stats.lowest_ever_at) }));
+    }
+  } else {
+    parts.push(t(offers.length ? 'set.answer.oos' : 'set.answer.nowhere', vars));
+    if (stats?.lowest_ever != null && stats.lowest_ever_at) parts.push(t('set.answer.lowestEver', { price: money(stats.lowest_ever), date: dateInSentence(stats.lowest_ever_at) }));
+  }
+  parts.push(checked ? t('set.answer.checked', { when: dateTimeLong(checked) }) : t('set.answer.daily'));
+  return <>{parts.join(' ')}</>;
 }

@@ -2,10 +2,12 @@ import { createHash } from 'node:crypto';
 import { config } from '../config.js';
 import { one, query } from '../db.js';
 import { latestDeals } from '../api/audience.js';
-import { buildSearch } from '../api/search.js';
+import { buildSearch, buildSummary, type ListSummary } from '../api/search.js';
+import { ensureCatalogSet } from '../lib/legoCatalog.js';
 import { getPost, listPosts, type BlogPost } from '../blog/posts.js';
 import { escapeHtml, rsd, shopLabel } from '../mail/format.js';
-import { blackFridayBody, dealsBody, homeBody, setBody, themeBody, themesBody } from './body.js';
+import { blackFridayBody, dealsBody, homeBody, landingBody, setBody, themeBody, themesBody } from './body.js';
+import { landingFor, type Landing } from './landings.js';
 import { blackFriday } from '../deals/blackFriday.js';
 import { OG_HEIGHT, OG_WIDTH, plural } from './og.js';
 
@@ -74,12 +76,15 @@ export interface SetSeo {
   description: string | null;
   pieces: number | null;
   ean: string | null;
+  /** when the shops' prices were last read (the morning crawl) */
+  last_checked: string | null;
 }
 
 export function loadSet(setNum: string): Promise<SetSeo | null> {
   return one<SetSeo>(
     `SELECT s.set_num, s.name, s.theme_slug, t.name AS theme_name, s.image_url, s.rrp_rsd, s.description, s.pieces,
             (SELECT o.ean FROM offers o WHERE o.set_num = s.set_num AND o.ean IS NOT NULL ORDER BY o.shop_id = 'lstore' DESC, o.id LIMIT 1) AS ean,
+            (SELECT max(o.last_seen) FROM public_offers o WHERE o.set_num = s.set_num AND o.active) AS last_checked,
             b.price_rsd AS best_price, b.shop_id AS best_shop, b.seller AS best_seller,
             a.max_price, a.any_price, coalesce(a.offers_in_stock, 0) AS offers_in_stock, coalesce(a.shops_in_stock, 0) AS shops_in_stock,
             array(
@@ -234,7 +239,20 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
       canonical: '/',
       description: `Uporedi cene LEGO kocke u ${inShops(st.shops)} u Srbiji: ${shortList(st.shop_names)}. ${sets(st.sets)} na stanju, ponude dana i istorija cena, svakog jutra.`.replace(/\u00a0/g, ' '),
       image: { url: `/og/home.jpg?v=${version(st.sets, items[0]?.best_price, items[0]?.image_url)}`, alt: 'Kockolov: najbolje cene LEGO setova' },
-      jsonLd: [{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE, url: `${site()}/`, inLanguage: 'sr-Latn' }],
+      jsonLd: [
+        { '@context': 'https://schema.org', '@type': 'WebSite', name: SITE, url: `${site()}/`, inLanguage: 'sr-Latn' },
+        // who we are, and our profiles elsewhere: how search engines and AI answers know Kockolov is one thing
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: SITE,
+          url: `${site()}/`,
+          logo: `${site()}/icons/icon-512.png`,
+          description: 'Poređenje cena LEGO setova u prodavnicama u Srbiji, sa istorijom cena i proverom popusta.',
+          areaServed: { '@type': 'Country', name: 'Srbija' },
+          sameAs: ['https://www.instagram.com/kockolov', 'https://play.google.com/store/apps/details?id=rs.kockolov.app'],
+        },
+      ],
       body: await homeBody(),
     };
   }
@@ -313,6 +331,9 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
     const slug = decoded(themeMatch[1]);
     if (slug != null) return themePage(slug, [...params.keys()].length > 0);
   }
+
+  const landing = landingFor(p);
+  if (landing) return landingPage(landing, [...params.keys()].length > 0);
 
   if (p === '/pretraga') {
     const keys = [...params.keys()];
@@ -435,6 +456,35 @@ async function themePage(slug: string, filtered = false): Promise<PageMeta> {
   };
 }
 
+/** A list in sentences: "Na stanju je 214 setova, od 499 do 1.999 RSD. Najjeftiniji je … za … ." */
+export function summaryText(s: ListSummary | null): string {
+  if (!s?.total) return 'Trenutno nijedan set sa ove liste nije na stanju u prodavnicama koje pratimo.';
+  const n = s.total;
+  let out = `Na stanju ${plural(n, 'je', 'su', 'je')} ${sets(n)}`;
+  out += n > 1 && s.min_price !== s.max_price ? `, od ${rsd(s.min_price)} do ${rsd(s.max_price)}.` : `, po ceni od ${rsd(s.min_price)}.`;
+  if (s.cheapest && n > 1) out += ` Najjeftiniji je ${s.cheapest.name} (${s.cheapest.set_num}) za ${rsd(s.cheapest.price)}.`;
+  if (s.on_sale === 1) out += ' Jedan je na akciji.';
+  else if (s.on_sale > 1) out += ` Na akciji ${plural(s.on_sale, 'je', 'su', 'je')} ${sets(s.on_sale)}.`;
+  return out.replace(/\u00a0/g, ' ');
+}
+
+async function landingPage(l: Landing, filtered: boolean): Promise<PageMeta> {
+  const f = { ...l.filters, stock: true };
+  const q = buildSummary(f);
+  const summary = await one<ListSummary>(q.sql, q.params);
+  const list = buildSearch({ ...f, sort: 'deal', size: 60 });
+  const rows = await query<{ set_num: string; name: string; best_price: number | null }>(list.sql, list.params);
+  return {
+    ...DEFAULT,
+    path: l.path,
+    canonical: l.path,
+    robots: filtered ? 'noindex, follow' : undefined,
+    title: `${l.heading}: uporedi cene | ${SITE}`,
+    description: `${l.intro} ${summaryText(summary)}`,
+    body: landingBody(l, summaryText(summary), rows),
+  };
+}
+
 export const CONDITION: Record<string, string> = {
   like_new: 'kao novo',
   used_complete: 'korišćeno, kompletno',
@@ -515,7 +565,8 @@ async function adPage(id: string): Promise<PageMeta> {
 }
 
 async function setPage(setNum: string): Promise<PageMeta> {
-  const s = await loadSet(setNum);
+  // a set no shop has ever sold gets its page from the catalog (and noindex below: nothing to compare)
+  const s = (await loadSet(setNum)) ?? ((await ensureCatalogSet(setNum)) ? await loadSet(setNum) : null);
   const path = `/set/${encodeURIComponent(setNum)}`;
   if (!s) return { ...DEFAULT, status: 404, path, title: `Set nije pronađen | ${SITE}`, robots: 'noindex' };
 
@@ -545,6 +596,17 @@ async function setPage(setNum: string): Promise<PageMeta> {
       ],
     },
   ];
+  // the page's prices are as fresh as the last check: AI answers about prices prefer fresh pages
+  if (s.last_checked) {
+    jsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      url: `${site()}${path}`,
+      name: title,
+      inLanguage: 'sr-Latn',
+      dateModified: new Date(s.last_checked).toISOString(),
+    });
+  }
   const offerPrice = s.best_price ?? s.any_price;
   if (offerPrice) {
     jsonLd.push({

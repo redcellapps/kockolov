@@ -4,10 +4,11 @@ import { blackFriday } from '../../deals/blackFriday.js';
 import { pickFeatured } from '../../deals/featured.js';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
+import { ensureCatalogSet } from '../../lib/legoCatalog.js';
 import { normalizeText } from '../../lib/normalize.js';
 import { listingsEnabledFor, usedAdsForSet, usedSummary } from '../../listings/service.js';
 import { audienceOf, latestDeals, offersFor } from '../audience.js';
-import { buildLockedSearch, buildSearch, buildShopFacet, buildThemeFacet, type SearchFilters } from '../search.js';
+import { type ListSummary, type SearchFilters, buildLockedSearch, buildSearch, buildShopFacet, buildSummary, buildThemeFacet } from '../search.js';
 
 const csv = z
   .string()
@@ -31,6 +32,8 @@ const searchSchema = z.object({
   sort: z.string().optional(),
   page: z.coerce.number().int().min(1).max(500).optional(),
   size: z.coerce.number().int().min(1).max(96).optional(),
+  /** a theme's, gift or age page: also the list in a few numbers (buildSummary) */
+  summary: flag,
 });
 
 /** Sets that match the search and have active ads, but no shop offer among the results */
@@ -82,11 +85,13 @@ export async function catalogRoutes(app: FastifyInstance) {
     // anonymous visitors on the first page also see sets that exist only in members-only shops (no price, no shop)
     const wantLocked = f.audience === 'public' && s.page === 1 && !!(f.q || f.themes?.length) && !f.shops?.length && f.min === undefined && f.max === undefined && !f.sale;
     const lq = wantLocked ? buildLockedSearch(f) : null;
-    const [rows, themes, shops, lockedRows] = await Promise.all([
+    const sum = qs.summary && s.page === 1 ? buildSummary(f) : null;
+    const [rows, themes, shops, lockedRows, summary] = await Promise.all([
       query(s.sql, s.params),
       query(tf.sql, tf.params),
       query(sf.sql, sf.params),
       lq ? query(lq.sql, lq.params) : Promise.resolve([]),
+      sum ? one<ListSummary>(sum.sql, sum.params) : Promise.resolve(null),
     ]);
     // second-hand ads: how many and from what price on each set found, and sets found only in ads
     const adsOn = listingsEnabledFor(req.user);
@@ -102,6 +107,7 @@ export async function catalogRoutes(app: FastifyInstance) {
       used_only: usedOnly,
       items: rows.map(({ total, search_text, created_at, ...r }) => ({ ...r, used_count: used.get(r.set_num as string)?.count ?? 0, used_min_price: used.get(r.set_num as string)?.min ?? null })),
       facets: { themes, shops },
+      ...(summary ? { summary } : {}),
     };
   });
 
@@ -109,13 +115,16 @@ export async function catalogRoutes(app: FastifyInstance) {
     const setNum = req.params.setNum;
     const audience = audienceOf(req.user);
     const visible = offersFor(audience);
-    const set = await one(
-      `SELECT s.set_num, s.name, s.name_en, s.theme_slug, t.name AS theme_name, s.year, s.pieces, s.age_min,
-              s.image_url, s.rrp_rsd, s.created_at, s.description,
-              (SELECT o.ean FROM offers o WHERE o.set_num = s.set_num AND o.ean IS NOT NULL ORDER BY o.shop_id = 'lstore' DESC, o.id LIMIT 1) AS ean
-         FROM sets s LEFT JOIN themes t ON t.slug = s.theme_slug WHERE s.set_num = $1`,
-      [setNum],
-    );
+    const load = () =>
+      one(
+        `SELECT s.set_num, s.name, s.name_en, s.theme_slug, t.name AS theme_name, s.year, s.pieces, s.age_min,
+                s.image_url, s.rrp_rsd, s.created_at, s.description,
+                (SELECT o.ean FROM offers o WHERE o.set_num = s.set_num AND o.ean IS NOT NULL ORDER BY o.shop_id = 'lstore' DESC, o.id LIMIT 1) AS ean
+           FROM sets s LEFT JOIN themes t ON t.slug = s.theme_slug WHERE s.set_num = $1`,
+        [setNum],
+      );
+    // a set no shop has ever sold: from the catalog of every LEGO set, "not in stock anywhere"
+    const set = (await load()) ?? ((await ensureCatalogSet(setNum)) ? await load() : null);
     if (!set) return reply.code(404).send({ error: 'Set nije pronađen' });
 
     const offers = await query(
@@ -135,6 +144,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     );
     const stats = await one(
       `SELECT min(ph.price_rsd) FILTER (WHERE ph.in_stock) AS lowest_ever,
+              (array_agg(ph.recorded_at ORDER BY ph.price_rsd, ph.recorded_at DESC) FILTER (WHERE ph.in_stock))[1] AS lowest_ever_at,
               min(ph.price_rsd) FILTER (WHERE ph.in_stock AND ph.recorded_at > now() - interval '30 days') AS lowest_30d,
               min(ph.recorded_at) AS tracked_since
          FROM price_history ph JOIN ${visible} o ON o.id = ph.offer_id WHERE o.set_num = $1`,

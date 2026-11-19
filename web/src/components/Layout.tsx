@@ -9,6 +9,7 @@ import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { showBlackFriday } from '../lib/blackFriday';
 import { ago, displayCurrency, rateText } from '../lib/format';
+import { LANDINGS } from '../lib/landings';
 import { CONTACT_EMAIL, CREDITS, INSTAGRAM_URL, PLAY_URL } from '../lib/site';
 import { ClockIcon, GooglePlayIcon, HeartIcon, InstagramIcon } from './icons';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -224,6 +225,19 @@ function Footer() {
               <GooglePlayIcon size={18} className="text-brand" /> {t('footer.googlePlay')}
             </a>
           </nav>
+          {/* gift and age pages: also how search engines find them */}
+          <div className="mt-4 space-y-1.5 text-sm">
+            {(['gift', 'age'] as const).map((g) => (
+              <p key={g} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-semibold text-ink-3">{t(g === 'gift' ? 'landing.footer.gift' : 'landing.footer.age')}</span>
+                {LANDINGS.filter((l) => l.group === g).map((l) => (
+                  <Link key={l.path} to={l.path} className="text-ink-2 hover:text-ink hover:underline">
+                    {t(l.short)}
+                  </Link>
+                ))}
+              </p>
+            ))}
+          </div>
           <p className="mt-4 text-xs leading-relaxed text-ink-3">{t('footer.disclaimer')}</p>
           {displayCurrency() === 'EUR' && <p className="mt-2 text-xs leading-relaxed text-ink-3">{t('fx.note', { rate: rateText(fx?.eur.rate) })}</p>}
         </div>

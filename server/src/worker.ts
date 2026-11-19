@@ -9,6 +9,7 @@ import { refreshEurRate } from './fx.js';
 import { sendDigests } from './mail/digest.js';
 import { sendWatchAlerts } from './push/alerts.js';
 import { instagramJob } from './social/instagram.js';
+import { submitChanged } from './seo/indexnow.js';
 import { expireListings, purgeExpiredListings, purgeOldReports, sendExpiryReminders, sweepOrphanImages } from './listings/service.js';
 import { mailConfigured, sendAccountMail } from './mail/mailer.js';
 
@@ -17,9 +18,16 @@ const log = (m: string) => console.log(`${new Date().toISOString()} ${m}`);
 async function crawlJob() {
   try {
     log('posao: jutarnje preuzimanje cena');
+    const started = new Date();
     await refreshEurRate(log);
     const res = await runCrawl({ log });
     await alertOnCrawlProblems(res, log);
+    // Bing & co.: the pages that changed this morning
+    try {
+      await submitChanged(started, log);
+    } catch (err) {
+      log(`IndexNow: nije uspelo: ${(err as Error).message}`);
+    }
     if (config.PROMOS_CRAWL) {
       try {
         const promos = await runPromoCrawl({ log });

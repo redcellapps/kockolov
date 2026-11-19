@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
+import { ensureCatalogSet } from '../../lib/legoCatalog.js';
 import { destroySession, hashPassword, verifyPassword } from '../auth.js';
 import { buildSearch } from '../search.js';
 import { cleanPhone, dropFiles, filesOfUser, PhoneError } from '../../listings/service.js';
@@ -92,8 +93,8 @@ export async function meRoutes(app: FastifyInstance) {
   });
 
   app.put<{ Params: { setNum: string } }>('/api/me/watchlist/:setNum', { preHandler: requireUser }, async (req, reply) => {
-    const exists = await one('SELECT 1 FROM sets WHERE set_num = $1', [req.params.setNum]);
-    if (!exists) return reply.code(404).send({ error: 'Set nije pronađen' });
+    // a set no shop has ever sold can be watched too (its row comes from the catalog of every LEGO set)
+    if (!(await ensureCatalogSet(req.params.setNum))) return reply.code(404).send({ error: 'Set nije pronađen' });
     // today's best price is the starting point for "got cheaper" notifications
     await query(
       `INSERT INTO watchlist (user_id, set_num, seen_price, seen_in_stock)

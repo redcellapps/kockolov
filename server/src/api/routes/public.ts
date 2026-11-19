@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { LANDINGS } from '../../seo/landings.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
@@ -59,6 +60,12 @@ export async function publicRoutes(app: FastifyInstance) {
       return reply.code(404).send();
     }
   });
+
+  // IndexNow's key file: proves to Bing & co. that the pages we report are ours
+  if (config.INDEXNOW_KEY) {
+    const key = config.INDEXNOW_KEY;
+    app.get(`/${key}.txt`, async (_req, reply) => reply.type('text/plain; charset=utf-8').send(key));
+  }
 
   app.get('/robots.txt', async (_req, reply) => {
     reply.type('text/plain; charset=utf-8').header('Cache-Control', 'public, max-age=3600');
@@ -160,9 +167,15 @@ export async function publicRoutes(app: FastifyInstance) {
     `<url><loc>${site()}${path}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ''}</url>`;
   const setUrls = async () =>
     (
+      // last change of anything the page shows: a price or stock change (price history), a new offer, or the
+      // set's own details (name, picture, LEGO Store text); Google picks what to crawl again by this date
       await query<{ set_num: string; updated: string }>(
-        `SELECT o.set_num, to_char(max(o.price_changed_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS updated
-           FROM public_offers o WHERE o.set_num IS NOT NULL AND o.active
+        `SELECT o.set_num,
+                to_char(greatest(max(o.price_changed_at), max(o.first_seen), max(s.updated_at), max(h.last)) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS updated
+           FROM public_offers o
+           JOIN sets s ON s.set_num = o.set_num
+           LEFT JOIN LATERAL (SELECT max(ph.recorded_at) AS last FROM price_history ph WHERE ph.offer_id = o.id) h ON true
+          WHERE o.set_num IS NOT NULL AND o.active
           GROUP BY o.set_num
          HAVING bool_or(o.in_stock) ORDER BY o.set_num`,
       )
@@ -185,18 +198,23 @@ export async function publicRoutes(app: FastifyInstance) {
         WHERE s.theme_slug IS NOT NULL AND o.active AND o.in_stock ORDER BY 1`,
     );
     const posts = await listPosts();
+    // lists that change with every morning crawl carry its date
+    const crawled = (await one<{ day: string | null }>(
+      "SELECT to_char(max(finished_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day FROM crawl_runs WHERE status = 'ok'",
+    ))?.day ?? undefined;
     return xml(reply, [
-      url('/'),
-      url('/ponude'),
-      url('/crni-petak'),
-      url('/akcije'),
-      url('/teme'),
-      url('/pretraga'),
+      url('/', crawled),
+      url('/ponude', crawled),
+      url('/crni-petak', crawled),
+      url('/akcije', crawled),
+      url('/teme', crawled),
+      url('/pretraga', crawled),
       url('/privatnost'),
       url('/uslovi'),
       url('/blog', posts[0]?.date),
       ...posts.map((post) => url(`/blog/${post.slug}`, post.date)),
-      ...themes.map((t) => url(`/tema/${encodeURIComponent(t.slug)}`)),
+      ...themes.map((t) => url(`/tema/${encodeURIComponent(t.slug)}`, crawled)),
+      ...LANDINGS.map((l) => url(l.path, crawled)),
     ]);
   });
 

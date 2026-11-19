@@ -2,6 +2,7 @@ import { query } from '../db.js';
 import { latestDeals } from '../api/audience.js';
 import type { BlackFriday } from '../deals/blackFriday.js';
 import { buildSearch } from '../api/search.js';
+import { LANDINGS, type Landing } from './landings.js';
 import { escapeHtml as h, rsd, shopLabel } from '../mail/format.js';
 import { plural } from './og.js';
 import type { SetSeo } from './pages.js';
@@ -106,6 +107,14 @@ export async function themeBody(slug: string, name: string, subtitle: string): P
   return wrapBody(
     `${nav}<h1>LEGO ${h(name)}</h1><p>${h(subtitle)}</p>${setLinks(rows)}` + `<p><a href="/teme">Sve LEGO teme</a></p>`,
   );
+}
+
+/** A gift or age page: what it is, the list in sentences, the sets, and the other such pages */
+export function landingBody(l: Landing, summary: string, rows: ListedSet[]): string {
+  const others = LANDINGS.filter((x) => x.path !== l.path)
+    .map((x) => `<a href="${x.path}">${h(x.heading)}</a>`)
+    .join(' ');
+  return wrapBody(`${nav}<h1>${h(l.heading)}</h1><p>${h(l.intro)}</p><p>${h(summary)}</p>${setLinks(rows)}<p>${others}</p>`);
 }
 
 export async function setBody(s: SetSeo): Promise<string> {

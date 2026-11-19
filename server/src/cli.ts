@@ -16,6 +16,7 @@ import { todayLocal } from './lib/time.js';
 import { sendWatchAlerts } from './push/alerts.js';
 import { sendPushToUser } from './push/push.js';
 import { fillEans } from './crawler/ean.js';
+import { indexNowOn, submitAll } from './seo/indexnow.js';
 
 const HELP = `Kockolov CLI
 
@@ -30,6 +31,7 @@ const HELP = `Kockolov CLI
   push:test --email x@y.rs                 probno obaveštenje na sve uređaje tog korisnika
   ean [broj]                               preuzmi bar-kodove kutija iz LEGO Store-a (podrazumevano 400)
   promos [prodavnica…]                     pročitaj stranice sa akcijama i predloži ih u administraciji
+  indexnow                                 javi Bing-u (IndexNow) sve stranice iz sitemap-a (treba INDEXNOW_KEY)
   user:create --email x@y.rs [--name Ime] [--admin] [--password tajna]
   user:invite --email x@y.rs [--name Ime] [--admin]   (e-mail sa linkom za postavljanje lozinke)
   user:password --email x@y.rs [--password tajna]
@@ -80,6 +82,12 @@ async function main() {
       break;
     case 'deals':
       await computeDeals();
+      break;
+    case 'indexnow':
+      if (!indexNowOn()) {
+        console.log('IndexNow nije uključen: postavi INDEXNOW_KEY (i PUBLIC_MODE) u .env.');
+        process.exitCode = 1;
+      } else await submitAll();
       break;
     case 'digest': {
       if (values.preview) {

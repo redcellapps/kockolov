@@ -93,6 +93,8 @@ export default function App() {
         <Route path="/moji-oglasi" element={<Gate needAds needUser><MyListings /></Gate>} />
         <Route path="/pretraga" element={<Gate><SearchPage /></Gate>} />
         <Route path="/tema/:slug" element={<Gate><SearchPage /></Gate>} />
+        <Route path="/pokloni/:landing" element={<Gate><SearchPage /></Gate>} />
+        <Route path="/uzrast/:landing" element={<Gate><SearchPage /></Gate>} />
         <Route path="/ponude" element={<Gate><DealsPage /></Gate>} />
         <Route path="/akcije" element={<Gate><PromosPage /></Gate>} />
         <Route path="/crni-petak" element={<Gate><BlackFridayPage /></Gate>} />

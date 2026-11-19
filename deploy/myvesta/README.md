@@ -245,6 +245,24 @@ it or people watch it, a bonus for a real discount, a different theme than the l
 - Put `kockolov.rs` (with `?utm_source=instagram`) in the profile's bio: the captions say "link u bio-u".
 - Another time: `INSTAGRAM_CRON=0 9 * * *` in `.env`, then `docker compose up -d worker`; empty turns it off.
 
+## 11. Bing and IndexNow
+
+Bing's index also feeds ChatGPT and Copilot search. After each morning crawl the worker tells Bing (and
+Yandex, Seznam, Naver) which pages changed, through IndexNow. Google doesn't use IndexNow; it reads the sitemap.
+
+1. Make a key and put it in `.env`:
+   ```bash
+   echo "INDEXNOW_KEY=$(openssl rand -hex 16)" >> /opt/kockolov/.env
+   cd /opt/kockolov && docker compose up -d
+   ```
+   `https://kockolov.rs/<key>.txt` must now show the key.
+2. Bing Webmaster Tools (https://www.bing.com/webmasters): sign in, "Import from Google Search Console",
+   pick kockolov.rs. The site and its sitemap come over, no extra verification.
+3. Report every page once: `docker compose exec worker node server/dist/cli.js indexnow`.
+   From then on it happens by itself after the 05:30 crawl (the worker log says "IndexNow: javljeno …").
+
+Bing Webmaster → IndexNow shows what arrived.
+
 ## Updating
 
 ```bash

@@ -477,6 +477,36 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       expect((await head('/set/75%ZZ192')).m.status).toBe(404);
       expect((await sitemapText()).text).toContain('/tema/harry-potter</loc>');
       expect((await head('/')).m.jsonLd?.[0]).toMatchObject({ '@type': 'WebSite' });
+      expect((await head('/')).m.jsonLd?.[1]).toMatchObject({ '@type': 'Organization', sameAs: expect.arrayContaining([expect.stringContaining('instagram.com/kockolov')]) });
+
+      // gift and age pages: their own title and intro in sentences, in the sitemap, filtered views not indexed
+      const gift = await head('/pokloni/do-5000-dinara');
+      expect(gift.m).toMatchObject({ status: 200, canonical: '/pokloni/do-5000-dinara', title: 'LEGO pokloni do 5.000 dinara: uporedi cene | Kockolov' });
+      expect(gift.m.robots).toBeUndefined();
+      expect(gift.m.description).toMatch(/za najviše 5\.000 dinara.* Na stanju (je|su) \d+ set/);
+      expect(gift.html).toContain('<h1>LEGO pokloni do 5.000 dinara</h1>');
+      expect((await head('/uzrast/za-odrasle')).m.title).toBe('LEGO za odrasle (18+): uporedi cene | Kockolov');
+      expect((await head('/pokloni/do-5000-dinara?sort=price_asc')).m.robots).toBe('noindex, follow');
+      expect((await head('/pokloni/do-3-dinara')).m.status).toBe(404);
+      const pages = (await app.inject({ method: 'GET', url: '/sitemap-pages.xml' })).body;
+      expect(pages).toContain('/pokloni/do-2000-dinara</loc>');
+      expect(pages).toContain('/uzrast/4-6-godina</loc>');
+      // every list there carries the last crawl's date, set pages the date of their last change
+      expect(pages).toMatch(/\/ponude<\/loc><lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+      expect((await app.inject({ method: 'GET', url: '/sitemap-sets.xml' })).body).toMatch(/\/set\/10280<\/loc><lastmod>\d{4}-\d{2}-\d{2}/);
+
+      // a set no shop has ever sold: its page from the catalog of every LEGO set, "not in stock anywhere", not indexed
+      await query("DELETE FROM sets WHERE set_num = '40772'");
+      const ghost = await head('/set/40772');
+      expect(ghost.m).toMatchObject({ status: 200, robots: 'noindex, follow' });
+      expect(ghost.m.title).toBe('LEGO 40772 Celebration Series: Luminous Ghost: cena i dostupnost | Kockolov');
+      const api = (await app.inject({ method: 'GET', url: '/api/sets/40772', headers: { cookie } })).json();
+      expect(api.set).toMatchObject({ set_num: '40772', year: 2025, pieces: 167, image_url: 'https://cdn.rebrickable.com/media/sets/40772-1.jpg' });
+      expect(api.offers).toEqual([]);
+      expect((await sitemapText()).text).not.toContain('/set/40772<');
+      // and it can be watched like any other set
+      expect((await app.inject({ method: 'PUT', url: '/api/me/watchlist/40772', headers: { cookie } })).statusCode).toBeLessThan(300);
+      await query("DELETE FROM sets WHERE set_num = '40772'");
       expect(theme.html).toContain('<h1>LEGO Harry Potter</h1>');
       expect(theme.html).toMatch(/<a href="\/set\/\d+[^"]*">LEGO \d+/);
       const home = (await head('/')).html;

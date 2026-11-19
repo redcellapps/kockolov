@@ -117,6 +117,16 @@ export interface SearchResponse {
   /** sets that match the search and exist only in second-hand ads */
   used_only?: UsedOnlySet[];
   facets: { themes: { slug: string | null; count: number }[]; shops: { id: string; count: number }[] };
+  /** asked for with summary=1 (a theme's, gift or age page): the list in a few numbers */
+  summary?: ListSummary;
+}
+
+export interface ListSummary {
+  total: number;
+  min_price: number | null;
+  max_price: number | null;
+  on_sale: number;
+  cheapest: { set_num: string; name: string; price: number } | null;
 }
 
 export interface Offer {
@@ -166,7 +176,7 @@ export interface SetDetail {
   /** active second-hand ads for this set (cheapest first) */
   used?: UsedAd[];
   history: HistoryPoint[];
-  stats: { lowest_ever: number | null; lowest_30d: number | null; tracked_since: string | null } | null;
+  stats: { lowest_ever: number | null; lowest_ever_at?: string | null; lowest_30d: number | null; tracked_since: string | null } | null;
   deal: { day: string; rank: number; score: number; best_price_rsd: number; reference_price_rsd: number | null; reasons: Reason[] } | null;
   related: SetSummary[];
   watched: boolean;
