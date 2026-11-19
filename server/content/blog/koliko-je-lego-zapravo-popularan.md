@@ -76,13 +76,13 @@ Tu je, verovatno, i odgovor na pitanje koliko je LEGO popularan. Deca ga vole je
 
 Toliko popularna igračka prodaje se skoro svuda: u LEGO Store-u, u velikim online prodavnicama i u malim radnjama. A cena istog seta zna da se razlikuje i za nekoliko hiljada dinara. Tu pomaže Kockolov:
 
-- Svako jutro poredi cene u a uz besplatan nalog i u skoro sve prodavnice u Srbiji.
+- Svako jutro poredi cene u skoro svim prodavnicama LEGO kocki u Srbiji.
 - Za svaki set pokazuje istoriju cena, pa odmah vidiš da li je akcija stvarno akcija.
 - Setove koje želiš dodaš u Praćeno, a svako jutro u 7 sati stiže ti mejl sa najboljim ponudama.
 
 Ako ti se neki set dopada, a ne žuri ti se, stavi ga u Praćeno i sačekaj pravu cenu. Pogotovo ako je u pitanju set za koji se priča da uskoro izlazi iz prodaje.
 
-Pogledaj [ponude dana](/ponude), prošetaj kroz [teme](/teme) ili [napravi besplatan nalog](/registracija) i vidi ponude iz svih prodavnica.
+Pogledaj [ponude dana](/ponude), prošetaj kroz [teme](/teme) ili [napravi besplatan nalog](/registracija) i prati setove koje želiš.
 
 Vidimo se među kockicama,
 

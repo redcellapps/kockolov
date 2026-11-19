@@ -47,7 +47,7 @@ Zato sam napravio Kockolov. Iskreno, on je pre svega poklon onom dečaku ispred 
 
 Šta Kockolov radi:
 
-- Svako jutro proverava cene u [LEGO Store-u](https://lstore.rs), [Kockariumu](https://www.kockarium.rs) i [Ananasu](https://ananas.rs), a uz besplatan nalog i u još desetak prodavnica u Srbiji.
+- Svako jutro proverava cene u [LEGO Store-u](https://lstore.rs), [Kockariumu](https://www.kockarium.rs) i [Ananasu](https://ananas.rs) i u još petnaestak prodavnica u Srbiji. Sve cene vidiš i bez naloga.
 - Za svaki set pokazuje sve ponude na jednom mestu, od najjeftinije, sa istorijom cena. Odmah vidiš da li je akcija stvarno akcija.
 - Svakog dana izdvaja [ponude dana](/ponude): setove koji su tog jutra najpovoljniji u odnosu na cenu u [LEGO Store-u](https://lstore.rs) i na svoje ranije cene.
 - Setove koje želiš dodaš u Praćeno, a svako jutro u 7 sati stiže ti mejl sa najboljim ponudama.
@@ -62,7 +62,7 @@ Ako danas biraš prvi set za svoje dete, želim da ga kupiš po najboljoj ceni, 
 
 A ako si odrastao čovek koji sebi i dalje kupuje kockice, nisi jedini. Ja sam svoje obećanje ispunio. Kockolov je moj način da pomognem i tebi da ispuniš svoje.
 
-Potraži svoj set na [kockolov.rs](/) ili [napravi besplatan nalog](/registracija) i vidi ponude iz svih prodavnica.
+Potraži svoj set na [kockolov.rs](/) i uporedi ponude iz svih prodavnica. Uz [besplatan nalog](/registracija) pratiš setove i dobijaš obaveštenje kad cena padne.
 
 Vidimo se među kockicama,
 
