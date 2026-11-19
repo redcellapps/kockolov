@@ -203,6 +203,49 @@ body {
   }
 }
 
+/* Crni petak: a black hero in light and dark theme, a faint stud field fading in on the right */
+.bf-hero {
+  background: #16150f;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.bf-hero :focus-visible {
+  outline-color: var(--brand);
+}
+.bf-field {
+  background-image: radial-gradient(circle at 18px 18px, rgba(255, 255, 255, 0.05) 6px, transparent 6.5px);
+  background-size: 36px 36px;
+  -webkit-mask-image: linear-gradient(100deg, transparent 45%, #000 95%);
+  mask-image: linear-gradient(100deg, transparent 45%, #000 95%);
+}
+/* the 1×20 plate: dark studs, the real discounts in yellow */
+.bf-plate {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+}
+.bf-stud {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1.5px 0 rgba(0, 0, 0, 0.55);
+}
+/* a stud seen from above: flat face, light top rim, darker lower rim */
+.bf-stud-on {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--brand);
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.55), inset 0 -2px 0 rgba(150, 100, 0, 0.35);
+  animation: bf-stud-on 0.35s cubic-bezier(0.3, 1.5, 0.6, 1) both;
+}
+@keyframes bf-stud-on {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
 /* Product images are shop photos on white; keep them on white in dark mode too */
 .product-img {
   background: #ffffff;
