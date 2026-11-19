@@ -220,6 +220,7 @@ export const sr = {
   'home.bf.text': 'Crni petak je 27. novembra. Pogledaj koji LEGO popusti su pravi.',
   'home.bf.link': 'Crni petak',
   'set.about.title': 'O setu',
+  'set.about.more': 'Više o setu',
   'set.about.number': 'Broj seta',
   'set.about.name': 'Naziv',
   'set.about.theme': 'Tema',
