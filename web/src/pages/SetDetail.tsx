@@ -87,8 +87,8 @@ export default function SetDetail() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-10">
-        {/* image */}
-        <div className="relative overflow-hidden rounded-3xl border border-line">
+        {/* image: as tall as itself, not stretched to the summary next to it */}
+        <div className="relative self-start overflow-hidden rounded-3xl border border-line">
           <ProductImage src={set.image_url} alt={set.name} className="aspect-square [&_img]:p-8 sm:[&_img]:p-12" />
           {savingPct >= 3 && (
             <span className="absolute left-4 top-4 rounded-xl bg-deal px-3 py-1.5 text-lg font-extrabold text-white shadow">−{savingPct}%</span>
@@ -170,6 +170,16 @@ export default function SetDetail() {
             <Stat label={t('set.lowest30')} value={money(stats?.lowest_30d)} />
             <Stat label={t('set.lowestEver')} value={money(stats?.lowest_ever)} hint={stats?.tracked_since ? t('set.trackedSince', { date: dateLong(stats.tracked_since) }) : undefined} />
           </dl>
+
+          {/* the start of the LEGO Store's text, the whole of it under "O setu" */}
+          {set.description && (
+            <div className="mt-5 text-[15px] leading-relaxed text-ink-2">
+              <p className="line-clamp-3">{set.description.replace(/\n+/g, ' ')}</p>
+              <a href="#o-setu" className="mt-1.5 inline-block text-sm font-bold text-ink underline decoration-line decoration-2 underline-offset-4 hover:decoration-ink">
+                {t('set.about.more')}
+              </a>
+            </div>
+          )}
         </div>
       </div>
 
@@ -304,7 +314,7 @@ export default function SetDetail() {
       </section>
 
       {/* about the set: the LEGO Store's text and the facts, also what search engines read */}
-      <section className="mt-12">
+      <section id="o-setu" className="mt-12 scroll-mt-24">
         <h2 className="mb-4 text-2xl font-extrabold tracking-tight">{t('set.about.title')}</h2>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           {set.description ? (
