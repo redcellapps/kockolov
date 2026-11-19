@@ -5,7 +5,7 @@ import { ArrowLeft, CheckIcon, ExternalIcon, TrendDown } from '../components/ico
 import { ShareButton } from '../components/ShareButton';
 import { PriceHistoryChart } from '../components/PriceHistoryChart';
 import { ProductImage, SetCard } from '../components/SetCard';
-import { EmptyState, ErrorState, ShopDot, Skeleton, buttonClasses, cx } from '../components/ui';
+import { ErrorState, ShopDot, Skeleton, buttonClasses, cx } from '../components/ui';
 import { WatchButton } from '../components/WatchButton';
 import { PromoCard } from '../components/PromoCard';
 import { usePromos, type Promo } from '../lib/promos';
@@ -15,6 +15,7 @@ import { api, ApiError, type SetDetail as SetDetailData, type UsedAd } from '../
 import { ageLabel, ago, dateInSentence, dateLong, dateTimeLong, displayCurrency, money, rateText, reasonText, shopName } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { usePageTitle } from '../lib/title';
+import { NotFoundPage } from './Other';
 
 export default function SetDetail() {
   const { setNum = '' } = useParams();
@@ -39,12 +40,7 @@ export default function SetDetail() {
   );
 
   if (q.isLoading) return <DetailSkeleton />;
-  if (q.error instanceof ApiError && q.error.status === 404)
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-16">
-        <EmptyState title={t('set.notFound')} action={<Link to="/pretraga" className="font-bold text-accent">{t('nav.search')}</Link>} />
-      </div>
-    );
+  if (q.error instanceof ApiError && q.error.status === 404) return <NotFoundPage title={t('set.notFound')} text={t('set.notFound.text')} />;
   if (q.isError || !q.data) return <div className="mx-auto max-w-3xl px-4 py-16"><ErrorState onRetry={() => q.refetch()} /></div>;
 
   const { set, offers, history, stats, deal, related } = q.data;

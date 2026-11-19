@@ -5,13 +5,14 @@ import { useAdsStatus } from '../ads/store';
 import { useAuth } from '../lib/auth';
 import { cx } from '../components/ui';
 import { DealCard, SetCard } from '../components/SetCard';
-import { CardSkeleton, EmptyState, ErrorState } from '../components/ui';
+import { CardSkeleton, EmptyState, ErrorState, buttonClasses } from '../components/ui';
 import { useWatchlist } from '../components/WatchButton';
 import { t } from '../i18n';
 import { api, type Deal, type Theme } from '../lib/api';
 import { dateLong } from '../lib/format';
 import { ThemeTile } from './Home';
 import { usePageTitle } from '../lib/title';
+import { BrickGame } from '../components/BrickGame';
 import { PushPrompt } from '../components/PhoneSettings';
 
 function PageHead({ title, subtitle }: { title: string; subtitle?: string }) {
@@ -145,16 +146,24 @@ export function WatchlistPage() {
   );
 }
 
-export function NotFoundPage() {
+/** 404: the page doesn't exist, the way home, and a small game while you're here (components/BrickGame.tsx) */
+export function NotFoundPage({ title, text }: { title?: string; text?: string }) {
   usePageTitle(t('title.notFound'));
   return (
-    <div className="mx-auto max-w-3xl px-4 py-20">
-      <EmptyState
-        title={t('notFound.title')}
-        action={
-          <Link to="/" className="font-bold text-accent hover:underline">
-            {t('notFound.back')}
-          </Link>
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+      <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">{title ?? t('notFound.title')}</h1>
+      <p className="mt-3 max-w-2xl text-pretty text-base text-ink-2 sm:text-lg">{text ?? t('notFound.text')}</p>
+      <BrickGame
+        className="mt-6 sm:mt-8"
+        after={
+          <>
+            <Link to="/" className={buttonClasses('primary', 'md')}>
+              {t('notFound.back')}
+            </Link>
+            <Link to="/ponude" className={buttonClasses('outline', 'md')}>
+              {t('notFound.deals')}
+            </Link>
+          </>
         }
       />
     </div>
