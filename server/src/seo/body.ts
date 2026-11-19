@@ -1,5 +1,6 @@
 import { query } from '../db.js';
 import { latestDeals } from '../api/audience.js';
+import type { BlackFriday } from '../deals/blackFriday.js';
 import { buildSearch } from '../api/search.js';
 import { escapeHtml as h, rsd, shopLabel } from '../mail/format.js';
 import { plural } from './og.js';
@@ -27,7 +28,7 @@ export function wrapBody(inner: string): string {
   return `<div data-ssr style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">${inner}</div>`;
 }
 
-const nav = `<nav><a href="/">Kockolov</a> <a href="/ponude">Ponude dana</a> <a href="/teme">Teme</a> <a href="/pretraga">Pretraga</a> <a href="/blog">Blog</a></nav>`;
+const nav = `<nav><a href="/">Kockolov</a> <a href="/ponude">Ponude dana</a> <a href="/crni-petak">Crni petak</a> <a href="/teme">Teme</a> <a href="/pretraga">Pretraga</a> <a href="/blog">Blog</a></nav>`;
 
 async function themeList() {
   return query<{ slug: string; name: string; count: number }>(
@@ -63,6 +64,36 @@ export async function homeBody(): Promise<string> {
 export async function dealsBody(): Promise<string> {
   const deals = await dealList(40);
   return wrapBody(`${nav}<h1>LEGO na akciji danas: ponude dana</h1>${setLinks(deals)}`);
+}
+
+const GENITIVE = ['januara', 'februara', 'marta', 'aprila', 'maja', 'juna', 'jula', 'avgusta', 'septembra', 'oktobra', 'novembra', 'decembra'];
+/** "27. novembra" for a YYYY-MM-DD date */
+const dayMonth = (d: string) => {
+  const [, m, day] = d.split('-').map(Number);
+  return `${day}. ${GENITIVE[(m ?? 1) - 1]}`;
+};
+
+export function blackFridayBody(bf: BlackFriday): string {
+  const items = bf.items.slice(0, 60).map((i) => {
+    const verdict =
+      i.real === true
+        ? 'najniža cena u poslednjih 30 dana'
+        : i.real === false && i.min30 != null && i.min30_at
+          ? `bilo je i jeftinije: ${price(i.min30)}, ${dayMonth(i.min30_at)}`
+          : '';
+    return (
+      `<li><a href="/set/${encodeURIComponent(i.set_num)}">LEGO ${h(i.set_num)} ${h(i.name)}</a> – ${price(i.best_price)} ` +
+      `(−${i.pct}% od ${price(i.rrp)} u LEGO Store-u${verdict ? `; ${verdict}` : ''})</li>`
+    );
+  });
+  return wrapBody(
+    `${nav}<h1>Crni petak 2026: LEGO popusti</h1>` +
+      `<p>Crni petak (Black Friday) je ${dayMonth(bf.date)}. Ovde su svi LEGO setovi koji su danas bar 10% jeftiniji od redovne cene u LEGO Store-u, iz svih prodavnica koje pratimo. ` +
+      `Za svaki popust proveravamo da li je cena zaista najniža u poslednjih 30 dana.</p>` +
+      (items.length ? `<h2>LEGO popusti danas</h2><ul>${items.join('')}</ul>` : '<p>Trenutno nema setova sa popustom od bar 10%.</p>') +
+      `<h2>Kako da prepoznaš lažni popust</h2><ul><li>Ne veruj precrtanoj ceni: gledaj koliko je set koštao pre akcije.</li>` +
+      `<li>Pogledaj istoriju cene na stranici seta.</li><li>Uporedi sa redovnom cenom u LEGO Store-u.</li></ul>`,
+  );
 }
 
 export async function themesBody(): Promise<string> {

@@ -5,7 +5,8 @@ import { latestDeals } from '../api/audience.js';
 import { buildSearch } from '../api/search.js';
 import { getPost, listPosts, type BlogPost } from '../blog/posts.js';
 import { escapeHtml, rsd, shopLabel } from '../mail/format.js';
-import { dealsBody, homeBody, setBody, themeBody, themesBody } from './body.js';
+import { blackFridayBody, dealsBody, homeBody, setBody, themeBody, themesBody } from './body.js';
+import { blackFriday } from '../deals/blackFriday.js';
 import { OG_HEIGHT, OG_WIDTH, plural } from './og.js';
 
 /**
@@ -122,7 +123,17 @@ async function topDeals(n: number) {
   );
 }
 
-export async function loadCollection(kind: 'home' | 'deals' | 'theme', slug?: string): Promise<Collection | null> {
+export async function loadCollection(kind: 'home' | 'deals' | 'theme' | 'crni-petak', slug?: string): Promise<Collection | null> {
+  if (kind === 'crni-petak') {
+    const bf = await blackFriday();
+    return {
+      title: 'Crni petak: LEGO popusti',
+      subtitle: bf.total
+        ? `${sets(bf.total)} jeftinije do${NB}−${bf.max_pct}%. Proveravamo da li je popust pravi.`
+        : 'Svi LEGO popusti na jednom mestu. Proveravamo da li je popust pravi.',
+      items: bf.items.slice(0, 3).map((i) => ({ image_url: i.image_url, best_price: i.best_price })),
+    };
+  }
   if (kind === 'theme') {
     const theme = await one<{ name: string }>('SELECT name FROM themes WHERE slug = $1', [slug]);
     if (!theme) return null;
@@ -221,6 +232,22 @@ export async function pageMeta(rawPath: string, params: URLSearchParams): Promis
       canonical: p,
       title: `Akcije LEGO prodavnica u Srbiji | ${SITE}`,
       description: `Poklon uz kupovinu, popust samo online i popust za više setova u srpskim LEGO prodavnicama${n ? `: ${count(n, 'aktuelna akcija', 'aktuelne akcije', 'aktuelnih akcija')}` : ''}. Svaku akciju proveravamo pre objave.`.replace(/\u00a0/g, ' '),
+    };
+  }
+
+  if (p === '/crni-petak') {
+    const bf = await blackFriday();
+    return {
+      ...DEFAULT,
+      path: p,
+      canonical: p,
+      title: `Crni petak 2026: LEGO popusti i provera cena | ${SITE}`,
+      description: (bf.total
+        ? `Black Friday LEGO popusti u Srbiji: ${sets(bf.total)} bar 10% jeftinije od LEGO Store-a, do −${bf.max_pct}%. Za svaki popust proveravamo da li je cena zaista najniža u poslednjih 30 dana.`
+        : 'Black Friday LEGO popusti u Srbiji na jednom mestu. Za svaki popust proveravamo da li je cena zaista najniža u poslednjih 30 dana.'
+      ).replace(/\u00a0/g, ' '),
+      image: { url: `/og/crni-petak.jpg?v=${version(bf.total, bf.max_pct, bf.items[0]?.best_price, bf.items[0]?.image_url)}`, alt: 'Crni petak: LEGO popusti na Kockolovu' },
+      body: blackFridayBody(bf),
     };
   }
 

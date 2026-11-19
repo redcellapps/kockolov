@@ -133,7 +133,7 @@ export async function publicRoutes(app: FastifyInstance) {
     return reply.type('image/jpeg').header('Cache-Control', 'public, max-age=86400').send(buf);
   });
 
-  async function collection(reply: import('fastify').FastifyReply, kind: 'home' | 'deals' | 'theme', slug?: string) {
+  async function collection(reply: import('fastify').FastifyReply, kind: 'home' | 'deals' | 'theme' | 'crni-petak', slug?: string) {
     const c = config.PUBLIC_MODE ? await loadCollection(kind, slug) : null;
     if (!c) return reply.code(404).send('');
     const card = { title: c.title, subtitle: c.subtitle, items: c.items.map((i) => ({ imageUrl: i.image_url, price: i.best_price })) };
@@ -142,6 +142,7 @@ export async function publicRoutes(app: FastifyInstance) {
   }
   app.get('/og/home.jpg', (_req, reply) => collection(reply, 'home'));
   app.get('/og/deals.jpg', (_req, reply) => collection(reply, 'deals'));
+  app.get('/og/crni-petak.jpg', (_req, reply) => collection(reply, 'crni-petak'));
   app.get<{ Params: { file: string } }>('/og/theme/:file', (req, reply) => {
     const slug = jpgName(req.params.file);
     return slug ? collection(reply, 'theme', slug) : reply.code(404).send('');
@@ -187,6 +188,7 @@ export async function publicRoutes(app: FastifyInstance) {
     return xml(reply, [
       url('/'),
       url('/ponude'),
+      url('/crni-petak'),
       url('/akcije'),
       url('/teme'),
       url('/pretraga'),

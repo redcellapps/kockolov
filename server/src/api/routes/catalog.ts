@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { setForCode } from '../../crawler/ean.js';
+import { blackFriday } from '../../deals/blackFriday.js';
 import { pickFeatured } from '../../deals/featured.js';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
@@ -166,6 +167,13 @@ export async function catalogRoutes(app: FastifyInstance) {
         : { n: 0, shops: 0 };
     const used = listingsEnabledFor(req.user) ? await usedAdsForSet(setNum, req.user?.id ?? null) : [];
     return { set, offers, used, history, stats, deal, related, watched, hidden_offers: hidden.n, hidden_shops: hidden.shops };
+  });
+
+  // Crni petak: sets at least 10% below the LEGO Store price, each checked against its 30-day low
+  app.get('/api/crni-petak', async (req) => {
+    const { limit } = z.object({ limit: z.coerce.number().int().min(1).max(300).default(120) }).parse(req.query);
+    const bf = await blackFriday();
+    return { ...bf, items: bf.items.slice(0, limit) };
   });
 
   app.get('/api/deals', async (req) => {

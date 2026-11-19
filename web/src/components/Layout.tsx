@@ -7,6 +7,7 @@ import { useAdsStatus } from '../ads/store';
 import { t } from '../i18n';
 import { api, type Stats } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { showBlackFriday } from '../lib/blackFriday';
 import { ago, displayCurrency, rateText } from '../lib/format';
 import { CONTACT_EMAIL, CREDITS, INSTAGRAM_URL, PLAY_URL } from '../lib/site';
 import { ClockIcon, GooglePlayIcon, HeartIcon, InstagramIcon } from './icons';
@@ -100,6 +101,11 @@ function Header() {
           <NavLink to="/ponude" className={link}>
             {t('nav.deals')}
           </NavLink>
+          {showBlackFriday() && (
+            <NavLink to="/crni-petak" className={link}>
+              {t('nav.blackFriday')}
+            </NavLink>
+          )}
           <NavLink to="/akcije" className={link}>
             {t('nav.promos')}
           </NavLink>
@@ -135,6 +141,11 @@ function Header() {
             <NavLink to="/ponude" className={link}>
               {t('nav.deals')}
             </NavLink>
+            {showBlackFriday() && (
+              <NavLink to="/crni-petak" className={link}>
+                {t('nav.blackFriday')}
+              </NavLink>
+            )}
             <NavLink to="/akcije" className={link}>
               {t('nav.promos')}
             </NavLink>

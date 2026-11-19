@@ -10,6 +10,7 @@ import { api, type Deal, type Shop, type Stats, type Theme } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { num, SHOPS } from '../lib/format';
 import { usePageTitle } from '../lib/title';
+import { showBlackFriday } from '../lib/blackFriday';
 
 export default function Home() {
   usePageTitle(null);
@@ -33,6 +34,19 @@ export default function Home() {
 
       {/* Visitors: every shop is public; the account is for watching sets, the morning e-mail and the ads */}
       {!user && shops.data && <AccountCta shops={shops.data} registrationOpen={registrationOpen} listings={listings} />}
+
+      {/* Crni petak, until 30 November */}
+      {showBlackFriday() && (
+        <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6">
+          <Link to="/crni-petak" className="flex items-center justify-between gap-3 rounded-2xl bg-ink px-5 py-4 text-bg transition hover:opacity-95">
+            <span className="flex items-center gap-3">
+              <span className="shrink-0 rounded-full bg-brand px-2.5 py-1 text-xs font-extrabold uppercase tracking-wider text-brand-ink">{t('home.bf.link')}</span>
+              <span className="font-semibold">{t('home.bf.text')}</span>
+            </span>
+            <ChevronRight size={20} className="shrink-0" />
+          </Link>
+        </div>
+      )}
 
       {/* Deals */}
       <section className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 sm:pt-16">
