@@ -160,6 +160,34 @@ export function buildShopFacet(f: SearchFilters) {
 }
 
 /**
+ * In a few numbers, what a list has in stock (a theme's page, gifts up to a price, an age): how many sets,
+ * the price range, the cheapest one, and how many are on sale. Written out as sentences on those pages.
+ */
+export function buildSummary(f: SearchFilters) {
+  const p = new Params();
+  const head = ctes(p, f.shops, f.audience);
+  const w = where(p, { ...f, q: undefined, stock: true }, null);
+  return {
+    sql: `${head},
+    m AS (SELECT * FROM base ${w.sql})
+    SELECT count(*)::int AS total, min(best_price)::int AS min_price, max(best_price)::int AS max_price,
+           count(*) FILTER (WHERE discount_pct >= 5 OR shop_sale)::int AS on_sale,
+           (SELECT json_build_object('set_num', set_num, 'name', name, 'price', best_price)
+              FROM m ORDER BY best_price, set_num LIMIT 1) AS cheapest
+      FROM m`,
+    params: p.values,
+  };
+}
+
+export interface ListSummary {
+  total: number;
+  min_price: number | null;
+  max_price: number | null;
+  on_sale: number;
+  cheapest: { set_num: string; name: string; price: number } | null;
+}
+
+/**
  * Teaser for anonymous visitors: sets that match the text, theme and age filters and are in stock only in
  * members-only shops. Only name and picture are selected: no number, theme, price, shop or offer reaches the browser.
  */

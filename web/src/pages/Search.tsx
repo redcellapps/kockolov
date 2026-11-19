@@ -1,39 +1,44 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams, Link } from 'react-router';
+import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router';
 import { Filters, activeFilterCount, readFilters, writeFilters, type FilterState } from '../components/Filters';
 import { FilterIcon, XIcon } from '../components/icons';
 import { SetCard, UsedOnlyCard } from '../components/SetCard';
 import { Button, CardSkeleton, EmptyState, ErrorState, Spinner, cx } from '../components/ui';
 import { t, tn, type TKey } from '../i18n';
-import { api, type SearchResponse, type Theme } from '../lib/api';
-import { displayCurrency, moneyNum, shopName } from '../lib/format';
+import { api, type ListSummary, type SearchResponse, type Theme } from '../lib/api';
+import { displayCurrency, money, moneyNum, shopName } from '../lib/format';
+import { landingFor } from '../lib/landings';
 import { usePageTitle } from '../lib/title';
 
 const SORTS = ['relevance', 'deal', 'discount', 'price_asc', 'price_desc', 'newest', 'name'];
 const PAGE = 24;
 
 export default function SearchPage() {
-  // /tema/:slug is a theme's own page: the same list with that theme picked
+  // /tema/:slug is a theme's own page, /pokloni/… and /uzrast/… a price limit's or an age's: the same list
+  // with those filters picked by the address
   const { slug } = useParams();
+  const landing = landingFor(useLocation().pathname);
+  const preset = useMemo(() => (slug ? { theme: slug } : (landing?.params ?? null)), [slug, landing]);
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const f = useMemo(() => {
     const p = new URLSearchParams(params);
-    // the address decides the theme (a stray ?theme= on a theme's page would list another one)
-    if (slug) p.set('theme', slug);
+    // the address decides (a stray ?theme= on a theme's page would list another one)
+    for (const [k, v] of Object.entries(preset ?? {})) p.set(k, v);
     return readFilters(p);
-  }, [params, slug]);
+  }, [params, preset]);
   const [sheet, setSheet] = useState(false);
 
   const q = useInfiniteQuery({
-    queryKey: ['sets', writeFilters(f).toString()],
+    queryKey: ['sets', writeFilters(f).toString(), !!preset],
     initialPageParam: 1,
     queryFn: ({ pageParam }) => {
       const p = writeFilters(f);
       p.set('page', String(pageParam));
       p.set('size', String(PAGE));
       if (!f.stock) p.set('stock', '0');
+      if (preset && pageParam === 1) p.set('summary', '1');
       return api<SearchResponse>(`/api/sets?${p}`);
     },
     getNextPageParam: (last) => (last.page * last.size < last.total ? last.page + 1 : undefined),
@@ -42,7 +47,7 @@ export default function SearchPage() {
 
   const themes = useQuery({ queryKey: ['themes'], queryFn: () => api<Theme[]>('/api/themes'), staleTime: 600_000 });
   const onlyTheme = f.themes.length === 1 && !f.q ? themes.data?.find((x) => x.slug === f.themes[0])?.name : undefined;
-  usePageTitle(f.q ? t('title.search', { q: f.q }) : onlyTheme ? t('title.theme', { name: onlyTheme }) : t('title.all'));
+  usePageTitle(f.q ? t('title.search', { q: f.q }) : landing ? t(landing.heading) : onlyTheme ? t('title.theme', { name: onlyTheme }) : t('title.all'));
 
   const first = q.data?.pages[0];
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -51,11 +56,11 @@ export default function SearchPage() {
   const sort = f.sort || first?.sort || (f.q ? 'relevance' : 'deal');
   const update = (next: FilterState) => {
     const p = writeFilters(next);
-    // on a theme's page: stay there while that theme alone is picked, otherwise go to the full search
-    if (slug && p.get('theme') === slug) {
-      p.delete('theme');
+    // on a theme's, gift or age page: stay there while its filters stay as they are, otherwise go to the full search
+    if (preset && Object.entries(preset).every(([k, v]) => p.get(k) === v)) {
+      for (const k of Object.keys(preset)) p.delete(k);
       setParams(p, { replace: false });
-    } else if (slug) navigate(`/pretraga?${p}`);
+    } else if (preset) navigate(`/pretraga?${p}`);
     else setParams(p, { replace: false });
   };
   const themeName = slug ? themes.data?.find((x) => x.slug === slug)?.name : undefined;
@@ -66,10 +71,17 @@ export default function SearchPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-            {f.q ? <>„{f.q}”</> : themeName ? t('theme.heading', { name: themeName }) : t('nav.search')}
+            {f.q ? <>„{f.q}”</> : landing ? t(landing.heading) : themeName ? t('theme.heading', { name: themeName }) : t('nav.search')}
           </h1>
+          {preset && first?.summary && (
+            <p className="mt-2 max-w-3xl text-pretty text-[15px] leading-relaxed text-ink-2">
+              {landing && <>{t(landing.intro)} </>}
+              <SummaryText s={first.summary} />
+            </p>
+          )}
+          {/* the count is in the sentences above on theme, gift and age pages */}
           <p className="mt-1 flex items-center gap-2 text-ink-2">
-            {first ? tn('results.count', total) : t('common.loading')}
+            {!(preset && first?.summary) && (first ? tn('results.count', total) : t('common.loading'))}
             {q.isFetching && !q.isFetchingNextPage && <Spinner className="h-4 w-4" />}
           </p>
         </div>
@@ -211,5 +223,26 @@ function ActiveChips({ f, onChange }: { f: FilterState; onChange: (f: FilterStat
         </button>
       ))}
     </div>
+  );
+}
+
+/** The list in sentences: how many sets, from what to what price, the cheapest one, how many on sale */
+function SummaryText({ s }: { s: ListSummary }) {
+  if (!s.total || s.min_price == null) return <>{t('summary.none')}</>;
+  return (
+    <>
+      {s.total === 1 ? t('summary.single', { min: money(s.min_price) }) : tn('summary.stock', s.total, { min: money(s.min_price), max: money(s.max_price) })}
+      {s.cheapest && s.total > 1 && (
+        <>
+          {' '}
+          {t('summary.cheapest')}{' '}
+          <Link to={`/set/${s.cheapest.set_num}`} className="font-semibold text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
+            {s.cheapest.name} ({s.cheapest.set_num})
+          </Link>{' '}
+          {t('summary.cheapestFor', { price: money(s.cheapest.price) })}
+        </>
+      )}
+      {s.on_sale > 0 && <> {s.on_sale === 1 ? t('summary.sale.single') : tn('summary.sale', s.on_sale)}</>}
+    </>
   );
 }

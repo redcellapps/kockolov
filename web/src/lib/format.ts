@@ -124,6 +124,26 @@ export function dateShort(d: Date): string {
   return new Intl.DateTimeFormat('sr-Latn-RS', { day: 'numeric', month: 'short', timeZone: ZONE }).format(d);
 }
 
+const GENITIVE = ['januara', 'februara', 'marta', 'aprila', 'maja', 'juna', 'jula', 'avgusta', 'septembra', 'oktobra', 'novembra', 'decembra'];
+
+/** "19. novembra 2026." for inside a sentence (Serbian date) */
+export function dateInSentence(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: ZONE })
+      .formatToParts(new Date(iso))
+      .map((x) => [x.type, x.value]),
+  );
+  return `${p.day}. ${GENITIVE[Number(p.month) - 1]} ${p.year}.`;
+}
+
+/** "19. novembra 2026. u 05:41", Serbian time wherever the page is drawn */
+export function dateTimeLong(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const time = new Intl.DateTimeFormat('sr-Latn-RS', { hour: '2-digit', minute: '2-digit', timeZone: ZONE }).format(new Date(iso));
+  return `${dateInSentence(iso)} u ${time}`;
+}
+
 export function timeHM(iso: string | null | undefined): string {
   if (!iso) return '';
   return new Intl.DateTimeFormat('sr-Latn-RS', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));

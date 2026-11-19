@@ -68,6 +68,13 @@ const schema = z.object({
   FX_URL: z.string().default('https://kurs.resenje.org/api/v1/currencies/eur/rates/today'),
   EUR_RSD_FALLBACK: z.coerce.number().default(117.2),
 
+  // IndexNow (Bing, Yandex…): after each crawl, tell them which pages changed. Any 8–128 letters, digits or dashes.
+  INDEXNOW_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9-]{8,128}$/)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+
   // Schedules (Europe/Belgrade)
   TZ_NAME: z.string().default('Europe/Belgrade'),
   CRAWL_CRON: z.string().default('30 5 * * *'),

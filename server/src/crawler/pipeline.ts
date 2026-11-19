@@ -148,7 +148,7 @@ export async function crawlShop(adapter: ShopAdapter, log: (m: string) => void, 
           // count replaces the old one (a corrected text fixes it), a text without one keeps it
           if (setNum && adapter.shop.kind === 'official' && o.description) {
             await db.query(
-              `UPDATE sets SET description = $2, pieces = COALESCE($3, pieces)
+              `UPDATE sets SET description = $2, pieces = COALESCE($3, pieces), updated_at = now()
                 WHERE set_num = $1 AND (description IS DISTINCT FROM $2 OR pieces IS DISTINCT FROM COALESCE($3::int, pieces))`,
               [setNum, o.description, o.pieces ?? null],
             );

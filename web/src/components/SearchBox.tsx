@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { t } from '../i18n';
 import { useMedia } from '../lib/media';
 import { SearchIcon, XIcon } from './icons';
+import { landingFor } from '../lib/landings';
 import { cx } from './ui';
 
 /**
@@ -26,8 +27,10 @@ export function SearchBox({ size = 'md', autoFocus, className }: { size?: 'md' |
     e.preventDefault();
     // a search from the list (or a theme's page) keeps its filters, the theme included
     const theme = /^\/tema\/([^/]+)$/.exec(location.pathname)?.[1];
-    const next = new URLSearchParams(location.pathname === '/pretraga' || theme ? params : undefined);
+    const landing = landingFor(location.pathname);
+    const next = new URLSearchParams(location.pathname === '/pretraga' || theme || landing ? params : undefined);
     if (theme) next.set('theme', decodeURIComponent(theme));
+    for (const [k, v] of Object.entries(landing?.params ?? {})) next.set(k, v);
     if (value.trim()) next.set('q', value.trim());
     else next.delete('q');
     next.delete('page');
