@@ -2,7 +2,7 @@
 title: Crni petak: koji popusti na LEGO setove su pravi
 seoTitle: Crni petak LEGO popusti: kako da proveriš da li su pravi | Kockolov
 description: Crni petak je 27. novembra. Kockolov svaki popust proverava prema redovnoj ceni u LEGO Store-u i najnižoj ceni u poslednjih 30 dana. Evo šta smo videli i kako da iskoristiš proveru.
-date: 2026-11-20
+date: 2026-11-19
 author: Milan Đorđević
 image: crni-petak-naslovna.jpg
 imageAlt: Crna naslovnica sa žutim tekstom „Koji su popusti pravi?“ i pločicom sa žutim kockicama koja pokazuje udeo pravih popusta
