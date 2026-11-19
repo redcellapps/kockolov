@@ -119,6 +119,8 @@ export interface SearchResponse {
   facets: { themes: { slug: string | null; count: number }[]; shops: { id: string; count: number }[] };
   /** asked for with summary=1 (a theme's, gift or age page): the list in a few numbers */
   summary?: ListSummary;
+  /** the search was a set number that isn't in the list: that set (out of stock, or no shop ever had it) */
+  exact?: { set_num: string; name: string; image_url: string | null; year: number | null; theme_name: string | null; has_offers: boolean };
 }
 
 export interface ListSummary {

@@ -3,8 +3,8 @@ import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router';
 import { Filters, activeFilterCount, readFilters, writeFilters, type FilterState } from '../components/Filters';
 import { FilterIcon, XIcon } from '../components/icons';
-import { SetCard, UsedOnlyCard } from '../components/SetCard';
-import { Button, CardSkeleton, EmptyState, ErrorState, Spinner, cx } from '../components/ui';
+import { ProductImage, SetCard, UsedOnlyCard } from '../components/SetCard';
+import { Button, CardSkeleton, EmptyState, ErrorState, Spinner, buttonClasses, cx } from '../components/ui';
 import { t, tn, type TKey } from '../i18n';
 import { api, type ListSummary, type SearchResponse, type Theme } from '../lib/api';
 import { displayCurrency, money, moneyNum, shopName } from '../lib/format';
@@ -81,7 +81,7 @@ export default function SearchPage() {
           )}
           {/* the count is in the sentences above on theme, gift and age pages */}
           <p className="mt-1 flex items-center gap-2 text-ink-2">
-            {!(preset && first?.summary) && (first ? tn('results.count', total) : t('common.loading'))}
+            {!(preset && first?.summary) && !(first?.exact && !total) && (first ? tn('results.count', total) : t('common.loading'))}
             {q.isFetching && !q.isFetchingNextPage && <Spinner className="h-4 w-4" />}
           </p>
         </div>
@@ -125,6 +125,8 @@ export default function SearchPage() {
                 <CardSkeleton key={i} />
               ))}
             </div>
+          ) : items.length === 0 && !usedOnly.length && first?.exact ? (
+            <ExactSet s={first.exact} />
           ) : items.length === 0 && !usedOnly.length ? (
             <EmptyState
               title={t('results.empty.title')}
@@ -140,6 +142,7 @@ export default function SearchPage() {
           ) : (
             <>
               {items.length === 0 && !usedOnly.length && <p className="mb-4 font-semibold text-ink-2">{t('results.empty.title')}</p>}
+              {first?.exact && <ExactSet s={first.exact} className="mb-6" />}
               <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
                 {items.map((s) => (
                   <SetCard key={s.set_num} s={s} />
@@ -244,5 +247,25 @@ function SummaryText({ s }: { s: ListSummary }) {
       )}
       {s.on_sale > 0 && <> {s.on_sale === 1 ? t('summary.sale.single') : tn('summary.sale', s.on_sale)}</>}
     </>
+  );
+}
+
+/** The set someone searched for by number, when no shop has it in stock: straight to its page */
+function ExactSet({ s, className }: { s: NonNullable<SearchResponse['exact']>; className?: string }) {
+  return (
+    <Link
+      to={`/set/${s.set_num}`}
+      className={cx('flex items-center gap-4 rounded-2xl border border-line bg-surface p-3 transition hover:border-ink sm:gap-5 sm:p-4', className)}
+    >
+      <ProductImage src={s.image_url} alt={s.name} className="aspect-square w-20 shrink-0 overflow-hidden rounded-xl sm:w-28" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-ink-3">
+          {[t('set.number', { num: s.set_num }), s.theme_name, s.year].filter(Boolean).join(' · ')}
+        </p>
+        <p className="mt-0.5 text-lg font-extrabold leading-snug">{s.name}</p>
+        <p className="mt-1 text-sm text-ink-2">{s.has_offers ? t('results.exact.oos') : t('results.exact.nowhere')}</p>
+      </div>
+      <span className={buttonClasses('outline', 'md', 'hidden shrink-0 sm:inline-flex')}>{t('results.exact.open')}</span>
+    </Link>
   );
 }

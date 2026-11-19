@@ -507,6 +507,12 @@ describe.skipIf(!dbAvailable)('crawl → database → API (end to end, recorded 
       // and it can be watched like any other set
       expect((await app.inject({ method: 'PUT', url: '/api/me/watchlist/40772', headers: { cookie } })).statusCode).toBeLessThan(300);
       await query("DELETE FROM sets WHERE set_num = '40772'");
+      // searching for its number leads to it (without adding it), a set in stock is just in the list
+      const found = (await app.inject({ method: 'GET', url: '/api/sets?q=40772', headers: { cookie } })).json();
+      expect(found.total).toBe(0);
+      expect(found.exact).toMatchObject({ set_num: '40772', name: 'Celebration Series: Luminous Ghost', year: 2025, has_offers: false });
+      expect(await one("SELECT 1 FROM sets WHERE set_num = '40772'")).toBeNull();
+      expect((await app.inject({ method: 'GET', url: '/api/sets?q=10280', headers: { cookie } })).json().exact).toBeUndefined();
       expect(theme.html).toContain('<h1>LEGO Harry Potter</h1>');
       expect(theme.html).toMatch(/<a href="\/set\/\d+[^"]*">LEGO \d+/);
       const home = (await head('/')).html;

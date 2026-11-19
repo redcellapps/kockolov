@@ -4,10 +4,10 @@ import { blackFriday } from '../../deals/blackFriday.js';
 import { pickFeatured } from '../../deals/featured.js';
 import { z } from 'zod';
 import { one, query } from '../../db.js';
-import { ensureCatalogSet } from '../../lib/legoCatalog.js';
+import { catalogImage, catalogSet, ensureCatalogSet } from '../../lib/legoCatalog.js';
 import { normalizeText } from '../../lib/normalize.js';
 import { listingsEnabledFor, usedAdsForSet, usedSummary } from '../../listings/service.js';
-import { audienceOf, latestDeals, offersFor } from '../audience.js';
+import { audienceOf, latestDeals, offersFor, type Audience } from '../audience.js';
 import { type ListSummary, type SearchFilters, buildLockedSearch, buildSearch, buildShopFacet, buildSummary, buildThemeFacet } from '../search.js';
 
 const csv = z
@@ -62,6 +62,19 @@ async function usedOnlySets(f: SearchFilters, viewerId: number | null, already: 
   return sets.map((x) => ({ ...x, used_count: used.get(x.set_num)?.count ?? 0, used_min_price: used.get(x.set_num)?.min ?? null }));
 }
 
+/** A set looked up by its number: from our sets (out of stock), else from the catalog of every LEGO set */
+async function exactSet(setNum: string, audience: Audience) {
+  const known = await one<{ set_num: string; name: string; image_url: string | null; year: number | null; theme_name: string | null; has_offers: boolean }>(
+    `SELECT s.set_num, s.name, s.image_url, s.year, t.name AS theme_name,
+            EXISTS (SELECT 1 FROM ${offersFor(audience)} o WHERE o.set_num = s.set_num AND o.active) AS has_offers
+       FROM sets s LEFT JOIN themes t ON t.slug = s.theme_slug WHERE s.set_num = $1`,
+    [setNum],
+  );
+  if (known) return known;
+  const c = catalogSet(setNum);
+  return c ? { set_num: setNum, name: c.name, image_url: catalogImage(setNum), year: c.year, theme_name: null, has_offers: false } : null;
+}
+
 export async function catalogRoutes(app: FastifyInstance) {
   app.get('/api/sets', async (req) => {
     const qs = searchSchema.parse(req.query);
@@ -86,6 +99,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     const wantLocked = f.audience === 'public' && s.page === 1 && !!(f.q || f.themes?.length) && !f.shops?.length && f.min === undefined && f.max === undefined && !f.sale;
     const lq = wantLocked ? buildLockedSearch(f) : null;
     const sum = qs.summary && s.page === 1 ? buildSummary(f) : null;
+    const exactNum = s.page === 1 ? qs.q?.trim().match(/^(\d{3,7})(?:-1)?$/)?.[1] : undefined;
     const [rows, themes, shops, lockedRows, summary] = await Promise.all([
       query(s.sql, s.params),
       query(tf.sql, tf.params),
@@ -93,6 +107,9 @@ export async function catalogRoutes(app: FastifyInstance) {
       lq ? query(lq.sql, lq.params) : Promise.resolve([]),
       sum ? one<ListSummary>(sum.sql, sum.params) : Promise.resolve(null),
     ]);
+    // a set number that isn't in the list (no shop has it in stock, or no shop ever sold it): the set itself,
+    // so the search still leads to its page
+    const exact = exactNum && !rows.some((r) => r.set_num === exactNum) ? await exactSet(exactNum, f.audience ?? 'public') : null;
     // second-hand ads: how many and from what price on each set found, and sets found only in ads
     const adsOn = listingsEnabledFor(req.user);
     const viewerId = req.user?.id ?? null;
@@ -108,6 +125,7 @@ export async function catalogRoutes(app: FastifyInstance) {
       items: rows.map(({ total, search_text, created_at, ...r }) => ({ ...r, used_count: used.get(r.set_num as string)?.count ?? 0, used_min_price: used.get(r.set_num as string)?.min ?? null })),
       facets: { themes, shops },
       ...(summary ? { summary } : {}),
+      ...(exact ? { exact } : {}),
     };
   });
 
