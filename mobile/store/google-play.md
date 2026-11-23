@@ -233,6 +233,20 @@ Novo u verziji 1.2:
 • Manja i brža aplikacija
 ```
 
+## 4h. Verzija 1.3 (Crni petak, sve prodavnice bez naloga)
+
+Isti postupak kao 4g, koraci 3–5 (probni APK, „Verzija za Google Play”, Production). Data safety se ne menja.
+U Store listing → Full description proveri da stoji tekst iz §3 (sve prodavnice bez naloga), stari opis to nije imao.
+
+```
+Novo u verziji 1.3:
+• Cene iz svih prodavnica vidiš bez naloga
+• Crni petak: pravi LEGO popusti, provereni prema najnižoj ceni u poslednjih 30 dana
+• Akcije LEGO Store-a (pokloni i promocije) na stranici seta
+• Opis seta i broj delova
+• Pretraga po broju seta nalazi i setove koje trenutno nema nijedna prodavnica
+```
+
 ## 5. Zatvoreni test
 
 1. **Testing → Closed testing → Create track** (ili postojeći „Alpha”) → **Testers**: napravi e-mail listu
