@@ -48,17 +48,36 @@ self.addEventListener('push', (event) => {
   );
 });
 
+// Where a tapped notification should land. iOS home-screen apps are unreliable here: WindowClient.navigate()
+// often does nothing, and a cold start may open the start URL ("/") whatever openWindow() is given. So a running
+// page is told by message to route there itself, and for a cold start the target is left in the cache for the
+// page to pick up when it loads (see takePendingNav in src/lib/pwa.ts).
+const PENDING_NAV = '/__pending-nav';
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
-      const same = wins.find((w) => w.url === target);
-      if (same) return same.focus();
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const open = wins.find((w) => new URL(w.url).origin === self.location.origin);
-      if (open && 'navigate' in open) return open.focus().then((w) => (w || open).navigate(target));
-      return self.clients.openWindow(target);
-    }),
+      if (open) {
+        open.postMessage({ type: 'open-url', url: target });
+        try {
+          await open.focus();
+        } catch {
+          /* the message is what matters */
+        }
+        return;
+      }
+      try {
+        const cache = await caches.open(CACHE);
+        await cache.put(PENDING_NAV, new Response(JSON.stringify({ url: target, t: Date.now() })));
+      } catch {
+        /* without it we still open the target below */
+      }
+      await self.clients.openWindow(target);
+    })(),
   );
 });
 

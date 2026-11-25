@@ -10,7 +10,7 @@ import { trackPage } from './lib/analytics';
 import { AuthProvider } from './lib/auth';
 import { freezeClock } from './lib/format';
 import { isApp, loadAppToken } from './lib/platform';
-import { startPwa } from './lib/pwa';
+import { startPwa, takePendingNav } from './lib/pwa';
 
 // The in-browser preview (npm run build:demo) has no server for deep links, so it routes by #hash
 const Router = import.meta.env.VITE_DEMO ? HashRouter : BrowserRouter;
@@ -46,6 +46,27 @@ function NativeBridge() {
   return null;
 }
 
+/** Tapped push notification (installed website): go to the page it was about, from a running page or a cold start */
+function PushNavigation() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const go = (url: string) => {
+      const u = new URL(url, window.location.origin);
+      if (u.origin === window.location.origin) navigate(u.pathname + u.search + u.hash, { replace: true });
+    };
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'open-url' && typeof e.data.url === 'string') go(e.data.url);
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    void takePendingNav().then((url) => {
+      if (url) go(url);
+    });
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [navigate]);
+  return null;
+}
+
 // the app reads its sign-in token from the phone before the first request
 await loadAppToken();
 
@@ -77,6 +98,7 @@ const tree = (
     <QueryClientProvider client={queryClient}>
       <Router>
         <NativeBridge />
+        <PushNavigation />
         <PageTracker />
         <ClockRelease />
         <AuthProvider>

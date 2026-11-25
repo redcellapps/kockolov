@@ -176,3 +176,21 @@ export async function pushAddress(): Promise<string | undefined> {
   const reg = await registration();
   return (await reg?.pushManager.getSubscription())?.endpoint;
 }
+
+/**
+ * A notification tapped while the app was closed: the service worker leaves the target page in its cache,
+ * because iOS may start the app on "/" whatever URL the notification opened. Returns it once, if it is fresh.
+ */
+export async function takePendingNav(): Promise<string | null> {
+  try {
+    if (!('caches' in window)) return null;
+    const cache = await caches.open('kockolov-v1');
+    const hit = await cache.match('/__pending-nav');
+    if (!hit) return null;
+    await cache.delete('/__pending-nav');
+    const { url, t } = (await hit.json()) as { url?: unknown; t?: unknown };
+    return typeof url === 'string' && typeof t === 'number' && Date.now() - t < 2 * 60_000 ? url : null;
+  } catch {
+    return null;
+  }
+}
