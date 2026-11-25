@@ -284,9 +284,9 @@ export default function LoginPage() {
               {t('register.privacyLink')}
             </Link>
             .
-            {recaptchaSiteKey && <> {t('register.recaptcha')}</>}
           </p>
         )}
+        {recaptchaSiteKey && <p className="text-center text-xs text-ink-3">{t('register.recaptcha')}</p>}
       </form>
       {mode === 'forgot' ? (
         <button onClick={() => go('login')} className="mt-5 w-full cursor-pointer text-center text-sm font-bold text-accent hover:underline">

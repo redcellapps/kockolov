@@ -14,6 +14,11 @@ export async function startNativeApp(open: (path: string) => void): Promise<void
   if (started) return;
   started = true;
   open = (path) => opener(path);
+  // an app screen, not a web page: no pinch zoom (a zoomed page moved the header under the clock on
+  // iPhone) and content drawn edge to edge, with the safe areas kept free by CSS
+  document
+    .querySelector('meta[name="viewport"]')
+    ?.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
   await App.addListener('backButton', ({ canGoBack }) => {
     if (canGoBack) window.history.back();
     else void App.exitApp();
